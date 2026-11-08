@@ -1,0 +1,75 @@
+:root {
+  --plum-900: #1b1029;
+  --plum-800: #241634;
+  --plum-700: #33203f;
+  --plum-600: #432a4c;
+  --rose-300: #f2b28c;
+  --rose-200: #ffd9a8;
+  --cream: #fdf4ec;
+  --cream-dim: rgba(253, 244, 236, 0.72);
+  --cream-faint: rgba(253, 244, 236, 0.5);
+  --line: rgba(253, 244, 236, 0.16);
+  --glass: rgba(27, 16, 41, 0.58);
+  --glass-strong: rgba(27, 16, 41, 0.82);
+  --focus: #ffd9a8;
+
+  --font-sans:
+    'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono:
+    'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Mono',
+    Menlo, Consolas, monospace;
+
+  color-scheme: dark;
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--plum-900);
+  color: var(--cream);
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
