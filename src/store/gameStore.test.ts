@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { clearInput, readMoveAxes, setTouchMove } from '../game/input'
 import { isWorldPaused, useGameStore } from './gameStore'
+import { useOnboardingStore } from './onboardingStore'
 
 describe('site interaction state', () => {
   beforeEach(() => {
     clearInput()
+    useOnboardingStore.setState({ phase: 'playing' })
     useGameStore.setState({ settingsOpen: false, nearbySiteId: null, activeSiteId: null, challengePreview: false, travelTargetId: null })
   })
 

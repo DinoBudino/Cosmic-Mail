@@ -20,9 +20,13 @@ const MOVEMENT_KEYS = new Set([
 ])
 
 const INTERACT_KEY = 'e'
+const BOOT_KEY = ' '
+const RUN_KEY = 'shift'
 
 const pressed = new Set<string>()
 const touchAxes: MoveAxes = { x: 0, y: 0 }
+let touchBoot = false
+let touchRun = false
 let interactQueued = false
 
 /** Normalizes a 2D movement vector so diagonals are not faster. */
@@ -48,6 +52,26 @@ export function clampMoveVector(x: number, z: number): MoveVector {
 export function setTouchMove(x: number, y: number): void {
   touchAxes.x = Math.min(1, Math.max(-1, x))
   touchAxes.y = Math.min(1, Math.max(-1, y))
+}
+
+/** Writes the touch jet-boot button (hold) into the shared input state. */
+export function setTouchBoot(held: boolean): void {
+  touchBoot = held
+}
+
+/** Writes the touch full-tilt run flag into the shared input state. */
+export function setTouchRun(run: boolean): void {
+  touchRun = run
+}
+
+/** True while Space (or the touch button) is held — edge/hold handled by physics. */
+export function isBootHeld(): boolean {
+  return pressed.has(BOOT_KEY) || touchBoot
+}
+
+/** True while Shift (or a full-tilt touch pad) requests running. */
+export function isRunHeld(): boolean {
+  return pressed.has(RUN_KEY) || touchRun
 }
 
 /** True once per E press. Consumed by the future interaction system. */
@@ -105,6 +129,8 @@ export function clearInput(): void {
   pressed.clear()
   touchAxes.x = 0
   touchAxes.y = 0
+  touchBoot = false
+  touchRun = false
   interactQueued = false
 }
 
@@ -120,6 +146,12 @@ export function attachInput(isPaused: () => boolean = () => false): () => void {
       return
     }
 
+    if (key === BOOT_KEY || key === RUN_KEY) {
+      pressed.add(key)
+      event.preventDefault()
+      return
+    }
+
     if (!MOVEMENT_KEYS.has(key)) return
     pressed.add(key)
     event.preventDefault()
@@ -127,7 +159,7 @@ export function attachInput(isPaused: () => boolean = () => false): () => void {
 
   const onKeyUp = (event: KeyboardEvent) => {
     const key = event.key.toLowerCase()
-    if (MOVEMENT_KEYS.has(key)) pressed.delete(key)
+    if (MOVEMENT_KEYS.has(key) || key === BOOT_KEY || key === RUN_KEY) pressed.delete(key)
   }
 
   const onBlur = () => clearInput()

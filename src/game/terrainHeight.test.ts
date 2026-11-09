@@ -85,6 +85,62 @@ describe('getTerrainHeight', () => {
   })
 })
 
+describe('regional relief (Fase 4 · Paso 1)', () => {
+  function ringStats(cx: number, cz: number) {
+    const heights: number[] = []
+    const slopes: number[] = []
+    for (let dx = -16; dx <= 16; dx += 2) {
+      for (let dz = -16; dz <= 16; dz += 2) {
+        const distance = Math.hypot(dx, dz)
+        if (distance < 8.5 || distance > 17) continue
+        heights.push(getTerrainHeight(cx + dx, cz + dz))
+        slopes.push(getTerrainSlope(cx + dx, cz + dz))
+      }
+    }
+    const mean = heights.reduce((a, b) => a + b, 0) / heights.length
+    const sd = Math.sqrt(
+      heights.reduce((a, b) => a + (b - mean) ** 2, 0) / heights.length,
+    )
+    const meanSlope = slopes.reduce((a, b) => a + b, 0) / slopes.length
+    return { mean, sd, meanSlope }
+  }
+
+  const byId = (id: string) => MARS_OBJECTS.find((o) => o.id === id)!
+
+  it('keeps every region traversable (gentle mean slope in its ring)', () => {
+    for (const object of MARS_OBJECTS) {
+      expect(ringStats(object.position.x, object.position.z).meanSlope).toBeLessThan(0.35)
+    }
+  })
+
+  it('makes InSight the calmest plain and Ingenuity smooth', () => {
+    const insight = byId('insight')
+    const ingenuity = byId('ingenuity')
+    const insightStats = ringStats(insight.position.x, insight.position.z)
+    const ingenuityStats = ringStats(ingenuity.position.x, ingenuity.position.z)
+    expect(insightStats.sd).toBeLessThan(0.35)
+    expect(insightStats.meanSlope).toBeLessThan(ingenuityStats.meanSlope)
+    expect(ingenuityStats.sd).toBeLessThan(0.5)
+  })
+
+  it('sinks Viking 1 into a depression and Opportunity into its valley', () => {
+    const viking = byId('viking1')
+    const opportunity = byId('opportunity')
+    const insight = byId('insight')
+    const vikingMean = ringStats(viking.position.x, viking.position.z).mean
+    const opportunityMean = ringStats(opportunity.position.x, opportunity.position.z).mean
+    const insightMean = ringStats(insight.position.x, insight.position.z).mean
+    expect(vikingMean).toBeLessThan(opportunityMean)
+    expect(opportunityMean).toBeLessThan(insightMean)
+  })
+
+  it('keeps wild ground more varied than the curated regions', () => {
+    const wild = ringStats(0, 38)
+    const insight = byId('insight')
+    expect(wild.sd).toBeGreaterThan(ringStats(insight.position.x, insight.position.z).sd)
+  })
+})
+
 describe('getTerrainSlope', () => {
   it('reports nearly level ground at the cleared sites', () => {
     for (const object of MARS_OBJECTS) {
@@ -131,6 +187,21 @@ describe('distanceToPath', () => {
       0,
       1e-9,
     )
+  })
+
+  it('is curved, not ruler-straight, and stays inside the playable radius', () => {
+    // Fase 4 · Paso 2: the midpoint of the straight spawn→Opportunity line
+    // must sit off the painted route, proving the loop is genuinely curved.
+    const spawn = PATH_WAYPOINTS[0]!
+    const opportunity = MARS_OBJECTS.find((o) => o.id === 'opportunity')!
+    const straightMid = {
+      x: (spawn.x + opportunity.position.x) / 2,
+      z: (spawn.z + opportunity.position.z) / 2,
+    }
+    expect(distanceToPath(straightMid.x, straightMid.z)).toBeGreaterThan(0.5)
+    for (const waypoint of PATH_WAYPOINTS) {
+      expect(Math.hypot(waypoint.x, waypoint.z)).toBeLessThanOrEqual(WORLD.playRadius)
+    }
   })
 
   it('grows with distance from the path', () => {

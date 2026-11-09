@@ -47,11 +47,101 @@ function fbm(x: number, z: number, seed: number, octaves: number): number {
   return normalization === 0 ? 0 : sum / normalization
 }
 
+interface ZoneRelief {
+  broad: number
+  dunes: number
+  ridges: number
+  basins: number
+  detail: number
+  offset: number
+}
+
+const DEFAULT_RELIEF: ZoneRelief = {
+  broad: 2.6,
+  dunes: 3.1,
+  ridges: 1.0,
+  basins: 1.1,
+  detail: 0.3,
+  offset: 0,
+}
+
+/**
+ * Fase 4 · Paso 1 — each region keeps the shared noise field but with its own
+ * relief mix, so the four Mars sites read as distinct landscapes without a
+ * new palette or a larger map. Distinction is geographic only (§5).
+ */
+const ZONE_RELIEF: Record<string, ZoneRelief> = {
+  // Valley of discoveries: gentler dunes, sunk between the mesas.
+  opportunity: { broad: 2.4, dunes: 2.0, ridges: 0.6, basins: 0.8, detail: 0.25, offset: -1.0 },
+  // Quiet plain: strongly reduced dunes and detail, the calmest ground.
+  insight: { broad: 2.0, dunes: 0.45, ridges: 0.15, basins: 0.3, detail: 0.15, offset: 0.2 },
+  // First-flight dunes: low, smooth ridges and a clear flight area.
+  ingenuity: { broad: 2.2, dunes: 1.7, ridges: 0.25, basins: 0.4, detail: 0.12, offset: -0.3 },
+  // Older, rockier ground: depression plus more broken relief and detail.
+  viking1: { broad: 2.6, dunes: 1.9, ridges: 1.7, basins: 0.9, detail: 0.55, offset: -2.0 },
+}
+
+const ZONE_INNER_RADIUS = 9
+const ZONE_OUTER_RADIUS = 26
+
+function zoneWeight(x: number, z: number, site: { x: number; z: number }): number {
+  const distance = Math.hypot(x - site.x, z - site.z)
+  return 1 - smoothstep(ZONE_INNER_RADIUS, ZONE_OUTER_RADIUS, distance)
+}
+
+/**
+ * Regional falloff (1 at the site, 0 beyond ZONE_OUTER_RADIUS), exported so
+ * terrain coloring uses the exact same geography as the height modulation.
+ */
+export function getRegionWeight(x: number, z: number, siteId: string): number {
+  const site = MARS_OBJECTS.find((object) => object.id === siteId)
+  return site ? zoneWeight(x, z, site.position) : 0
+}
+
+function reliefFor(x: number, z: number): ZoneRelief {
+  let total = 0
+  const weighted: ZoneRelief = { broad: 0, dunes: 0, ridges: 0, basins: 0, detail: 0, offset: 0 }
+
+  for (const object of MARS_OBJECTS) {
+    const weight = zoneWeight(x, z, object.position)
+    if (weight <= 0) continue
+    const params = ZONE_RELIEF[object.id] ?? DEFAULT_RELIEF
+    total += weight
+    weighted.broad += params.broad * weight
+    weighted.dunes += params.dunes * weight
+    weighted.ridges += params.ridges * weight
+    weighted.basins += params.basins * weight
+    weighted.detail += params.detail * weight
+    weighted.offset += params.offset * weight
+  }
+
+  if (total <= 0) return DEFAULT_RELIEF
+
+  // In overlapping falloffs, normalized weights prevent double-counting.
+  const blend = Math.min(1, total)
+  const mix = (zoneValue: number, defaultValue: number) =>
+    defaultValue + (zoneValue / total - defaultValue) * blend
+
+  return {
+    broad: mix(weighted.broad, DEFAULT_RELIEF.broad),
+    dunes: mix(weighted.dunes, DEFAULT_RELIEF.dunes),
+    ridges: mix(weighted.ridges, DEFAULT_RELIEF.ridges),
+    basins: mix(weighted.basins, DEFAULT_RELIEF.basins),
+    detail: mix(weighted.detail, DEFAULT_RELIEF.detail),
+    offset: (weighted.offset / total) * blend,
+  }
+}
+
 function rawHeight(x: number, z: number): number {
-  const broad = fbm(x * 0.012, z * 0.012, 7, 2) * 2.6
-  const dunes = fbm(x * 0.038, z * 0.038, 1, 4) * 3.1
-  const detail = fbm(x * 0.12, z * 0.12, 19, 2) * 0.32
-  return broad + dunes + detail
+  const relief = reliefFor(x, z)
+  const broad = fbm(x * 0.012, z * 0.012, 7, 2) * relief.broad
+  const dunes = fbm(x * 0.038, z * 0.038, 1, 4) * relief.dunes
+  // Low, broken ridges and shallow basins add readable relief without turning
+  // the playable area into steep, hard-to-traverse terrain.
+  const ridges = fbm(x * 0.075 + 13, z * 0.075 - 8, 31, 3) * relief.ridges
+  const basins = -Math.max(0, fbm(x * 0.03 - 5, z * 0.03 + 9, 43, 2)) * relief.basins
+  const detail = fbm(x * 0.12, z * 0.12, 19, 2) * relief.detail
+  return broad + dunes + ridges + basins + detail + relief.offset
 }
 
 interface FlattenZone {
@@ -91,7 +181,8 @@ export function getTerrainHeight(x: number, z: number): number {
   }
 
   const distanceFromCenter = Math.hypot(x, z)
-  height += smoothstep(46, 66, distanceFromCenter) * 10
+  // Rim scaled to the semi-open world (play radius 95).
+  height += smoothstep(85, 125, distanceFromCenter) * 12
   return height
 }
 

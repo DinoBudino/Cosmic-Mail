@@ -1,15 +1,18 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { MARS_OBJECTS } from '../data/marsObjects'
+import { MARS_OBJECTS, REGION_INFO } from '../data/marsObjects'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
-import { findNearbySite, getAutoMove } from './interaction'
+import { AstronautModel } from './AstronautModel'
 import { Companion } from './Companion'
 import {
   computeCameraOffset,
   getMovementBasis,
 } from './cameraRig'
-import { consumeInteract, readMoveAxes, type MoveAxes } from './input'
+import { consumeInteract, isBootHeld, isRunHeld, readMoveAxes, type MoveAxes } from './input'
+import { findNearbyRegion, findNearbySite, getAutoMove, resolveSiteCollision } from './interaction'
+import { stepVertical, type VerticalState } from './marsGravity'
+import { playerPosition } from './playerPosition'
 import {
   getTerrainHeight,
   getTerrainSlope,
@@ -67,25 +70,23 @@ function resolveObjectClearance(desired: THREE.Vector3): void {
 
 export function Player() {
   const group = useRef<THREE.Group>(null)
-  const body = useRef<THREE.Group>(null)
-  const leftLeg = useRef<THREE.Group>(null)
-  const rightLeg = useRef<THREE.Group>(null)
-  const leftArm = useRef<THREE.Group>(null)
-  const rightArm = useRef<THREE.Group>(null)
 
   const velocity = useRef(new THREE.Vector3())
   const axes = useRef<MoveAxes>({ x: 0, y: 0 })
   const forward = useRef(new THREE.Vector2())
   const right = useRef(new THREE.Vector2())
   const yaw = useRef(0)
-  const phase = useRef(0)
+  const motionRef = useRef(0)
+  /** Boot thrust + vertical velocity, read by AstronautModel for glow/pose. */
+  const flightRef = useRef({ thrust: 0, vy: 0, airborne: 0 })
+  const verticalRef = useRef<VerticalState>({ y: 0, vy: 0, grounded: true })
+  const prevBoot = useRef(false)
   const cameraTarget = useRef(new THREE.Vector3())
   const cameraDesired = useRef(new THREE.Vector3())
   const cameraOffset = useRef(new THREE.Vector3())
   const lookGoal = useRef(new THREE.Vector3())
 
   const { camera } = useThree()
-  const reducedMotion = useGameStore((state) => state.reducedMotion)
   const quality = useGameStore((state) => state.quality)
 
   const spawn = useMemo(
@@ -98,10 +99,34 @@ export function Player() {
     [],
   )
 
+  const contactShadowTexture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 128
+    canvas.height = 128
+    const context = canvas.getContext('2d')
+    if (!context) return null
+
+    const gradient = context.createRadialGradient(64, 64, 4, 64, 64, 64)
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.55)')
+    gradient.addColorStop(0.55, 'rgba(255, 255, 255, 0.28)')
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, 128, 128)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    return texture
+  }, [])
+
+  useEffect(() => {
+    return () => contactShadowTexture?.dispose()
+  }, [contactShadowTexture])
+
   useLayoutEffect(() => {
     const player = group.current
     if (!player) return
     player.position.copy(spawn)
+    verticalRef.current = { y: spawn.y, vy: 0, grounded: true }
 
     cameraTarget.current.set(
       spawn.x,
@@ -113,132 +138,138 @@ export function Player() {
     camera.lookAt(cameraTarget.current)
   }, [camera, spawn])
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const player = group.current
     if (!player) return
 
-    const paused = isWorldPaused()
     const dt = Math.min(delta, 0.05)
+    const paused = isWorldPaused()
     if (paused) {
       velocity.current.set(0, 0, 0)
+      motionRef.current = 0
+      flightRef.current.thrust = 0
       return
     }
 
-    if (!paused) {
-      const store = useGameStore.getState()
-      store.setNearbySite(findNearbySite(player.position))
-      if (consumeInteract()) {
-        store.openNearbySite()
-        if (isWorldPaused()) {
-          velocity.current.set(0, 0, 0)
-          return
-        }
+    const store = useGameStore.getState()
+    if (consumeInteract()) {
+      store.openNearbySite()
+      if (isWorldPaused()) {
+        velocity.current.set(0, 0, 0)
+        motionRef.current = 0
+        return
       }
-      readMoveAxes(axes.current)
-      getMovementBasis(forward.current, right.current)
+    }
 
-      const slope = getTerrainSlope(player.position.x, player.position.z)
-      const speed = PLAYER.moveSpeed * slopeSpeedFactor(slope)
-      let moveX =
-        forward.current.x * axes.current.y +
-        right.current.x * axes.current.x
-      let moveZ =
-        forward.current.y * axes.current.y +
-        right.current.y * axes.current.x
+    readMoveAxes(axes.current)
+    getMovementBasis(forward.current, right.current)
 
-      if (store.travelTargetId) {
-        if (Math.hypot(axes.current.x, axes.current.y) > 0.01) {
-          store.cancelTravel()
-        } else {
-          const travel = getAutoMove(player.position, store.travelTargetId)
-          moveX = travel.x
-          moveZ = travel.z
-          if (travel.arrived) {
-            store.cancelTravel()
-            velocity.current.set(0, 0, 0)
-          }
-        }
-      }
+    // Jet boots: press edge jumps, hold sustains thrust. Disabled while an
+    // assisted trip is active so the route can't be left in mid-air.
+    const traveling = Boolean(store.travelTargetId)
+    const bootHeld = traveling ? false : isBootHeld()
+    const jumpPressed = bootHeld && !prevBoot.current
+    prevBoot.current = bootHeld
 
-      const targetX = moveX * speed
-      const targetZ = moveZ * speed
-      const blend = 1 - Math.exp(-PLAYER.moveAccel * dt)
-      velocity.current.x += (targetX - velocity.current.x) * blend
-      velocity.current.z += (targetZ - velocity.current.z) * blend
+    const runHeld = isRunHeld()
+    const topSpeed = runHeld
+      ? PLAYER.moveSpeed * PLAYER.runSpeedMultiplier
+      : PLAYER.moveSpeed
+    const slope = getTerrainSlope(player.position.x, player.position.z)
+    const speed = topSpeed * slopeSpeedFactor(slope)
+    let moveX =
+      forward.current.x * axes.current.y +
+      right.current.x * axes.current.x
+    let moveZ =
+      forward.current.y * axes.current.y +
+      right.current.y * axes.current.x
 
-      player.position.x += velocity.current.x * dt
-      player.position.z += velocity.current.z * dt
-
-      const distanceFromCenter = Math.hypot(
-        player.position.x,
-        player.position.z,
-      )
-      if (distanceFromCenter > WORLD.playRadius) {
-        const scale = WORLD.playRadius / distanceFromCenter
-        player.position.x *= scale
-        player.position.z *= scale
-        velocity.current.x *= 0.4
-        velocity.current.z *= 0.4
-      }
-
-      player.position.y = getTerrainHeight(
-        player.position.x,
-        player.position.z,
-      )
-      store.setNearbySite(findNearbySite(player.position))
-
-      const horizontalSpeed = Math.hypot(
-        velocity.current.x,
-        velocity.current.z,
-      )
-      if (horizontalSpeed > 0.12) {
-        const targetYaw = Math.atan2(
-          -velocity.current.x,
-          -velocity.current.z,
-        )
-        let difference = targetYaw - yaw.current
-        difference = Math.atan2(Math.sin(difference), Math.cos(difference))
-        yaw.current += difference * (1 - Math.exp(-PLAYER.turnSpeed * dt))
-        player.rotation.y = yaw.current
-      }
-
-      const motion = Math.min(horizontalSpeed / PLAYER.moveSpeed, 1)
-      if (motion > 0.01) phase.current += dt * (3 + motion * 7)
-
-      if (reducedMotion) {
-        if (leftLeg.current) leftLeg.current.rotation.x = 0
-        if (rightLeg.current) rightLeg.current.rotation.x = 0
-        if (leftArm.current) {
-          leftArm.current.rotation.x = 0
-          leftArm.current.rotation.z = 0
-        }
-        if (rightArm.current) {
-          rightArm.current.rotation.x = 0
-          rightArm.current.rotation.z = 0
-        }
-        if (body.current) body.current.position.y = 0
+    if (store.travelTargetId) {
+      if (Math.hypot(axes.current.x, axes.current.y) > 0.01) {
+        store.cancelTravel()
       } else {
-        const walkSwing = Math.sin(phase.current) * 0.55 * motion
-        if (leftLeg.current) leftLeg.current.rotation.x = walkSwing
-        if (rightLeg.current) rightLeg.current.rotation.x = -walkSwing
-        if (leftArm.current) {
-          leftArm.current.rotation.x = -walkSwing * 0.75
-          leftArm.current.rotation.z =
-            Math.sin(state.clock.elapsedTime * 1.2) * 0.035 * (1 - motion)
-        }
-        if (rightArm.current) {
-          rightArm.current.rotation.x = walkSwing * 0.75
-          rightArm.current.rotation.z =
-            -Math.sin(state.clock.elapsedTime * 1.2) * 0.035 * (1 - motion)
-        }
-        if (body.current) {
-          const walkBob = Math.abs(Math.sin(phase.current)) * 0.05 * motion
-          const idleBob =
-            Math.sin(state.clock.elapsedTime * 1.6) * 0.012 * (1 - motion)
-          body.current.position.y = walkBob + idleBob
+        const travel = getAutoMove(player.position, store.travelTargetId)
+        moveX = travel.x
+        moveZ = travel.z
+        if (travel.arrived) {
+          store.cancelTravel()
+          velocity.current.set(0, 0, 0)
         }
       }
     }
+
+    const targetX = moveX * speed
+    const targetZ = moveZ * speed
+    const groundedNow = verticalRef.current.grounded
+    const accel = groundedNow ? PLAYER.moveAccel : PLAYER.airAccel
+    const blend = 1 - Math.exp(-accel * dt)
+    velocity.current.x += (targetX - velocity.current.x) * blend
+    velocity.current.z += (targetZ - velocity.current.z) * blend
+
+    player.position.x += velocity.current.x * dt
+    player.position.z += velocity.current.z * dt
+
+    const distanceFromCenter = Math.hypot(
+      player.position.x,
+      player.position.z,
+    )
+    if (distanceFromCenter > WORLD.playRadius) {
+      const scale = WORLD.playRadius / distanceFromCenter
+      player.position.x *= scale
+      player.position.z *= scale
+      velocity.current.x *= 0.4
+      velocity.current.z *= 0.4
+    }
+
+    resolveSiteCollision(player.position)
+
+    // Mars gravity: long arcs on takeoff, soft capped falls on landing.
+    const groundY = getTerrainHeight(player.position.x, player.position.z)
+    const vertical = stepVertical(verticalRef.current, groundY, dt, {
+      jumpPressed,
+      bootHeld,
+    })
+    verticalRef.current = vertical
+    player.position.y = vertical.y
+    const heightAboveGround = Math.max(0, vertical.y - groundY)
+    flightRef.current = {
+      thrust: bootHeld && !vertical.grounded ? 1 : 0,
+      vy: vertical.vy,
+      airborne: heightAboveGround,
+    }
+    playerPosition.x = player.position.x
+    playerPosition.z = player.position.z
+    playerPosition.airborne = heightAboveGround
+
+    // Rings + PIP only count close to the ground, so a high boot flight
+    // over a site never triggers inspection mid-air.
+    if (heightAboveGround <= PLAYER.inspectMaxHeight) {
+      store.setNearbySite(findNearbySite(player.position))
+    } else {
+      store.setNearbySite(null)
+    }
+    const regionId = findNearbyRegion(player.position)
+    if (regionId && !store.visitedRegions[regionId]) {
+      store.markRegionVisited(regionId)
+      if (!store.nearbySiteId) store.showPipMessage(REGION_INFO[regionId].pipMessage)
+    }
+
+    const horizontalSpeed = Math.hypot(
+      velocity.current.x,
+      velocity.current.z,
+    )
+    if (horizontalSpeed > 0.12) {
+      const targetYaw = Math.atan2(
+        -velocity.current.x,
+        -velocity.current.z,
+      )
+      let difference = targetYaw - yaw.current
+      difference = Math.atan2(Math.sin(difference), Math.cos(difference))
+      yaw.current += difference * (1 - Math.exp(-PLAYER.turnSpeed * dt))
+      player.rotation.y = yaw.current
+    }
+
+    motionRef.current = Math.min(horizontalSpeed / (PLAYER.moveSpeed * PLAYER.runSpeedMultiplier), 1)
 
     lookGoal.current.set(
       player.position.x,
@@ -263,108 +294,30 @@ export function Player() {
 
   return (
     <>
-    <Companion playerRef={group} />
-    <group ref={group} position={spawn}>
-      {quality === 'low' && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]}>
-          <circleGeometry args={[0.62, 24]} />
-          <meshBasicMaterial
-            color="#2a1420"
-            transparent
-            opacity={0.28}
-            depthWrite={false}
-          />
-        </mesh>
-      )}
+      <Companion playerRef={group} motionRef={motionRef} />
+      <group ref={group} position={spawn}>
+        {quality === 'low' && (
+          <mesh
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[0, 0.002, 0]}
+            scale={[1.0, 0.72, 1]}
+          >
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial
+              map={contactShadowTexture ?? undefined}
+              color="#2a1420"
+              transparent
+              opacity={0.55}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          </mesh>
+        )}
 
-      <group ref={leftLeg} position={[-0.22, 0.7, 0]}>
-        <mesh position={[0, -0.3, 0]} castShadow>
-          <boxGeometry args={[0.28, 0.55, 0.36]} />
-          <meshStandardMaterial color="#e8e2ed" roughness={0.7} />
-        </mesh>
-        <mesh position={[0, -0.63, -0.04]} castShadow>
-          <boxGeometry args={[0.3, 0.12, 0.46]} />
-          <meshStandardMaterial color="#c9b9c9" roughness={0.7} />
-        </mesh>
+        <Suspense fallback={null}>
+          <AstronautModel motionRef={motionRef} flightRef={flightRef} />
+        </Suspense>
       </group>
-
-      <group ref={rightLeg} position={[0.22, 0.7, 0]}>
-        <mesh position={[0, -0.3, 0]} castShadow>
-          <boxGeometry args={[0.28, 0.55, 0.36]} />
-          <meshStandardMaterial color="#e8e2ed" roughness={0.7} />
-        </mesh>
-        <mesh position={[0, -0.63, -0.04]} castShadow>
-          <boxGeometry args={[0.3, 0.12, 0.46]} />
-          <meshStandardMaterial color="#c9b9c9" roughness={0.7} />
-        </mesh>
-      </group>
-
-      <group ref={body}>
-        <mesh position={[0, 0.92, 0]} castShadow>
-          <capsuleGeometry args={[0.42, 0.62, 6, 12]} />
-          <meshStandardMaterial color="#f2e9e8" roughness={0.7} />
-        </mesh>
-
-        <mesh position={[0, 1.05, -0.4]} castShadow>
-          <boxGeometry args={[0.34, 0.22, 0.06]} />
-          <meshStandardMaterial
-            color="#e0a25f"
-            metalness={0.3}
-            roughness={0.5}
-          />
-        </mesh>
-
-        <mesh position={[0, 1.78, 0]} castShadow>
-          <sphereGeometry args={[0.54, 24, 20]} />
-          <meshStandardMaterial color="#fef6e8" roughness={0.55} />
-        </mesh>
-
-        <mesh position={[0, 1.78, -0.36]}>
-          <sphereGeometry args={[0.38, 20, 16]} />
-          <meshStandardMaterial
-            color="#191b42"
-            metalness={0.5}
-            roughness={0.18}
-          />
-        </mesh>
-
-        <mesh position={[0, 0.98, 0.5]} castShadow>
-          <boxGeometry args={[0.7, 0.8, 0.3]} />
-          <meshStandardMaterial color="#edac65" roughness={0.7} />
-        </mesh>
-
-        <mesh position={[0.36, 2.22, 0.1]} castShadow>
-          <cylinderGeometry args={[0.02, 0.02, 0.4, 6]} />
-          <meshStandardMaterial color="#c1ad9f" />
-        </mesh>
-        <mesh position={[0.36, 2.44, 0.1]}>
-          <sphereGeometry args={[0.06, 10, 8]} />
-          <meshBasicMaterial color="#ff9b6a" toneMapped={false} />
-        </mesh>
-
-        <group ref={leftArm} position={[-0.5, 1.3, 0]}>
-          <mesh position={[0, -0.28, 0]} castShadow>
-            <boxGeometry args={[0.22, 0.55, 0.26]} />
-            <meshStandardMaterial color="#e8e2ed" roughness={0.7} />
-          </mesh>
-          <mesh position={[0, -0.62, 0]} castShadow>
-            <sphereGeometry args={[0.13, 12, 10]} />
-            <meshStandardMaterial color="#d9cfd9" roughness={0.7} />
-          </mesh>
-        </group>
-
-        <group ref={rightArm} position={[0.5, 1.3, 0]}>
-          <mesh position={[0, -0.28, 0]} castShadow>
-            <boxGeometry args={[0.22, 0.55, 0.26]} />
-            <meshStandardMaterial color="#e8e2ed" roughness={0.7} />
-          </mesh>
-          <mesh position={[0, -0.62, 0]} castShadow>
-            <sphereGeometry args={[0.13, 12, 10]} />
-            <meshStandardMaterial color="#d9cfd9" roughness={0.7} />
-          </mesh>
-        </group>
-      </group>
-    </group>
     </>
   )
 }

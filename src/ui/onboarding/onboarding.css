@@ -1,0 +1,2075 @@
+/* ------------------------------------------------------------ Onboarding */
+
+.onboarding {
+  position: absolute;
+  inset: 0;
+  /* Cabin phases manage their own height (100dvh, no page scroll);
+     only the tall passport may scroll the page. */
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding:
+    calc(28px + env(safe-area-inset-top, 0px))
+    calc(20px + env(safe-area-inset-right, 0px))
+    calc(28px + env(safe-area-inset-bottom, 0px))
+    calc(20px + env(safe-area-inset-left, 0px));
+  /* Black space; the living 3D scene (MenuScene) is the backdrop. */
+  background: #050309;
+  color: var(--cream);
+}
+
+.onboarding__backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.onboarding__star,
+.onboarding__planet,
+.onboarding__moon {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.onboarding__star {
+  width: var(--size, 3px);
+  height: var(--size, 3px);
+  left: var(--x, 50%);
+  top: var(--y, 50%);
+  background: var(--cream);
+  opacity: 0.55;
+  animation: onboarding-twinkle 4.5s ease-in-out infinite;
+}
+
+.onboarding__planet {
+  width: 180px;
+  height: 180px;
+  right: -40px;
+  top: 8%;
+  background: radial-gradient(circle at 32% 30%, #f2b28c 0%, #b77b65 55%, #7c4a63 100%);
+  opacity: 0.5;
+  box-shadow: inset -28px -18px 60px rgba(27, 16, 41, 0.75);
+}
+
+.onboarding__moon {
+  width: 54px;
+  height: 54px;
+  left: 9%;
+  bottom: 12%;
+  background: radial-gradient(circle at 35% 32%, #fdf4ec 0%, #d9c7c2 70%, #b8a6ad 100%);
+  opacity: 0.55;
+}
+
+@keyframes onboarding-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 0.85; transform: scale(1.15); }
+}
+
+.onboarding__panel {
+  position: relative;
+  z-index: 1;
+  width: min(680px, 100%);
+  box-sizing: border-box;
+  padding: clamp(26px, 5vw, 44px);
+  border: 1px solid rgba(253, 244, 236, 0.18);
+  border-radius: 28px;
+  background: linear-gradient(165deg, rgba(67, 42, 76, 0.5) 0%, rgba(27, 16, 41, 0.88) 60%);
+  box-shadow:
+    0 40px 90px -30px rgba(5, 2, 10, 0.95),
+    inset 0 1px 0 rgba(253, 244, 236, 0.1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  text-align: center;
+}
+
+.onboarding__panel--wide { width: min(820px, 100%); }
+
+.onboarding__eyebrow {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--rose-300);
+}
+
+.onboarding__title {
+  margin: 0;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.onboarding__subtitle {
+  margin: 14px auto 0;
+  max-width: 44ch;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--cream-dim);
+}
+
+.onboarding__pip {
+  margin: 18px auto 0;
+  max-width: 46ch;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--rose-200);
+}
+
+.onboarding__progress {
+  margin: 20px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+}
+
+.onboarding__progress-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.onboarding__progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(253, 244, 236, 0.22);
+}
+
+.onboarding__progress-dot.is-done { background: var(--rose-300); }
+.onboarding__progress-dot.is-current { background: var(--cream); box-shadow: 0 0 10px 1px rgba(253, 244, 236, 0.6); }
+
+.onboarding__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.onboarding__cta {
+  min-width: min(280px, 100%);
+  padding: 15px 28px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe6c4 0%, #f2b28c 100%);
+  color: var(--plum-900);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 14px 34px -12px rgba(242, 178, 140, 0.65);
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.onboarding__cta:hover { filter: brightness(1.06); }
+.onboarding__cta:active { transform: translateY(1px); }
+.onboarding__cta:disabled { opacity: 0.5; cursor: default; filter: none; }
+
+.onboarding__quiet {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cream-dim);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.onboarding__quiet:hover { color: var(--cream); }
+
+.onboarding__back {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cream-faint);
+  font-size: 0.8rem;
+}
+
+.onboarding__back:hover { color: var(--cream); }
+
+/* ------------------------------------------------------------ Choice cards */
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+  text-align: left;
+}
+
+/* Five answers: the fifth card spans the full row. */
+.choice-grid .choice-card:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.choice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 108px;
+  padding: 18px 20px;
+  border: 1px solid rgba(253, 244, 236, 0.16);
+  border-radius: 20px;
+  background: rgba(253, 244, 236, 0.05);
+  color: var(--cream);
+  text-align: left;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.choice-card:hover {
+  background: rgba(253, 244, 236, 0.1);
+  border-color: rgba(255, 217, 168, 0.45);
+  transform: translateY(-2px);
+}
+
+.choice-card:active { transform: translateY(0); }
+
+.choice-card.is-selected {
+  background: linear-gradient(165deg, rgba(255, 217, 168, 0.22), rgba(242, 178, 140, 0.12));
+  border-color: var(--rose-200);
+  box-shadow: 0 0 0 1px var(--rose-200), 0 12px 28px -14px rgba(242, 178, 140, 0.5);
+}
+
+.choice-card__title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.choice-card__hint {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--cream-dim);
+}
+
+.choice-card__mark {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rose-200);
+}
+
+/* ------------------------------------------------------------ Name prompt */
+
+.name-panel {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid rgba(253, 244, 236, 0.16);
+  border-radius: 20px;
+  background: rgba(12, 6, 18, 0.42);
+  text-align: center;
+}
+
+.name-panel__label {
+  display: block;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+}
+
+.name-panel__input {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 1px solid rgba(255, 217, 168, 0.4);
+  border-radius: 14px;
+  background: rgba(27, 16, 41, 0.85);
+  color: var(--cream);
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+.name-panel__input::placeholder { color: var(--cream-faint); font-weight: 400; }
+
+.name-panel__hint {
+  margin: 10px 0 0;
+  font-size: 0.76rem;
+  color: var(--cream-faint);
+}
+
+/* ------------------------------------------------------------ Reveal */
+
+.reveal {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+}
+
+.reveal__sigil {
+  display: grid;
+  place-items: center;
+  width: 110px;
+  height: 110px;
+  border: 1px solid rgba(255, 217, 168, 0.55);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 230, 196, 0.3), rgba(242, 178, 140, 0.08) 70%);
+  font-size: 3rem;
+  color: var(--rose-200);
+  box-shadow: 0 0 60px -10px rgba(255, 217, 168, 0.55);
+  animation: reveal-glow 2.6s ease-in-out infinite;
+}
+
+@keyframes reveal-glow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 50px -12px rgba(255, 217, 168, 0.45); }
+  50% { transform: scale(1.04); box-shadow: 0 0 72px -10px rgba(255, 217, 168, 0.7); }
+}
+
+.reveal__trait {
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.reveal__description {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--cream-dim);
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------ Profiles & modules */
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+  text-align: left;
+}
+
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid rgba(253, 244, 236, 0.16);
+  border-radius: 22px;
+  background: rgba(253, 244, 236, 0.05);
+  color: var(--cream);
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.profile-card:hover {
+  background: rgba(253, 244, 236, 0.1);
+  border-color: rgba(255, 217, 168, 0.45);
+  transform: translateY(-2px);
+}
+
+.profile-card.is-selected {
+  border-color: var(--rose-200);
+  box-shadow: 0 0 0 1px var(--rose-200);
+  background: linear-gradient(165deg, rgba(255, 217, 168, 0.2), rgba(242, 178, 140, 0.1));
+}
+
+.profile-card__silhouette {
+  display: grid;
+  place-items: center;
+  height: 92px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(253, 244, 236, 0.22) 0 18%, transparent 19%),
+    radial-gradient(circle at 50% 34%, var(--accent, #f2b28c) 0 16%, transparent 17%),
+    linear-gradient(180deg, rgba(12, 6, 18, 0.5), rgba(12, 6, 18, 0.2));
+  font-size: 1.9rem;
+  color: var(--cream);
+}
+
+.profile-card__name { font-size: 1.05rem; font-weight: 700; }
+
+.profile-card__trait {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rose-200);
+}
+
+.profile-card__bio {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--cream-dim);
+}
+
+.profile-card__who {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+}
+
+/* ------------------------------------------------------------ Passport */
+
+.passport {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid rgba(255, 217, 168, 0.5);
+  border-radius: 24px;
+  background:
+    linear-gradient(165deg, rgba(255, 230, 196, 0.14), rgba(27, 16, 41, 0.4) 55%),
+    rgba(12, 6, 18, 0.55);
+  text-align: left;
+}
+
+.passport__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed rgba(253, 244, 236, 0.25);
+}
+
+.passport__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.passport__mission {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rose-200);
+}
+
+.passport__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.passport__field dt {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+}
+
+.passport__field dd {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.passport__stamps {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.passport__stamp {
+  aspect-ratio: 1;
+  border: 1px dashed rgba(253, 244, 236, 0.3);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  color: var(--rose-200);
+}
+
+.passport__stamp.is-filled {
+  border-style: solid;
+  border-color: rgba(255, 217, 168, 0.65);
+  background: rgba(255, 217, 168, 0.14);
+}
+
+.passport__modules {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.passport__module {
+  padding: 10px 8px;
+  border: 1px dashed rgba(253, 244, 236, 0.3);
+  border-radius: 12px;
+  font-size: 0.68rem;
+  text-align: center;
+  color: var(--cream-dim);
+  line-height: 1.35;
+}
+
+.passport__module.is-unlocked {
+  border-style: solid;
+  border-color: rgba(255, 217, 168, 0.65);
+  background: rgba(255, 217, 168, 0.14);
+  color: var(--cream);
+  font-weight: 650;
+}
+
+.passport__slot-label {
+  margin-top: 18px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+}
+
+/* ------------------------------------------------------------ Responsive */
+
+@media (max-width: 640px) {
+  .choice-grid,
+  .profile-grid,
+  .passport__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding__panel { padding: 22px 16px; border-radius: 22px; }
+  .choice-card { min-height: 0; }
+  .passport__stamps { grid-template-columns: repeat(4, 1fr); }
+  .passport__modules { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ------------------------------------------------------------ Title screen */
+
+.onboarding[data-phase="menu"] {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: #050309;
+}
+
+.menu-scene {
+  position: absolute;
+  inset: 0;
+}
+
+.menu-scene canvas {
+  display: block;
+}
+
+.menu {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding:
+    calc(11dvh + env(safe-area-inset-top, 0px))
+    20px
+    calc(18px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+.menu__header {
+  animation: menu-rise 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes menu-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.menu__title {
+  margin: 0;
+  font-size: clamp(2.6rem, 9vw, 5.4rem);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  color: var(--cream);
+  text-shadow: 0 0 46px rgba(255, 217, 168, 0.28);
+}
+
+.menu__tagline {
+  margin: 16px 0 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-transform: uppercase;
+  color: var(--cream);
+  opacity: 0.85;
+}
+
+/* Subtle postal/cosmic detail: a dashed route line with one star,
+   joining the subtitle to the menu below. */
+.menu__divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+  color: var(--rose-200);
+  font-size: 0.62rem;
+}
+
+.menu__divider::before,
+.menu__divider::after {
+  content: '';
+  width: 44px;
+  border-top: 1px dashed rgba(253, 244, 236, 0.35);
+}
+
+.menu__nav {
+  margin-top: 12dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  animation: menu-rise 900ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+}
+
+.menu__option {
+  position: relative;
+  min-height: 48px;
+  padding: 12px 34px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cream-dim);
+  font-size: clamp(1.05rem, 2.6vw, 1.32rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    transform 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+/* Selection indicator: a warm star that slides in, plus a soft
+   underline accent — warm light, never a dashboard card. */
+.menu__option::before {
+  content: '✦';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translate(-6px, -50%);
+  color: var(--rose-200);
+  opacity: 0;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.menu__option::after {
+  content: '';
+  position: absolute;
+  left: 34px;
+  right: 34px;
+  bottom: 6px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 217, 168, 0.75), transparent);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.menu__option.is-selected {
+  color: var(--cream);
+  transform: translateX(4px);
+}
+
+.menu__option.is-selected::before {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.menu__option.is-selected::after {
+  opacity: 1;
+}
+
+.menu__option:focus-visible {
+  outline: 2px solid rgba(255, 217, 168, 0.8);
+  outline-offset: 3px;
+}
+
+.menu__option:active {
+  transform: translateY(1px);
+}
+
+/* Confirm pulse: a brief warm glow as the action starts. */
+.menu__option.is-confirming {
+  color: var(--cream);
+  background: rgba(255, 217, 168, 0.12);
+  box-shadow: 0 0 28px -6px rgba(255, 217, 168, 0.55);
+  transform: scale(1.04);
+}
+
+.menu__footer {
+  margin-top: auto;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--cream-faint);
+  font-size: 0.72rem;
+  pointer-events: auto;
+}
+
+.menu__footer:hover {
+  color: var(--cream-dim);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+@media (max-width: 640px) {
+  .menu { padding-top: calc(8dvh + env(safe-area-inset-top, 0px)); }
+  .menu__nav { margin-top: 10dvh; }
+  .menu__tagline { letter-spacing: 0.22em; text-indent: 0.22em; }
+  .menu__option { min-height: 52px; padding-inline: 28px; }
+}
+
+@media (max-height: 640px) {
+  .menu__nav { margin-top: 7dvh; }
+  .menu__title { font-size: clamp(2rem, 7vw, 3.2rem); }
+}
+
+.game[data-reduced-motion="true"] .menu__header,
+.game[data-reduced-motion="true"] .menu__nav {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu__header,
+  .menu__nav {
+    animation: none;
+  }
+}
+
+.menu__option:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.menu__option:disabled::before {
+  opacity: 0;
+}
+
+/* ------------------------------------------------------------ Identity (name) */
+
+.onboarding[data-phase="name"] {
+  display: block;
+  padding: 0;
+  overflow-y: auto;
+  background: #050309;
+}
+
+.identity {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding:
+    calc(9dvh + env(safe-area-inset-top, 0px))
+    20px
+    calc(28px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+.identity__back {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cream-faint);
+  font-size: 0.82rem;
+  pointer-events: auto;
+}
+
+.identity__back:hover {
+  color: var(--cream);
+}
+
+/* Fixed top-left cluster (Back + Settings) shared by cabin steps. */
+.cabin-controls {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+}
+
+.cabin-controls .identity__back {
+  position: static;
+}
+
+.identity__header {
+  max-width: 620px;
+}
+
+.identity__title {
+  margin: 16px 0 0;
+  font-size: clamp(1.55rem, 4.6vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.identity__form {
+  margin-top: 9dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: min(430px, 88vw);
+  pointer-events: auto;
+}
+
+.identity__input {
+  width: 100%;
+  padding: 14px 10px;
+  border: 0;
+  border-bottom: 1px solid rgba(253, 244, 236, 0.35);
+  border-radius: 0;
+  background: transparent;
+  color: var(--cream);
+  font: inherit;
+  font-size: 1.7rem;
+  font-weight: 650;
+  text-align: center;
+  caret-color: var(--rose-200);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.identity__input::placeholder {
+  color: var(--cream-faint);
+  font-weight: 400;
+}
+
+.identity__input:focus {
+  outline: none;
+  border-bottom-color: var(--rose-200);
+  box-shadow: 0 20px 26px -24px rgba(255, 217, 168, 0.55);
+}
+
+.identity__hint {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  color: var(--cream-faint);
+}
+
+@media (max-width: 640px) {
+  .identity__form { margin-top: 7dvh; }
+  .identity__input { font-size: 1.4rem; }
+}
+
+/* Fade through black when switching between title scene and cabin. */
+.scene-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: #050309;
+  pointer-events: none;
+  /* Starts fully black (covers the scene cut) and reveals the new
+     scene — never the reverse order the user saw as a flash. */
+  animation: scene-fade 800ms ease-out both;
+}
+
+@keyframes scene-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-fade { animation: none; }
+}
+
+/* ------------------------------------------------------------ Cabin (all steps) */
+
+.cabin {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Bubble up top (beside PIP), tablet down low over the 3D console:
+     no dead black band under the tablet. */
+  justify-content: space-between;
+  gap: 14px;
+  padding:
+    calc(10dvh + env(safe-area-inset-top, 0px))
+    20px
+    calc(7dvh + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+/* PIP's bubble floats BELOW the 3D PIP (his head is near the top of
+   the frame), separate from the tablet below. */
+.cabin .pip-bubble-wrap {
+  align-self: center;
+  margin-top: 21dvh;
+}
+
+.cabin .onboarding__panel {
+  pointer-events: auto;
+}
+
+.cabin .pip-bubble {
+  animation-delay: 150ms;
+}
+
+@media (max-width: 640px) {
+  .cabin { gap: 14px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+}
+
+@media (max-height: 700px) {
+  .cabin { padding-top: calc(6dvh + env(safe-area-inset-top, 0px)); padding-bottom: calc(4dvh + env(safe-area-inset-bottom, 0px)); }
+  .cabin .pip-bubble-wrap { margin-top: 4dvh; }
+  .tablet { padding: 12px 14px 10px; }
+}
+
+/* ------------------------------------------------------------ Questions (floating) */
+
+.quest {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: min(680px, 94vw);
+  pointer-events: none;
+}
+
+/* Back lives in the viewport corner, never inside the tablet. */
+.quest .identity__back {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  z-index: 6;
+}
+
+.quest__title {
+  margin: 16px 0 0;
+  font-size: clamp(1.5rem, 4.2vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  text-shadow: 0 2px 26px rgba(5, 3, 9, 0.85);
+}
+
+.quest__progress {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+/* ------------------------------------------------------------ Tablet (answers) */
+
+/* The answers live on a holographic tablet floating in the cabin: an
+   in-world object, so the ritual never reads as a web form. */
+.tablet {
+  position: relative;
+  width: min(700px, 94vw);
+  padding: 16px 18px 12px;
+  border: 1px solid rgba(143, 227, 216, 0.45);
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(165deg, rgba(67, 120, 140, 0.58) 0%, rgba(27, 16, 41, 0.82) 60%, rgba(43, 24, 58, 0.78) 100%);
+  box-shadow:
+    0 30px 60px -24px rgba(5, 2, 10, 0.95),
+    0 0 34px -8px rgba(143, 227, 216, 0.35),
+    inset 0 1px 0 rgba(216, 244, 240, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  /* Pre-result tablets (questions, copilot, module) float higher;
+     the reveal tablet keeps the lower -5dvh float (see below). */
+  transform: perspective(900px) rotateX(5deg) translateY(-18dvh);
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 450ms ease, visibility 450ms;
+}
+
+/* Scanlines over the hologram screen. */
+.tablet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(216, 244, 240, 0.045) 0 1px,
+    transparent 1px 4px
+  );
+  pointer-events: none;
+}
+
+/* Corner brackets like a targeting hologram (inside the clip). */
+.tablet::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 15px;
+  border: 1px solid rgba(143, 227, 216, 0.22);
+  clip-path: polygon(
+    0 0, 26px 0, 26px 3px, 3px 3px, 3px 26px, 0 26px,
+    0 calc(100% - 26px), 3px calc(100% - 26px), 3px calc(100% - 3px), 26px calc(100% - 3px), 26px 100%, 0 100%,
+    calc(100% - 26px) 100%, calc(100% - 26px) calc(100% - 3px), calc(100% - 3px) calc(100% - 3px), calc(100% - 3px) calc(100% - 26px), 100% calc(100% - 26px), 100% 100%,
+    100% 26px, calc(100% - 3px) 26px, calc(100% - 3px) 3px, calc(100% - 26px) 3px, calc(100% - 26px) 0, 100% 0
+  );
+  pointer-events: none;
+}
+
+.tablet.is-ready {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tablet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(232, 176, 75, 0.3);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--rose-200);
+}
+
+.tablet .quest__progress {
+  margin-top: 0;
+}
+
+/* Answers as a proper list on the tablet screen: action on the left,
+   its short description on the right, hairline separators. */
+.choice-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.choice-option {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 14px 11px 34px;
+  border: 0;
+  border-bottom: 1px solid rgba(216, 244, 240, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cream-dim);
+  text-align: left;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.choice-option::before {
+  content: '✦';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8FE3D8;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.choice-option:last-child {
+  border-bottom: 0;
+}
+
+.choice-option:hover,
+.choice-option:focus-visible {
+  color: var(--cream);
+  background: rgba(143, 227, 216, 0.1);
+}
+
+.choice-option:hover::before,
+.choice-option:focus-visible::before {
+  opacity: 1;
+}
+
+.choice-option:active {
+  transform: translateY(1px);
+}
+
+.choice-option__title {
+  flex: none;
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.choice-option__hint {
+  font-size: 0.8rem;
+  font-weight: 400;
+  text-align: right;
+  color: rgba(253, 244, 236, 0.78);
+}
+
+@media (max-width: 640px) {
+  .choice-option { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .choice-option__hint { text-align: left; }
+}
+
+.choice-option:hover .choice-option__hint,
+.choice-option:focus-visible .choice-option__hint {
+  color: var(--cream-dim);
+}
+
+/* ------------------------------------------------------------ Tablet wide + holo cards */
+
+.tablet--wide {
+  width: min(840px, 96vw);
+  /* Fits its content: no inner scrollbar. Only the expanded "other
+     spirits" grid scrolls (see .holo-grid--scroll). */
+}
+
+.tablet__header-trait {
+  color: var(--cream);
+  letter-spacing: 0.12em;
+}
+
+.tablet__cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.tablet__cta .menu__option {
+  color: var(--rose-200);
+}
+
+.holo-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.holo-grid--scroll {
+  max-height: 46dvh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.holo-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 16px 18px;
+  border: 1px solid rgba(216, 244, 240, 0.16);
+  border-radius: 14px;
+  background: rgba(216, 244, 240, 0.04);
+  color: var(--cream-dim);
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.holo-card:hover,
+.holo-card:focus-visible {
+  background: rgba(143, 227, 216, 0.09);
+  border-color: rgba(143, 227, 216, 0.5);
+  transform: translateY(-2px);
+  color: var(--cream);
+}
+
+/* Hologram glyph: emoji inside a thin glowing ring, no solid disc. */
+.holo-card__glyph {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(143, 227, 216, 0.55);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(143, 227, 216, 0.22), rgba(27, 16, 41, 0.4));
+  box-shadow: 0 0 18px -4px rgba(143, 227, 216, 0.7);
+  font-size: 1.35rem;
+}
+
+.holo-card__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--cream);
+}
+
+.holo-card__trait {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rose-200);
+}
+
+.holo-card__bio {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--cream-dim);
+}
+
+.holo-card__inspiration {
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--cream-faint);
+}
+
+.holo-card__cta {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8FE3D8;
+}
+
+/* ------------------------------------------------------------ Reveal sequence */
+
+.reveal-tablet {
+  width: min(560px, 94vw);
+  /* The result keeps the lower float while pre-result tablets ride higher. */
+  transform: perspective(900px) rotateX(5deg) translateY(-3dvh);
+}
+
+.reveal {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 14px;
+  /* Fixed stage height: the tablet never resizes between scan, sigil
+     and naming — the sequence plays inside a constant frame. */
+  min-height: 330px;
+  padding: 26px 10px 18px;
+  text-align: center;
+}
+
+.reveal-sigil-wrap {
+  visibility: hidden;
+}
+
+.reveal-sigil-wrap.is-shown {
+  visibility: visible;
+  animation: sigil-pop 500ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.reveal-copy {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-height: 98px;
+  align-content: start;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.reveal-copy.is-shown {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 400ms ease;
+}
+
+.reveal-stamp {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.reveal-stamp.is-shown {
+  opacity: 1;
+  visibility: visible;
+}
+
+.reveal-cta {
+  min-height: 52px;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.reveal-cta.is-shown {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 400ms ease;
+}
+
+/* Scan sweep while the calibration runs. */
+.reveal-scan {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.reveal-scan__line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #8FE3D8, transparent);
+  box-shadow: 0 0 18px 2px rgba(143, 227, 216, 0.6);
+  animation: reveal-scan 800ms linear both;
+}
+
+@keyframes reveal-scan {
+  from { top: 4%; }
+  to { top: 94%; }
+}
+
+/* Sigil ring that draws itself around the spirit emblem. */
+.reveal-sigil-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  animation: sigil-pop 500ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes sigil-pop {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.reveal-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.reveal-ring circle {
+  fill: none;
+  stroke: rgba(143, 227, 216, 0.8);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 340;
+  stroke-dashoffset: 340;
+  animation: ring-draw 700ms ease-out both;
+  filter: drop-shadow(0 0 6px rgba(143, 227, 216, 0.7));
+}
+
+@keyframes ring-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.reveal-sigil {
+  font-size: 3rem;
+  filter: drop-shadow(0 0 14px rgba(255, 217, 168, 0.55));
+}
+
+.reveal-name {
+}
+
+.reveal-stamp {
+  margin: 0;
+  padding: 5px 12px;
+  border: 2px solid rgba(143, 227, 216, 0.7);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8FE3D8;
+  transform: rotate(-4deg);
+  animation: seal-slam 320ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-scan__line,
+  .reveal-sigil-wrap,
+  .reveal-name,
+  .reveal-stamp {
+    animation: none;
+  }
+  .reveal-ring circle {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .holo-grid { grid-template-columns: 1fr; }
+}
+
+/* Passport: the only tall step — allow page scroll there. */
+.onboarding[data-phase="passport"] {
+  overflow-y: auto;
+}
+
+/* Passport: no glass panel — the postal card floats over the cabin. */
+.onboarding[data-phase="passport"] .onboarding__panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+}
+
+/* ------------------------------------------------------------ Route select */
+
+.zone-row--soon {
+  opacity: 0.5;
+}
+
+.zone-objects {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(216, 244, 240, 0.14);
+}
+
+.zone-objects__label {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+}
+
+.zone-objects__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.zone-objects__slot {
+  padding: 9px 12px;
+  border: 1px dashed rgba(253, 244, 236, 0.3);
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--cream-dim);
+}
+
+.tablet__open-hint {
+  margin: 10px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #8FE3D8;
+  animation: pip-blink 900ms steps(2) infinite;
+}
+
+/* ------------------------------------------------------------ Control-center hub */
+
+.hub {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  width: min(1120px, 96vw);
+  pointer-events: none;
+}
+
+.hub .identity__back {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  z-index: 6;
+}
+
+.hub .quest {
+  width: auto;
+  min-width: 0;
+  animation: none;
+}
+
+.hub .tablet {
+  width: 100%;
+  transform: perspective(900px) rotateX(5deg);
+  pointer-events: auto;
+}
+
+.hub__passport {
+  pointer-events: auto;
+  min-width: 0;
+}
+
+/* Pinned passport card: compact, no actions (navigation is beside it). */
+.passport--pinned {
+  width: min(420px, 92vw) !important;
+  padding: 14px 16px !important;
+  border-radius: 18px;
+}
+
+.passport--pinned .passport__header {
+  padding-bottom: 10px;
+}
+
+.passport--pinned .passport__fields {
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.passport--pinned .passport__field dd {
+  font-size: 0.88rem;
+}
+
+.passport--pinned .passport__slot-label {
+  margin-top: 12px;
+}
+
+.passport--pinned .passport__stamps {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.passport--pinned .passport__stamp {
+  border-radius: 7px;
+}
+
+.passport--pinned .passport__modules {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.passport--pinned .passport__module {
+  padding: 7px 6px;
+}
+
+@media (max-width: 900px) {
+  .hub {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 760px) {
+  .hub {
+    max-height: 78dvh;
+    overflow-y: auto;
+    padding-bottom: 10px;
+  }
+}
+
+/* ------------------------------------------------------------ Boarding (name) */
+
+.onboarding[data-phase="name"] {
+  overflow: hidden;
+}
+
+.boarding {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding:
+    calc(20px + env(safe-area-inset-top, 0px))
+    20px
+    calc(24px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+/* Soft focus + dim over the ship close-up: the label must stay readable. */
+.boarding__veil {
+  /* Full-viewport tint (no backdrop blur: its edge used to draw a
+     visible rectangle over the scene). */
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(5, 3, 9, 0.06) 0%, rgba(5, 3, 9, 0.34) 100%);
+  pointer-events: none;
+}
+
+/* Cockpit vignette: soft dark corners like a window frame. */
+.boarding__frame {
+  position: absolute;
+  inset: 0;
+  border-radius: 42px;
+  box-shadow:
+    inset 0 0 70px 18px rgba(5, 3, 9, 0.55),
+    inset 0 0 0 8px rgba(27, 16, 41, 0.4);
+  animation: boarding-fade-in 1.4s ease-out both;
+}
+
+@keyframes boarding-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* PIP speaks first in a small, compact bubble; the step content
+   appears after it (see the per-step entrance delays). */
+.pip-bubble-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  max-width: min(460px, 92vw);
+  /* When the panel crowds the bubble, it rises to clear it — smoothly. */
+  transition: transform 550ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cabin__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.pip-bubble__voice {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  flex: none;
+  border: 1px solid rgba(244, 180, 223, 0.35);
+  border-radius: 14px;
+  background: rgba(27, 16, 41, 0.88);
+  font-size: 1.05rem;
+  pointer-events: auto;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.pip-bubble__voice:hover {
+  border-color: rgba(244, 180, 223, 0.65);
+  background: rgba(43, 24, 58, 0.92);
+}
+
+.pip-bubble__voice[aria-pressed="false"] {
+  opacity: 0.65;
+}
+
+.pip-bubble {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px 10px 12px;
+  border: 1px solid rgba(244, 180, 223, 0.4);
+  border-radius: 16px;
+  background: rgba(27, 16, 41, 0.88);
+  box-shadow: 0 14px 30px -16px rgba(5, 2, 10, 0.9);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color 160ms ease;
+}
+
+.pip-bubble:hover {
+  border-color: rgba(244, 180, 223, 0.65);
+}
+
+.pip-bubble__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pip-bubble__next {
+  align-self: flex-end;
+  font-size: 0.72rem;
+  color: var(--rose-300);
+  animation: pip-blink 900ms steps(2) infinite;
+}
+
+.pip-bubble .pip-avatar {
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+
+.pip-bubble__name {
+  margin: 0 0 2px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--rose-300);
+}
+
+.pip-bubble__text {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--cream);
+  min-height: 2.4em;
+}
+
+/* ------------------------------------------------------------ Shipping label */
+
+.shipping-label {
+  position: relative;
+  width: min(440px, 92vw);
+  padding: 22px 24px 18px;
+  border-radius: 6px;
+  background: linear-gradient(170deg, #fdf4ec 0%, #f3e2cf 100%);
+  color: #2a1a33;
+  box-shadow:
+    0 34px 70px -24px rgba(5, 2, 10, 0.95),
+    0 0 0 1px rgba(253, 244, 236, 0.25);
+  /* Floated higher, clear of the 3D console below. */
+  transform: rotate(-1.2deg) translateY(-13dvh);
+  pointer-events: auto;
+}
+
+@keyframes label-rise {
+  from { opacity: 0; transform: translateY(16px) rotate(-1.2deg); }
+  to { opacity: 1; transform: translateY(-13dvh) rotate(-1.2deg); }
+}
+
+.shipping-label::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1.5px dashed rgba(42, 26, 51, 0.35);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.shipping-label__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #c97a63;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #8a4a3a;
+}
+
+.shipping-label__stamp {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 40px;
+  border: 2px dashed rgba(138, 74, 58, 0.6);
+  border-radius: 3px;
+  background: rgba(201, 122, 99, 0.14);
+  color: #8a4a3a;
+  font-size: 1rem;
+}
+
+.shipping-label__field {
+  margin-top: 14px;
+}
+
+.shipping-label__field label,
+.shipping-label__static-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #8a4a3a;
+}
+
+.shipping-label__input {
+  width: 100%;
+  padding: 6px 2px 8px;
+  border: 0;
+  border-bottom: 1.5px dashed rgba(42, 26, 51, 0.45);
+  border-radius: 0;
+  background: transparent;
+  color: #2a1a33;
+  font: inherit;
+  font-size: 1.45rem;
+  font-weight: 700;
+  caret-color: #c97a63;
+}
+
+.shipping-label__input::placeholder {
+  color: rgba(42, 26, 51, 0.35);
+  font-weight: 400;
+}
+
+.shipping-label__input:focus {
+  outline: none;
+  border-bottom-color: #c97a63;
+  border-bottom-style: solid;
+}
+
+.shipping-label__input:disabled {
+  opacity: 0.7;
+}
+
+.shipping-label__static-value {
+  display: block;
+  margin-top: 5px;
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: #4a3558;
+}
+
+.shipping-label__contents {
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.shipping-label__field--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(42, 26, 51, 0.18);
+}
+
+.shipping-label__fragile {
+  margin-top: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a4a3a;
+}
+
+.shipping-label__barcode {
+  width: 92px;
+  height: 22px;
+  background: repeating-linear-gradient(
+    90deg,
+    #2a1a33 0 2px,
+    transparent 2px 5px,
+    #2a1a33 5px 6px,
+    transparent 6px 10px,
+    #2a1a33 10px 13px,
+    transparent 13px 15px
+  );
+  opacity: 0.75;
+}
+
+.shipping-label__seal {
+  position: absolute;
+  right: 18px;
+  bottom: 64px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 2px solid #c97a63;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a4a3a;
+  opacity: 0;
+  transform: rotate(-8deg) scale(1.6);
+  pointer-events: none;
+}
+
+.shipping-label.is-sealed .shipping-label__seal {
+  animation: seal-slam 320ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes seal-slam {
+  from { opacity: 0; transform: rotate(-8deg) scale(1.6); }
+  to { opacity: 1; transform: rotate(-8deg) scale(1); }
+}
+
+.shipping-label__cta {
+  margin-top: 18px;
+  color: #8a4a3a;
+}
+
+.shipping-label__cta:hover,
+.shipping-label__cta:focus-visible {
+  color: #5f2f24;
+}
+
+.shipping-label__cta::before {
+  color: #c97a63;
+}
+
+.shipping-label__cta:disabled {
+  opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+  .boarding { gap: 16px; }
+  .shipping-label { transform: rotate(-0.6deg); }
+  .pip-bubble__text { font-size: 0.9rem; }
+}
+
+/* ------------------------------------------------------------ Hub mirror + detail */
+
+/* Accessible mirror of the in-scene objects: visually hidden until it
+   receives keyboard focus, then it appears as a bottom bar. */
+.mirror {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.mirror:focus-within {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 7;
+  width: min(700px, 94vw);
+  height: auto;
+  clip-path: none;
+  white-space: normal;
+  transform: translateX(-50%);
+}
+
+.mirror:focus-within .tablet {
+  transform: none;
+}
+
+.mirror-controls {
+  padding: 12px 18px;
+  border: 1px solid rgba(244, 180, 223, 0.4);
+  border-radius: 12px;
+  background: rgba(27, 16, 41, 0.92);
+  color: var(--cream);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.mirror:focus-within .mirror-controls {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 7;
+}
+
+.passport-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 3, 9, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+/* The card zooms in from the console card's resting spot and, on
+   dismiss, shrinks back toward it — one continuous motion. */
+.passport-detail__card {
+  animation: passport-zoom-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.passport-detail__card.is-closing {
+  animation: passport-zoom-out 380ms ease-in both;
+}
+
+@keyframes passport-zoom-in {
+  from { opacity: 0; transform: scale(0.55) translateY(60px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes passport-zoom-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.55) translateY(60px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .passport-detail__card,
+  .passport-detail__card.is-closing {
+    animation: none;
+  }
+}
+
+.passport-detail {
+  pointer-events: auto;
+}
+
+/* The close control lives in the header row, in flow — never
+   floating over the card content. */
+.passport__close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 217, 168, 0.5);
+  border-radius: 999px;
+  background: rgba(27, 16, 41, 0.95);
+  color: var(--cream);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  flex: none;
+}
+
+.passport__close:hover {
+  border-color: var(--rose-200);
+  color: var(--rose-200);
+}
+
+/* Bubble hidden while the passport detail or the navigation panel
+   is open (stays mounted so PIP's voice is not cut mid-line). */
+.pip-bubble-wrap.is-hidden {
+  visibility: hidden;
+}
+
+/* ------------------------------------------------------------ Launch */
+.onboarding[data-phase="launching"] { display: block; padding: 0; background: #050309; }
+.launch { position: absolute; inset: 0; overflow: hidden; }
+.launch .menu-scene { position: absolute; inset: 0; }
+.launch__vignette { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(5,3,9,.55); }
+.launch__countdown { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: clamp(4rem, 14vw, 8rem); font-weight: 800; letter-spacing: .04em; color: var(--cream); text-shadow: 0 0 54px rgba(255,217,168,.5); animation: launch-pop 900ms cubic-bezier(.2,1.4,.4,1) both; pointer-events: none; }
+@keyframes launch-pop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+.launch__caption { position: absolute; left: 50%; bottom: 12dvh; transform: translateX(-50%); margin: 0; padding: 10px 20px; border-radius: 999px; background: rgba(27,16,41,.78); font-weight: 650; text-align: center; max-width: 88vw; }
+.launch__fact { position: absolute; left: 50%; bottom: 10dvh; transform: translateX(-50%); margin: 0; padding: 12px 22px; border: 1px solid rgba(255,217,168,.45); border-radius: 16px; background: rgba(27,16,41,.82); font-family: var(--font-mono); font-size: .85rem; letter-spacing: .06em; text-align: center; animation: launch-fade 600ms ease both; max-width: 88vw; }
+.launch__fact-glyph { color: var(--rose-200); }
+.launch__destination { position: absolute; left: 50%; top: 9dvh; transform: translateX(-50%); margin: 0; font-size: 1.05rem; letter-spacing: .08em; text-transform: uppercase; color: var(--cream-dim); animation: launch-fade 600ms ease both; }
+.launch__destination strong { color: var(--cream); }
+@keyframes launch-fade { from { opacity: 0; } to { opacity: 1; } }
+.launch__skip { position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 2; padding: 12px 22px; border: 1px solid rgba(253,244,236,.4); border-radius: 999px; background: rgba(27,16,41,.85); color: var(--cream); font-weight: 700; cursor: pointer; }
+.launch__skip:hover { border-color: var(--rose-200); color: var(--rose-200); }
+@media (prefers-reduced-motion: reduce) { .launch__countdown, .launch__fact, .launch__destination { animation: none; } }
+.launch__caption { display: flex; align-items: center; gap: 10px; }
+.launch__caption .pip-avatar { width: 30px; height: 30px; flex: none; }

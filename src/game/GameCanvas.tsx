@@ -38,8 +38,9 @@ export default function GameCanvas() {
       fallback={<SceneStatus error />}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping
-        gl.toneMappingExposure = 1.05
-        gl.shadowMap.type = THREE.PCFSoftShadowMap
+        gl.toneMappingExposure = 1.1
+        // In this Three.js version PCFShadowMap uses radius-aware filtering.
+        gl.shadowMap.type = THREE.PCFShadowMap
       }}
     >
       <ContextMonitor onLost={() => setContextLost(true)} />

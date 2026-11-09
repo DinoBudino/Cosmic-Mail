@@ -26,22 +26,10 @@ export function Hud() {
 
   return (
     <>
-      <header className="hud-card" aria-label="Mission status">
+      <header className="hud-card" aria-label="Game title">
         <p className="hud-eyebrow">Mars Delivery Zone</p>
         <h1 className="hud-title">Letters to the Forgotten Explorers</h1>
-        <p className="hud-objective">Mission 01 — Find Opportunity</p>
       </header>
-
-      <div className="hud-legend" aria-hidden="true">
-        <span className="hud-legend-item">
-          <span className="hud-dot hud-dot--available" />
-          Mission site
-        </span>
-        <span className="hud-legend-item">
-          <span className="hud-dot hud-dot--soon" />
-          Coming soon
-        </span>
-      </div>
 
       <div className="hud-controls">
         <span className="hud-control">
@@ -61,6 +49,20 @@ export function Hud() {
         <span className="hud-control">
           <span className="hud-key">Scroll</span>
           <span className="hud-label">zoom</span>
+        </span>
+        <span className="hud-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="hud-control">
+          <span className="hud-key">Space</span>
+          <span className="hud-label">jet boots</span>
+        </span>
+        <span className="hud-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="hud-control">
+          <span className="hud-key">Shift</span>
+          <span className="hud-label">run</span>
         </span>
         <span className="hud-sep" aria-hidden="true">
           ·

@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
 import { mulberry32 } from './random'
+import { makeGlowTexture } from './textures'
 import { Starfield } from './Starfield'
 import {
   MOON_DIRECTION,
@@ -18,57 +19,57 @@ interface AtmosphereProps {
   quality: Quality
 }
 
-function makeSkyTexture(): THREE.CanvasTexture | null {
-  const canvas = document.createElement('canvas')
-  canvas.width = 16
-  canvas.height = 512
-  const context = canvas.getContext('2d')
-  if (!context) return null
+// Direction-based gradients avoid UV banding and stay coherent when orbiting.
+// This is an artistic dusk atmosphere, not a physical model of the Martian sky.
+const SKY_VERTEX = /* glsl */ `
+  varying vec3 vDirection;
+  void main() {
+    vDirection = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
 
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
-  gradient.addColorStop(0, PALETTE.skyZenith)
-  gradient.addColorStop(0.34, PALETTE.skyUpper)
-  gradient.addColorStop(0.46, PALETTE.skyMid)
-  gradient.addColorStop(0.505, PALETTE.skyHorizon)
-  gradient.addColorStop(0.56, PALETTE.skyBelow)
-  gradient.addColorStop(1, PALETTE.skyFloor)
-  context.fillStyle = gradient
-  context.fillRect(0, 0, canvas.width, canvas.height)
+const SKY_FRAGMENT = /* glsl */ `
+  uniform vec3 uZenith;
+  uniform vec3 uUpper;
+  uniform vec3 uMid;
+  uniform vec3 uHorizon;
+  uniform vec3 uFloor;
+  uniform vec3 uWarm;
+  uniform vec3 uCool;
+  uniform vec3 uSun;
+  varying vec3 vDirection;
+  void main() {
+    vec3 direction = normalize(vDirection);
+    float height = max(direction.y, 0.0);
+    vec3 sky = mix(uHorizon, uMid, smoothstep(0.0, 0.22, height));
+    sky = mix(sky, uUpper, smoothstep(0.16, 0.55, height));
+    sky = mix(sky, uZenith, smoothstep(0.42, 1.0, height));
+    sky = mix(sky, uFloor, smoothstep(0.0, 0.32, -direction.y));
 
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
-}
+    float sunFacing = max(dot(direction.xz, normalize(uSun.xz)), 0.0);
+    float horizon = exp(-abs(direction.y - 0.03) * 8.0);
+    float upperWash = smoothstep(0.65, 0.0, height);
+    sky += uWarm * horizon * pow(sunFacing, 3.0) * 0.34;
+    sky += uWarm * upperWash * pow(sunFacing, 1.5) * 0.045;
+    float opposite = max(dot(direction.xz, -normalize(uSun.xz)), 0.0);
+    sky = mix(sky, uCool, horizon * pow(opposite, 1.4) * 0.24);
+    // A cool violet wash keeps the anti-sun side from turning uniformly pink.
+    float coolWash = smoothstep(0.7, 0.0, height);
+    sky = mix(sky, uCool, coolWash * pow(opposite, 1.3) * 0.1);
+    // A pale luminous seam where the terrain meets the sky.
+    sky += uWarm * exp(-abs(direction.y - 0.01) * 80.0) * pow(sunFacing, 6.0) * 0.2;
+    // Broad horizontal dust layers, stationary and very low contrast.
+    float veil = sin(height * 26.0 + direction.x * 2.4) * 0.5 + 0.5;
+    sky += uWarm * veil * horizon * 0.01;
+    // Small dither removes visible gradient banding on cheap displays.
+    float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    sky += (dither - 0.5) / 255.0;
+    gl_FragColor = vec4(max(sky, vec3(0.0)), 1.0);
+    #include <colorspace_fragment>
+  }
+`
 
-function makeGlowTexture(): THREE.CanvasTexture | null {
-  const size = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const context = canvas.getContext('2d')
-  if (!context) return null
-
-  const gradient = context.createRadialGradient(
-    size / 2,
-    size / 2,
-    0,
-    size / 2,
-    size / 2,
-    size / 2,
-  )
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)')
-  gradient.addColorStop(0.16, 'rgba(255, 244, 220, 0.95)')
-  gradient.addColorStop(0.42, 'rgba(255, 205, 160, 0.32)')
-  gradient.addColorStop(1, 'rgba(255, 180, 130, 0)')
-  context.fillStyle = gradient
-  context.fillRect(0, 0, size, size)
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
-}
 
 function makeMoonTexture(): THREE.CanvasTexture | null {
   const size = 128
@@ -88,10 +89,10 @@ function makeMoonTexture(): THREE.CanvasTexture | null {
     center,
     radius,
   )
-  gradient.addColorStop(0, '#fff7ea')
-  gradient.addColorStop(0.55, '#e6cdb8')
-  gradient.addColorStop(0.86, '#bda096')
-  gradient.addColorStop(1, '#8d7182')
+  gradient.addColorStop(0, '#FFF4E8')
+  gradient.addColorStop(0.55, '#E8D2C2')
+  gradient.addColorStop(0.86, '#C2A69E')
+  gradient.addColorStop(1, '#8A707E')
 
   context.beginPath()
   context.arc(center, center, radius, 0, Math.PI * 2)
@@ -110,7 +111,7 @@ function makeMoonTexture(): THREE.CanvasTexture | null {
     const craterRadius = 2 + random() * 7
     context.beginPath()
     context.arc(craterX, craterY, craterRadius, 0, Math.PI * 2)
-    context.fillStyle = `rgba(92, 70, 86, ${0.08 + random() * 0.14})`
+    context.fillStyle = `rgba(92, 58, 96, ${0.08 + random() * 0.14})`
     context.fill()
   }
   context.restore()
@@ -125,9 +126,18 @@ export function Atmosphere({ quality }: AtmosphereProps) {
   const preset = QUALITY_PRESETS[quality]
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const skyRef = useRef<THREE.Group>(null)
-  const dustRef = useRef<THREE.Points>(null)
+  const dustGroupRef = useRef<THREE.Group>(null)
 
-  const skyTexture = useMemo(() => makeSkyTexture(), [])
+  const skyUniforms = useMemo(() => ({
+    uZenith: { value: new THREE.Color(PALETTE.skyZenith) },
+    uUpper: { value: new THREE.Color(PALETTE.skyUpper) },
+    uMid: { value: new THREE.Color(PALETTE.skyMid) },
+    uHorizon: { value: new THREE.Color(PALETTE.skyHorizon) },
+    uFloor: { value: new THREE.Color(PALETTE.skyFloor) },
+    uWarm: { value: new THREE.Color(PALETTE.skyGlowWarm) },
+    uCool: { value: new THREE.Color(PALETTE.skyGlowCool) },
+    uSun: { value: new THREE.Vector3(SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z).normalize() },
+  }), [])
   const glowTexture = useMemo(() => makeGlowTexture(), [])
   const moonTexture = useMemo(() => makeMoonTexture(), [])
   const sunDirection = useMemo(
@@ -160,55 +170,57 @@ export function Atmosphere({ quality }: AtmosphereProps) {
     () => moonDirection.clone().multiplyScalar(350),
     [moonDirection],
   )
-  const warmHorizonPosition = useMemo(
-    () =>
-      new THREE.Vector3(sunDirection.x, 0.08, sunDirection.z)
-        .normalize()
-        .multiplyScalar(330),
-    [sunDirection],
-  )
-  const coolHorizonPosition = useMemo(
-    () =>
-      new THREE.Vector3(-sunDirection.x, 0.1, -sunDirection.z)
-        .normalize()
-        .multiplyScalar(330),
-    [sunDirection],
-  )
-
-  const dustGeometry = useMemo(() => {
-    const random = mulberry32(0xc05a1c)
-    const geometry = new THREE.BufferGeometry()
-    const positions = new Float32Array(preset.dustCount * 3)
-    for (let index = 0; index < preset.dustCount; index += 1) {
-      positions[index * 3] = (random() - 0.5) * 72
-      positions[index * 3 + 1] = random() * 16
-      positions[index * 3 + 2] = (random() - 0.5) * 72
+  // Three parallax layers of drifting dust: fine near motes, mid haze and
+  // large far motes. Total points stay at preset.dustCount (cheap).
+  const dustLayers = useMemo(() => {
+    const makeLayer = (count: number, spread: number, maxHeight: number, seed: number) => {
+      const random = mulberry32(seed)
+      const geometry = new THREE.BufferGeometry()
+      const positions = new Float32Array(count * 3)
+      for (let index = 0; index < count; index += 1) {
+        positions[index * 3] = (random() - 0.5) * spread
+        positions[index * 3 + 1] = random() * maxHeight
+        positions[index * 3 + 2] = (random() - 0.5) * spread
+      }
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      geometry.computeBoundingSphere()
+      return geometry
     }
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.computeBoundingSphere()
-    return geometry
+    const total = preset.dustCount
+    return [
+      { geometry: makeLayer(Math.round(total * 0.55), 56, 7, 0xc05a1c), size: 0.09, opacity: 0.3, rotationSpeed: 0.012, bobSpeed: 0.5, bobAmplitude: 0.25 },
+      { geometry: makeLayer(Math.round(total * 0.32), 74, 14, 0xd051), size: 0.18, opacity: 0.2, rotationSpeed: -0.007, bobSpeed: 0.32, bobAmplitude: 0.45 },
+      { geometry: makeLayer(Math.max(8, total - Math.round(total * 0.87)), 92, 22, 0xe0517), size: 0.42, opacity: 0.1, rotationSpeed: 0.004, bobSpeed: 0.2, bobAmplitude: 0.7 },
+    ]
   }, [preset.dustCount])
 
   useEffect(() => {
     return () => {
-      skyTexture?.dispose()
       glowTexture?.dispose()
       moonTexture?.dispose()
     }
-  }, [skyTexture, glowTexture, moonTexture])
+  }, [glowTexture, moonTexture])
 
   useEffect(() => {
-    return () => dustGeometry.dispose()
-  }, [dustGeometry])
+    return () => dustLayers.forEach((layer) => layer.geometry.dispose())
+  }, [dustLayers])
 
-  useFrame(({ camera }, delta) => {
+  useFrame(({ camera, clock }, delta) => {
     if (skyRef.current) skyRef.current.position.copy(camera.position)
 
-    const dust = dustRef.current
-    if (!dust) return
-    dust.position.x = camera.position.x
-    dust.position.z = camera.position.z
-    if (!reducedMotion) dust.rotation.y += delta * 0.008
+    const elapsed = clock.elapsedTime
+    const dustGroup = dustGroupRef.current
+    if (!dustGroup) return
+    for (let index = 0; index < dustLayers.length; index += 1) {
+      const dust = dustGroup.children[index] as THREE.Points | undefined
+      if (!dust) continue
+      dust.position.x = camera.position.x
+      dust.position.z = camera.position.z
+      if (!reducedMotion) {
+        dust.rotation.y += delta * dustLayers[index]!.rotationSpeed
+        dust.position.y = Math.sin(elapsed * dustLayers[index]!.bobSpeed + index * 2.1) * dustLayers[index]!.bobAmplitude
+      }
+    }
   })
 
   return (
@@ -218,49 +230,17 @@ export function Atmosphere({ quality }: AtmosphereProps) {
 
       <group ref={skyRef}>
         <mesh renderOrder={-20} frustumCulled={false}>
-          <sphereGeometry args={[400, 64, 48]} />
-          <meshBasicMaterial
-            map={skyTexture ?? undefined}
+          <sphereGeometry args={[400, 48, 32]} />
+          <shaderMaterial
+            uniforms={skyUniforms}
+            vertexShader={SKY_VERTEX}
+            fragmentShader={SKY_FRAGMENT}
             side={THREE.BackSide}
             depthWrite={false}
             fog={false}
             toneMapped={false}
           />
         </mesh>
-
-        <sprite
-          position={warmHorizonPosition}
-          scale={[300, 300, 1]}
-          renderOrder={-19}
-        >
-          <spriteMaterial
-            map={glowTexture ?? undefined}
-            color={PALETTE.skyGlowWarm}
-            transparent
-            opacity={0.18}
-            depthWrite={false}
-            fog={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </sprite>
-
-        <sprite
-          position={coolHorizonPosition}
-          scale={[320, 320, 1]}
-          renderOrder={-19}
-        >
-          <spriteMaterial
-            map={glowTexture ?? undefined}
-            color={PALETTE.skyGlowCool}
-            transparent
-            opacity={0.12}
-            depthWrite={false}
-            fog={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </sprite>
 
         <Starfield count={preset.starCount} reducedMotion={reducedMotion} />
 
@@ -294,14 +274,14 @@ export function Atmosphere({ quality }: AtmosphereProps) {
 
         <sprite
           position={sunPosition}
-          scale={[210, 210, 1]}
+          scale={[230, 230, 1]}
           renderOrder={-15}
         >
           <spriteMaterial
             map={glowTexture ?? undefined}
             color={PALETTE.skyGlowWarm}
             transparent
-            opacity={0.2}
+            opacity={0.16}
             depthWrite={false}
             fog={false}
             blending={THREE.AdditiveBlending}
@@ -309,12 +289,12 @@ export function Atmosphere({ quality }: AtmosphereProps) {
           />
         </sprite>
 
-        <sprite position={sunPosition} scale={[92, 92, 1]} renderOrder={-14}>
+        <sprite position={sunPosition} scale={[80, 80, 1]} renderOrder={-14}>
           <spriteMaterial
             map={glowTexture ?? undefined}
             color={PALETTE.sun}
             transparent
-            opacity={0.85}
+            opacity={0.55}
             depthWrite={false}
             fog={false}
             blending={THREE.AdditiveBlending}
@@ -322,10 +302,10 @@ export function Atmosphere({ quality }: AtmosphereProps) {
           />
         </sprite>
 
-        <sprite position={sunPosition} scale={[20, 20, 1]} renderOrder={-13}>
+        <sprite position={sunPosition} scale={[12, 12, 1]} renderOrder={-13}>
           <spriteMaterial
             map={glowTexture ?? undefined}
-            color="#fff4dc"
+            color="#FFF0E8"
             transparent
             opacity={0.95}
             depthWrite={false}
@@ -336,42 +316,51 @@ export function Atmosphere({ quality }: AtmosphereProps) {
         </sprite>
       </group>
 
-      <ambientLight intensity={0.28} color={PALETTE.ambient} />
-      <hemisphereLight args={[PALETTE.hemiSky, PALETTE.hemiGround, 0.95]} />
+      <ambientLight intensity={0.32} color={PALETTE.ambient} />
+      <hemisphereLight args={[PALETTE.hemiSky, PALETTE.hemiGround, 0.85]} />
       <directionalLight
         position={lightPosition}
-        intensity={2.35}
+        intensity={2.55}
         color={PALETTE.sun}
         castShadow={preset.shadows}
         shadow-mapSize={[preset.shadowMapSize, preset.shadowMapSize]}
-        shadow-camera-left={-58}
-        shadow-camera-right={58}
-        shadow-camera-top={58}
-        shadow-camera-bottom={-58}
+        shadow-camera-left={-105}
+        shadow-camera-right={105}
+        shadow-camera-top={105}
+        shadow-camera-bottom={-105}
         shadow-camera-near={10}
-        shadow-camera-far={170}
+        shadow-camera-far={220}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
+        shadow-radius={4}
       />
       <directionalLight
         position={[-30, 18, 40]}
-        intensity={0.32}
-        color="#9c8ad6"
+        intensity={0.4}
+        color={PALETTE.skyGlowCool}
       />
 
-      <points ref={dustRef} geometry={dustGeometry} frustumCulled={false}>
-        <pointsMaterial
-          map={glowTexture ?? undefined}
-          color={PALETTE.dust}
-          size={0.18}
-          sizeAttenuation
-          transparent
-          opacity={0.32}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          toneMapped={false}
-        />
-      </points>
+      <group ref={dustGroupRef}>
+      {dustLayers.map((layer, index) => (
+        <points
+          key={index}
+          geometry={layer.geometry}
+          frustumCulled={false}
+        >
+          <pointsMaterial
+            map={glowTexture ?? undefined}
+            color={PALETTE.dust}
+            size={layer.size}
+            sizeAttenuation
+            transparent
+            opacity={layer.opacity}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
+          />
+        </points>
+      ))}
+      </group>
 
       {preset.postprocessing && (
         <Suspense fallback={null}>

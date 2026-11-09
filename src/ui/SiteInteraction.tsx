@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { MARS_OBJECTS, type MarsObjectId, type ObjectState } from '../data/marsObjects'
+import { useEffect, useRef } from 'react'
+import { MARS_OBJECTS, REGION_INFO, type ObjectState } from '../data/marsObjects'
 import { useGameStore } from '../store/gameStore'
 
 const STATE_LABELS: Record<ObjectState, string> = {
@@ -7,30 +7,6 @@ const STATE_LABELS: Record<ObjectState, string> = {
   'coming-soon': 'Coming soon',
   'in-progress': 'In progress',
   rescued: 'Rescued',
-}
-
-function TravelControls() {
-  const [destination, setDestination] = useState<MarsObjectId>('opportunity')
-  const targetId = useGameStore((state) => state.travelTargetId)
-  const startTravel = useGameStore((state) => state.startTravel)
-  const cancelTravel = useGameStore((state) => state.cancelTravel)
-  const target = MARS_OBJECTS.find((site) => site.id === targetId)
-
-  return (
-    <details className="travel-controls">
-      <summary>Travel assistance</summary>
-      <p id="travel-help">Choose a site to walk there automatically. Manual movement, settings or leaving the window stops the trip.</p>
-      <label htmlFor="travel-destination">Destination</label>
-      <select id="travel-destination" value={destination} onChange={(event) => {
-        const site = MARS_OBJECTS.find((item) => item.id === event.target.value)
-        if (site) setDestination(site.id)
-      }} aria-describedby="travel-help">
-        {MARS_OBJECTS.map((site) => <option key={site.id} value={site.id}>{site.name}{site.state === 'coming-soon' ? ' — Coming soon' : ''}</option>)}
-      </select>
-      <button type="button" className="site-action" onClick={() => startTravel(destination)}>Travel to selected site</button>
-      {target && <button type="button" className="site-action" onClick={cancelTravel}>Stop travel to {target.name}</button>}
-    </details>
-  )
 }
 
 export function SiteInteraction() {
@@ -59,26 +35,21 @@ export function SiteInteraction() {
 
   return (
     <>
-      {!active && !settingsOpen && (
-        <aside className="site-prompt" aria-label="Companion guidance">
-          <p className="settings-eyebrow">Mail companion</p>
+      {!active && !settingsOpen && nearby && (
+        <aside className="site-prompt" aria-label="Explorer information">
+          <p className="settings-eyebrow">Explorer</p>
           <div role="status" aria-live="polite" aria-atomic="true">
-            {nearby ? (
-              <>
-                <h2>{nearby.name}</h2>
-                <p>{STATE_LABELS[nearby.state]}</p>
-                <p>{nearby.description}</p>
-              </>
-            ) : <p>{travelTargetId ? `Walking to ${MARS_OBJECTS.find((site) => site.id === travelTargetId)?.name}.` : 'Step inside a glowing ring to inspect an explorer.'}</p>}
+            <h2>{nearby.name}</h2>
+            <p className="site-region">{REGION_INFO[nearby.id].regionName}</p>
+            <p>{STATE_LABELS[nearby.state]}</p>
+            <p>{nearby.description}</p>
           </div>
-          {nearby && (
-            <button type="button" className="site-action" onClick={openSite}>
-              <span className="desktop-interact">Press E or click to inspect</span>
-              <span className="touch-interact">Tap to inspect</span>
-              <span className="sr-only"> {nearby.name}</span>
-            </button>
-          )}
-          <TravelControls />
+          <button type="button" className="site-action" onClick={openSite}>
+            <span className="desktop-interact">Press E or click to inspect</span>
+            <span className="touch-interact">Tap to inspect</span>
+            <span className="sr-only"> {nearby.name}</span>
+          </button>
+          {travelTargetId && <p className="site-travel">Travelling to {MARS_OBJECTS.find((site) => site.id === travelTargetId)?.name}…</p>}
         </aside>
       )}
       {active && (

@@ -3,7 +3,7 @@ import {
   useRef,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { setTouchMove } from '../game/input'
+import { setTouchBoot, setTouchMove, setTouchRun } from '../game/input'
 import { useGameStore } from '../store/gameStore'
 
 export function TouchControls() {
@@ -17,6 +17,7 @@ export function TouchControls() {
   const reset = () => {
     activePointer.current = null
     setTouchMove(0, 0)
+    setTouchRun(false)
     if (knobRef.current) {
       knobRef.current.style.transform = 'translate(0px, 0px)'
     }
@@ -27,7 +28,11 @@ export function TouchControls() {
   }, [paused])
 
   useEffect(() => {
-    return () => setTouchMove(0, 0)
+    return () => {
+      setTouchMove(0, 0)
+      setTouchBoot(false)
+      setTouchRun(false)
+    }
   }, [])
 
   const update = (clientX: number, clientY: number) => {
@@ -48,6 +53,8 @@ export function TouchControls() {
     }
 
     setTouchMove(dx / limit, -dy / limit)
+    // Full tilt runs.
+    setTouchRun(Math.min(distance, limit) / limit > 0.92)
     if (knobRef.current) {
       knobRef.current.style.transform = `translate(${dx}px, ${dy}px)`
     }
@@ -87,7 +94,23 @@ export function TouchControls() {
       >
         <div ref={knobRef} className="touch-knob" />
       </div>
-      <p className="touch-hint">Drag to move</p>
+      <p className="touch-hint">Drag to move · push far to run</p>
+      <button
+        type="button"
+        className="touch-boost"
+        aria-label="Hold to use jet boots"
+        onPointerDown={(event) => {
+          if (paused) return
+          event.currentTarget.setPointerCapture(event.pointerId)
+          setTouchBoot(true)
+        }}
+        onPointerUp={() => setTouchBoot(false)}
+        onPointerCancel={() => setTouchBoot(false)}
+        onLostPointerCapture={() => setTouchBoot(false)}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        Boost
+      </button>
     </div>
   )
 }

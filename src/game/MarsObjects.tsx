@@ -11,73 +11,191 @@ import { getTerrainHeight } from './terrainHeight'
 import { PALETTE } from './worldConfig'
 import { SITE_RADII } from './interaction'
 
+const OPPORTUNITY_WHEEL_X = [-0.72, 0, 0.72] as const
+const OPPORTUNITY_WHEEL_Z = [-0.66, 0.66] as const
+
+function OpportunityWheel({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0.32, z]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.28, 0.28, 0.18, 14]} />
+        <meshStandardMaterial
+          color="#2E1F33"
+          metalness={0.1}
+          roughness={0.86}
+        />
+      </mesh>
+      <mesh>
+        <cylinderGeometry args={[0.1, 0.1, 0.2, 12]} />
+        <meshStandardMaterial
+          color="#c19a62"
+          metalness={0.45}
+          roughness={0.5}
+        />
+      </mesh>
+    </group>
+  )
+}
+
+function OpportunityWing({ side }: { side: -1 | 1 }) {
+  return (
+    <group
+      position={[side * 1.05, 1.1, 0]}
+      rotation={[0, 0, side * 0.06]}
+    >
+      {[0, 1, 2].map((index) => (
+        <group
+          key={index}
+          position={[side * (0.28 + index * 0.48), 0, 0]}
+        >
+          <mesh castShadow>
+            <boxGeometry args={[0.46, 0.035, 1.34]} />
+            <meshStandardMaterial
+              color="#35224F"
+              metalness={0.05}
+              roughness={0.65}
+            />
+          </mesh>
+          <mesh position={[0, -0.028, 0]}>
+            <boxGeometry args={[0.5, 0.02, 1.38]} />
+            <meshStandardMaterial
+              color="#b68b55"
+              metalness={0.4}
+              roughness={0.5}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
 function OpportunityModel() {
   return (
     <group>
-      <mesh position={[0, 0.8, 0]} castShadow>
-        <boxGeometry args={[2.2, 0.55, 1.2]} />
+      <mesh position={[0, 0.72, 0]} castShadow>
+        <boxGeometry args={[1.9, 0.4, 1.05]} />
         <meshStandardMaterial
-          color="#d9ab7b"
+          color="#c9a477"
           metalness={0.35}
           roughness={0.55}
         />
       </mesh>
 
-      {[-1.6, 1.6].map((x) => (
-        <mesh key={x} position={[x, 1.13, 0]} castShadow>
-          <boxGeometry args={[1.4, 0.06, 1.6]} />
+      <mesh position={[-0.3, 1.0, 0]} castShadow>
+        <boxGeometry args={[0.65, 0.38, 0.8]} />
+        <meshStandardMaterial
+          color="#e7c47f"
+          metalness={0.5}
+          roughness={0.4}
+        />
+      </mesh>
+
+      <mesh position={[0.55, 0.98, 0]} castShadow>
+        <boxGeometry args={[0.45, 0.28, 0.55]} />
+        <meshStandardMaterial
+          color="#b9a58c"
+          metalness={0.2}
+          roughness={0.6}
+        />
+      </mesh>
+
+      <OpportunityWing side={-1} />
+      <OpportunityWing side={1} />
+
+      {OPPORTUNITY_WHEEL_Z.map((z) => (
+        <mesh key={z} position={[0, 0.54, z]} castShadow>
+          <boxGeometry args={[1.68, 0.06, 0.08]} />
           <meshStandardMaterial
-            color="#243a6b"
-            metalness={0.3}
+            color="#b68b55"
+            metalness={0.4}
             roughness={0.5}
           />
         </mesh>
       ))}
 
-      {[-0.8, 0, 0.8].map((x) =>
-        [-0.7, 0.7].map((z) => (
-          <mesh
-            key={`${x}-${z}`}
-            position={[x, 0.35, z]}
-            rotation={[Math.PI / 2, 0, 0]}
-            castShadow
-          >
-            <cylinderGeometry args={[0.3, 0.3, 0.16, 12]} />
-            <meshStandardMaterial color="#2f2b3a" roughness={0.8} />
-          </mesh>
+      {OPPORTUNITY_WHEEL_X.map((x) =>
+        OPPORTUNITY_WHEEL_Z.map((z) => (
+          <OpportunityWheel key={`${x}-${z}`} x={x} z={z} />
         )),
       )}
 
-      <mesh position={[0, 1.75, 0]} castShadow>
-        <cylinderGeometry args={[0.07, 0.07, 1.6, 8]} />
+      <mesh position={[0.15, 1.8, -0.28]} castShadow>
+        <cylinderGeometry args={[0.055, 0.07, 1.15, 8]} />
         <meshStandardMaterial
-          color="#c1ad9f"
+          color="#cbb7a0"
           metalness={0.4}
           roughness={0.5}
         />
       </mesh>
 
-      <mesh position={[0, 2.55, 0]} castShadow>
-        <boxGeometry args={[0.8, 0.35, 0.3]} />
+      <mesh position={[0.15, 2.42, -0.28]} castShadow>
+        <boxGeometry args={[0.55, 0.28, 0.24]} />
         <meshStandardMaterial
-          color="#d5c6b2"
-          metalness={0.2}
+          color="#d8c6a8"
+          metalness={0.25}
           roughness={0.5}
         />
       </mesh>
 
-      <mesh position={[0, 2.55, 0.17]}>
-        <circleGeometry args={[0.08, 12]} />
-        <meshBasicMaterial color="#ffb066" toneMapped={false} />
-      </mesh>
+      {[-0.1, 0.1].map((dx) => (
+        <group key={dx}>
+          <mesh
+            position={[0.15 + dx, 2.42, -0.42]}
+            rotation={[Math.PI / 2, 0, 0]}
+          >
+            <cylinderGeometry args={[0.07, 0.07, 0.08, 12]} />
+            <meshStandardMaterial
+              color="#2A1D3B"
+              metalness={0.6}
+              roughness={0.25}
+            />
+          </mesh>
+          <mesh position={[0.15 + dx, 2.42, -0.465]}>
+            <sphereGeometry args={[0.018, 8, 6]} />
+            <meshBasicMaterial color="#F4B4DF" toneMapped={false} />
+          </mesh>
+        </group>
+      ))}
 
-      <mesh position={[0.75, 1.1, 0.25]} castShadow>
-        <cylinderGeometry args={[0.28, 0.28, 0.05, 12]} />
+      <mesh position={[-0.55, 1.55, 0.22]} castShadow>
+        <cylinderGeometry args={[0.28, 0.08, 0.12, 16]} />
         <meshStandardMaterial
-          color="#c9b7a0"
+          color="#d0b99b"
           metalness={0.4}
+          roughness={0.45}
+        />
+      </mesh>
+      <mesh position={[-0.55, 1.35, 0.22]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.4, 6]} />
+        <meshStandardMaterial color="#b9a58c" />
+      </mesh>
+
+      <mesh position={[0, 0.82, -0.58]} castShadow>
+        <boxGeometry args={[0.36, 0.14, 0.12]} />
+        <meshStandardMaterial color="#2E1F33" roughness={0.6} />
+      </mesh>
+
+      <mesh position={[0.62, 0.72, -0.62]} rotation={[0.2, 0, 0.5]} castShadow>
+        <boxGeometry args={[0.5, 0.06, 0.08]} />
+        <meshStandardMaterial
+          color="#cbb7a0"
+          metalness={0.35}
           roughness={0.5}
         />
+      </mesh>
+      <mesh position={[0.86, 0.55, -0.62]} rotation={[0.2, 0, 1.0]} castShadow>
+        <boxGeometry args={[0.4, 0.06, 0.08]} />
+        <meshStandardMaterial
+          color="#b9a58c"
+          metalness={0.3}
+          roughness={0.55}
+        />
+      </mesh>
+
+      <mesh position={[0.82, 1.08, 0.35]}>
+        <sphereGeometry args={[0.035, 8, 6]} />
+        <meshBasicMaterial color="#F4B4DF" toneMapped={false} />
       </mesh>
     </group>
   )
@@ -99,7 +217,7 @@ function InSightModel() {
         <mesh key={x} position={[x, 0.85, 0]} castShadow>
           <cylinderGeometry args={[1.15, 1.15, 0.06, 20]} />
           <meshStandardMaterial
-            color="#2c3f66"
+            color="#4A3568"
             metalness={0.3}
             roughness={0.5}
           />
@@ -167,7 +285,7 @@ function IngenuityModel() {
         <mesh key={y} position={[0, y, 0]} castShadow>
           <cylinderGeometry args={[0.62, 0.62, 0.025, 20]} />
           <meshStandardMaterial
-            color="#3a3446"
+            color="#3A2846"
             metalness={0.4}
             roughness={0.4}
           />
@@ -177,7 +295,7 @@ function IngenuityModel() {
       <mesh position={[0, 1.56, 0]} castShadow>
         <boxGeometry args={[0.42, 0.05, 0.42]} />
         <meshStandardMaterial
-          color="#2c3f66"
+          color="#4A3568"
           metalness={0.3}
           roughness={0.5}
         />
@@ -275,7 +393,10 @@ function Beacon({ object }: { object: MarsObject }) {
   const ringMaterial = useRef<THREE.MeshBasicMaterial>(null)
   const crystal = useRef<THREE.Mesh>(null)
   const available = object.state !== 'coming-soon'
-  const color = available ? PALETTE.beaconAvailable : PALETTE.beaconSoon
+  const rescued = object.state === 'rescued'
+  // Rescued = bright accent + steady ring; available = warm peach pulse;
+  // coming-soon = dim mauve. Prepared for future challenges / letters.
+  const color = rescued ? PALETTE.accent : available ? PALETTE.beaconAvailable : PALETTE.beaconSoon
   const radius = SITE_RADII[object.id]
   const small = object.id === 'ingenuity'
   const columnHeight = small ? 2.2 : 3.8
@@ -339,6 +460,11 @@ function Beacon({ object }: { object: MarsObject }) {
   )
 }
 
+const SITE_ROTATIONS: Partial<Record<MarsObjectId, number>> = {
+  // Turn Opportunity's camera mast and arm towards the usual approach path.
+  opportunity: 4,
+}
+
 export function MarsObjects() {
   return (
     <group>
@@ -351,7 +477,9 @@ export function MarsObjects() {
             object.position.z,
           ]}
         >
-          <ObjectModel id={object.id} />
+          <group rotation={[0, SITE_ROTATIONS[object.id] ?? 0, 0]}>
+            <ObjectModel id={object.id} />
+          </group>
           <Beacon object={object} />
         </group>
       ))}

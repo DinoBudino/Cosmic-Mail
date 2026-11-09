@@ -39,8 +39,18 @@ coverage/
 
 # Local documentation and backups (not published)
 /README.md
+*.md
 /backups/
 *.bak
+
+# Local AI assistant configuration
+.opencode/
+
+# Blender source files, autosaves and review builds
+*.blend
+*.blend1
+blender/*.glb
+/public/models/cosmic_carrier_v2.glb
 
 # Editor directories and files
 .vscode/*

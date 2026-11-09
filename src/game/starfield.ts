@@ -6,7 +6,7 @@ export const STAR_RADIUS = 385
 
 const BAND_NORMAL = new THREE.Vector3(0.34, 0.72, -0.6).normalize()
 
-const STAR_COLORS = ['#fff6e2', '#dfe8ff', '#ffd9b8', '#c9c2ff'] as const
+const STAR_COLORS = ['#FFF0E8', '#E0D4FF', '#FFD9E8', '#D8C4FF'] as const
 
 /**
  * Builds a deterministic upper-hemisphere starfield with a denser galactic
@@ -26,7 +26,7 @@ export function buildStarGeometry(count: number): THREE.BufferGeometry {
 
   const color = new THREE.Color()
   const white = new THREE.Color('#ffffff')
-  const bandColor = new THREE.Color('#c7d4ff')
+  const bandColor = new THREE.Color('#D8C4FF')
   const direction = new THREE.Vector3()
 
   const bandU = new THREE.Vector3(1, 0, 0).cross(BAND_NORMAL).normalize()
