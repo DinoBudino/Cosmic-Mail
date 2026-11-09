@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import {
   computeTrait,
+  explorersForTrait,
   isValidExplorerName,
   sanitizeExplorerName,
   type TraitId,
@@ -86,10 +87,18 @@ function loadPassport(): ExplorerPassport | null {
     ) {
       return null
     }
+    // Legacy passports may reference explorers that no longer exist
+    // (roster changes): fall back to the first explorer of the saved
+    // trait instead of crashing getExplorer() later.
+    const knownExplorer = explorersForTrait(record.trait).some(
+      (explorer) => explorer.id === record.explorerId,
+    )
     return {
       explorerName: sanitizeExplorerName(record.explorerName),
       trait: record.trait,
-      explorerId: record.explorerId,
+      explorerId: knownExplorer
+        ? record.explorerId
+        : (explorersForTrait(record.trait)[0]?.id ?? record.explorerId),
       moduleId: record.moduleId,
       missionNumber:
         typeof record.missionNumber === 'number' && record.missionNumber > 0

@@ -78,7 +78,7 @@ describe('onboarding flow', () => {
     store().startMission()
     for (let i = 0; i < 4; i += 1) store().answerQuestion('careful')
     store().continueFromReveal()
-    store().confirmExplorer('gene-kranz')
+    store().confirmExplorer('michael-collins')
     store().confirmModule('mission-clock')
     expect(store().phase).toBe('name')
 

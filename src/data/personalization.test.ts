@@ -26,7 +26,10 @@ describe('personalization data', () => {
     expect(TRAITS).toHaveLength(5)
     expect(HISTORICAL_EXPLORERS).toHaveLength(10)
     for (const trait of TRAITS) {
-      expect(explorersForTrait(trait.id)).toHaveLength(2)
+      const pair = explorersForTrait(trait.id)
+      expect(pair).toHaveLength(2)
+      // Every pair is one girl and one boy.
+      expect(new Set(pair.map((explorer) => explorer.gender))).toEqual(new Set(['girl', 'boy']))
     }
     expect(MISSION_MODULES).toHaveLength(4)
     expect(MISSION_MODULES.map((m) => m.id)).toEqual([
@@ -43,9 +46,18 @@ describe('computeTrait', () => {
     expect(computeTrait(['brave', 'brave', 'careful', 'reflective', 'observant'])).toBe('brave')
   })
 
-  it('breaks ties deterministically by trait order', () => {
+  it('breaks ties by recency, so every trait is reachable', () => {
+    // Last answer wins a tie (recency), not a fixed order.
     expect(computeTrait(['careful', 'observant'])).toBe('observant')
+    expect(computeTrait(['observant', 'careful'])).toBe('careful')
+    expect(computeTrait(['brave', 'observant', 'methodical', 'careful'])).toBe('careful')
+    expect(computeTrait(['brave', 'observant', 'methodical', 'reflective'])).toBe('reflective')
+    expect(computeTrait(['observant', 'methodical', 'reflective', 'brave'])).toBe('brave')
     expect(computeTrait([])).toBe('brave')
+  })
+
+  it('still prefers a clear majority over recency', () => {
+    expect(computeTrait(['observant', 'brave', 'brave', 'careful'])).toBe('brave')
   })
 })
 

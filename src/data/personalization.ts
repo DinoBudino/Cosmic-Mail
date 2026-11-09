@@ -148,8 +148,11 @@ export const DISCOVERY_QUESTIONS: readonly DiscoveryQuestion[] = [
 ]
 
 /**
- * Pick the trait with the most answers. Ties are broken by the fixed
- * TRAIT_ORDER so results are deterministic and testable.
+ * Pick the trait with the most answers. Ties are broken by RECeNCY:
+ * among the top-scoring traits, the one from the player's most
+ * recent answer wins (so varied answers can reach any trait —
+ * a fixed order would make the first trait win every tie).
+ * Empty answers fall back to the first trait in TRAIT_ORDER.
  */
 export function computeTrait(answers: readonly TraitId[]): TraitId {
   const scores: Record<TraitId, number> = {
@@ -160,11 +163,13 @@ export function computeTrait(answers: readonly TraitId[]): TraitId {
     reflective: 0,
   }
   for (const answer of answers) scores[answer] += 1
-  let best: TraitId = TRAIT_ORDER[0]
-  for (const id of TRAIT_ORDER) {
-    if (scores[id] > scores[best]) best = id
+  const max = Math.max(...TRAIT_ORDER.map((id) => scores[id]))
+  if (max === 0) return TRAIT_ORDER[0]
+  for (let index = answers.length - 1; index >= 0; index -= 1) {
+    const candidate = answers[index]!
+    if (scores[candidate] === max) return candidate
   }
-  return best
+  return TRAIT_ORDER[0]
 }
 
 /* ------------------------------------------------------------------ */
@@ -175,6 +180,8 @@ export interface HistoricalExplorer {
   id: string
   name: string
   trait: TraitId
+  /** Every trait pairs one girl and one boy explorer. */
+  gender: 'girl' | 'boy'
   bio: string
   accent: string
 }
@@ -184,20 +191,23 @@ export const HISTORICAL_EXPLORERS: readonly HistoricalExplorer[] = [
     id: 'valentina-tereshkova',
     name: 'Valentina Tereshkova',
     trait: 'brave',
+    gender: 'girl',
     bio: 'The first woman in space. In 1963 she orbited Earth alone aboard Vostok 6, spending almost three days in space on her historic flight.',
     accent: '#f4b4df',
   },
   {
-    id: 'sally-ride',
-    name: 'Sally Ride',
+    id: 'yuri-gagarin',
+    name: 'Yuri Gagarin',
     trait: 'brave',
-    bio: 'The first American woman in space in 1983. After her flights she became a science teacher who inspired thousands of children to explore.',
+    gender: 'boy',
+    bio: 'The first human in space. In 1961 he orbited Earth aboard Vostok 1, and his brave flight opened the way for every explorer who followed.',
     accent: '#b8a6d9',
   },
   {
     id: 'mae-jemison',
     name: 'Mae Jemison',
     trait: 'observant',
+    gender: 'girl',
     bio: 'A doctor and astronaut who became the first African American woman in space in 1992. She studied how bodies behave in zero gravity aboard the Space Shuttle Endeavour.',
     accent: '#f2b28c',
   },
@@ -205,6 +215,7 @@ export const HISTORICAL_EXPLORERS: readonly HistoricalExplorer[] = [
     id: 'chris-hadfield',
     name: 'Chris Hadfield',
     trait: 'observant',
+    gender: 'boy',
     bio: 'A Canadian astronaut who commanded the International Space Station. He photographed Earth from orbit and shared how our planet looks from space with the whole world.',
     accent: '#ffd9a8',
   },
@@ -212,27 +223,31 @@ export const HISTORICAL_EXPLORERS: readonly HistoricalExplorer[] = [
     id: 'katherine-johnson',
     name: 'Katherine Johnson',
     trait: 'methodical',
+    gender: 'girl',
     bio: 'A NASA mathematician who calculated trajectories for spaceflights, including John Glenn’s orbit around Earth. Her precise numbers helped astronauts fly safely.',
     accent: '#ffd9a8',
   },
   {
-    id: 'margaret-hamilton',
-    name: 'Margaret Hamilton',
+    id: 'wernher-von-braun',
+    name: 'Wernher von Braun',
     trait: 'methodical',
-    bio: 'A computer scientist who led the team that wrote the software for the Apollo Guidance Computer. She helped give us the term “software engineering”.',
+    gender: 'boy',
+    bio: 'A rocket scientist who built spacecraft step by step, testing every part with care. His methodical work helped rockets carry astronauts to the Moon.',
     accent: '#f2b28c',
   },
   {
-    id: 'gene-kranz',
-    name: 'Gene Kranz',
+    id: 'margaret-hamilton',
+    name: 'Margaret Hamilton',
     trait: 'careful',
-    bio: 'A NASA flight director who led mission teams through the Apollo program, including the safe return of Apollo 13. His careful planning kept crews safe far from home.',
+    gender: 'girl',
+    bio: 'A computer scientist who led the team that wrote the software for the Apollo Guidance Computer. Her careful testing kept every step of the Moon missions safe.',
     accent: '#b8a6d9',
   },
   {
     id: 'michael-collins',
     name: 'Michael Collins',
     trait: 'careful',
+    gender: 'boy',
     bio: 'The Apollo 11 command module pilot who orbited the Moon alone while his crewmates landed. His careful flying brought everyone home safely.',
     accent: '#f4b4df',
   },
@@ -240,14 +255,16 @@ export const HISTORICAL_EXPLORERS: readonly HistoricalExplorer[] = [
     id: 'carl-sagan',
     name: 'Carl Sagan',
     trait: 'reflective',
+    gender: 'boy',
     bio: 'An astronomer and writer who thought deeply about humanity’s place in the universe. He inspired the famous “Pale Blue Dot” photograph of Earth from far away.',
     accent: '#f2b28c',
   },
   {
-    id: 'edgar-mitchell',
-    name: 'Edgar Mitchell',
+    id: 'sally-ride',
+    name: 'Sally Ride',
     trait: 'reflective',
-    bio: 'An Apollo 14 astronaut who walked on the Moon and, looking back at Earth from deep space, reflected on how connected everything in the universe is.',
+    gender: 'girl',
+    bio: 'The first American woman in space in 1983. After her flights she became a science teacher who thought deeply about how to inspire the next explorers.',
     accent: '#ffd9a8',
   },
 ]

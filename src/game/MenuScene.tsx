@@ -1273,6 +1273,34 @@ function CabinPip() {
   )
 }
 
+/* ------------------------------------------------------------------ */
+/* Console local coordinate system                                     */
+/*                                                                     */
+/* The console board is a 2.5 x 0.7 box centred on the (tilted)       */
+/* console group origin, so in board-local space its top face is the   */
+/* plane y = 0.225 spanning x in [-1.25, 1.25], z in [-0.35, 0.35].   */
+/* Every component on the board is positioned relative to that plane   */
+/* and to one of three zones along x:                                  */
+/*   left    navigation  centred at x = -0.6875 (frame -1.158..-0.218) */
+/*   centre  controls    centred on the board's total centre, x = 0:   */
+/*           the take-off button is the main action, so its axis is    */
+/*           the symmetry axis of the whole console.                   */
+/*   right   passport    centred at x = 0.725 (tray 0.485..0.965)      */
+/* Stacking on the top face (no coplanar faces, no floating parts):   */
+/*   board top 0.225 -> nav frame top 0.245 -> screen plane 0.252 ->  */
+/*   radar sweep 0.258..0.270; button bezels / trays sit on 0.225.     */
+/* ------------------------------------------------------------------ */
+const CONSOLE_TOP_Y = 0.225
+const CONSOLE_CENTER_X = 0
+const NAV_ZONE_CENTER_X = -0.6875
+// Passport card + support centre: shifted 0.15 left from the right
+// zone's centre so the tray (0.485..0.965) sits 0.29 from the
+// indicator cluster (x <= 0.195) and 0.285 from the board's right
+// edge — balanced on both sides. Both the card and its support
+// read this constant, so they move as one assembly.
+const CARD_ZONE_CENTER_X = 0.725
+const NAV_SCREEN_Y = 0.252
+
 /** Radar sweep bar gliding across the console screen. It only shows
  *  once the route transition has fully settled back to the idle
  *  radar, so it never pops in over the fading destination cards. */
@@ -1285,12 +1313,16 @@ function RadarSweep({ position }: { position: [number, number, number] }) {
     if (!bar) return
     bar.visible = routeBlend.value < 0.02
     if (reducedMotion || !bar.visible) return
-    bar.position.x = position[0] + Math.sin(state.clock.elapsedTime * 0.9) * 0.42
+    // Stroke stays inside the 0.86-wide screen: 0.36 + 0.025 (half the
+    // bar) leaves a 0.045 margin to each long edge at the extremes.
+    bar.position.x = position[0] + Math.sin(state.clock.elapsedTime * 0.9) * 0.36
   })
 
   return (
     <mesh ref={barRef} position={position}>
-      <boxGeometry args={[0.05, 0.02, 0.5]} />
+      {/* 0.34 long (the screen is 0.40 deep): a 0.03 margin to each
+          short edge, so the bar never overhangs the frame. */}
+      <boxGeometry args={[0.05, 0.012, 0.34]} />
       <meshBasicMaterial color="#8FE3D8" toneMapped={false} transparent opacity={0.9} />
     </mesh>
   )
@@ -1781,6 +1813,21 @@ function PassportCard3D() {
   const detailOpen = useOnboardingStore((state) => state.passportDetailOpen)
   const setPassportDetailOpen = useOnboardingStore((state) => state.setPassportDetailOpen)
   const [hovered, setHovered] = useState(false)
+  const groupRef = useRef<THREE.Group>(null)
+
+  // Only the card face ABOVE the slot is clickable: without this,
+  // clicks through/under the board still hit the part of the plane
+  // hidden inside the console and opened the detail from below.
+  const isOnCardFace = (point: THREE.Vector3): boolean => {
+    const group = groupRef.current
+    if (!group) return false
+    // Force fresh matrices: on the very first hover the group's
+    // matrixWorld may be stale, which made the first pass miss and
+    // only the second hover work.
+    group.updateWorldMatrix(false, true)
+    const local = group.worldToLocal(point.clone())
+    return Math.abs(local.x) < 0.33 && local.y > -0.15
+  }
 
   const texture = useMemo(() => {
     if (!passport) return null
@@ -1795,29 +1842,61 @@ function PassportCard3D() {
 
   useEffect(() => () => texture?.dispose(), [texture])
 
+  // The card keeps a fixed orientation like the controls around it:
+  // leaning back slightly on the board, facing the same way as the
+  // take-off button (toward the pilot/camera). No billboarding —
+  // that hid the slot groove and looked detached from the console.
+  // No yaw/roll: the card is aligned with the board and with its
+  // support (right zone, centre x = 0.725). Its pivot stays at the
+  // card centre, so the isOnCardFace hit-test is unchanged. The foot
+  // (half-height 0.385 x 0.55 = 0.212 along the lean) lands exactly
+  // on the support tray top (y = 0.25) at z = -0.10:
+  //   foot y = 0.449 - 0.212 * cos(0.35) = 0.250
+  //   foot z = -0.173 + 0.212 * sin(0.35) = -0.100
+
   // While the detail is open, the 3D card leaves the console (it is
   // "in hand" now, not duplicated on the desk).
   if (!passport || !texture || detailOpen) return null
   return (
-    // Standing on the console top in a gold dock frame, leaning
+    // Standing on its support tray in the right zone, leaning
     // back like a card propped on the dashboard.
     <group
-      position={[0.85, 0.34, -0.12]}
-      rotation={[-0.32, 0, 0.04]}
-      scale={hovered ? 1.1 : 1}
+      ref={groupRef}
+      position={[CARD_ZONE_CENTER_X, 0.449, -0.173]}
+      rotation={[-0.35, 0, 0]}
+      scale={0.55 * (hovered ? 1.06 : 1)}
     >
       <mesh position={[0, 0, -0.012]}>
         <planeGeometry args={[0.66, 0.83]} />
         <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
       </mesh>
+
       <mesh
         onPointerDown={(event) => {
           event.stopPropagation()
+          if (!isOnCardFace(event.point)) return
           setPassportDetailOpen(true)
         }}
-        onPointerOver={() => {
+        onPointerOver={(event) => {
+          if (!isOnCardFace(event.point)) return
           setHovered(true)
           document.body.style.cursor = 'pointer'
+        }}
+        onPointerMove={(event) => {
+          // Backup for a missed pointerover (e.g. after the hover
+          // scale shifted the geometry under the cursor) — and the
+          // release when the pointer slides below the slot: the
+          // visible face ends there, even if the ray still hits the
+          // hidden part of the plane inside the board.
+          if (isOnCardFace(event.point)) {
+            if (!hovered) {
+              setHovered(true)
+              document.body.style.cursor = 'pointer'
+            }
+          } else if (hovered) {
+            setHovered(false)
+            document.body.style.cursor = 'auto'
+          }
         }}
         onPointerOut={() => {
           setHovered(false)
@@ -1884,7 +1963,7 @@ function NavScreenOnBoard() {
 
   return (
     <mesh
-      position={[-0.6, 0.265, 0]}
+      position={[NAV_ZONE_CENTER_X, NAV_SCREEN_Y, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       onPointerDown={(event) => {
         event.stopPropagation()
@@ -2019,23 +2098,30 @@ function makeConsoleTopTexture(): THREE.CanvasTexture {
     ctx.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.12)'
     ctx.fillRect(random() * W, random() * H, 1.6, 1.6)
   }
+  // Only a perimeter border: any divider line or plate painted here
+  // would run underneath the screen, buttons or card support and
+  // read as a moulding crossing a functional component.
   ctx.strokeStyle = 'rgba(143,227,216,0.35)'
   ctx.lineWidth = 3
   ctx.strokeRect(10, 10, W - 20, H - 20)
-  ctx.strokeStyle = 'rgba(253,244,236,0.18)'
-  ctx.beginPath()
-  ctx.moveTo(W * 0.52, 10)
-  ctx.lineTo(W * 0.52, H - 10)
-  ctx.stroke()
-  // Small label plates.
-  ctx.fillStyle = 'rgba(255,217,168,0.5)'
-  for (const [x, y, w] of [
-    [26, H - 34, 70],
-    [110, H - 34, 46],
-    [W * 0.55 + 16, 24, 84],
-    [W * 0.55 + 16, H - 34, 60],
-  ] as const) {
-    ctx.fillRect(x, y, w, 10)
+  // Fine engraved traces along the front and back margins (canvas
+  // y = 14 / H-14, i.e. board z = +/-0.31 in either V orientation):
+  // orbital-route arcs with node dots at the ends. They stay in the
+  // 0.11-deep margin strips, where no screen, button or support
+  // reaches (the nav frame ends at z = +/-0.24), and components
+  // sitting on the board cover them anyway where they overlap.
+  ctx.strokeStyle = 'rgba(143,227,216,0.28)'
+  ctx.lineWidth = 2
+  for (const y of [14, H - 14]) {
+    ctx.beginPath()
+    ctx.moveTo(24, y)
+    ctx.quadraticCurveTo(W / 2, y + (y < H / 2 ? 6 : -6), W - 24, y)
+    ctx.stroke()
+    for (const x of [24, W - 24]) {
+      ctx.beginPath()
+      ctx.arc(x, y, 3, 0, Math.PI * 2)
+      ctx.stroke()
+    }
   }
   ctx.fillStyle = 'rgba(253,244,236,0.5)'
   for (const [x, y] of [
@@ -2095,6 +2181,62 @@ function makeMailDecalTexture(): THREE.CanvasTexture {
   return texture
 }
 
+/** Small dark plate label for the outgoing-mail slot: an envelope
+ *  glyph and OUTGOING MAIL in cream monospace. Purely decorative
+ *  for now; the slot geometry it labels is a plain recess, so a
+ *  future mail-delivery interaction can reuse it as-is. */
+function makeSlotLabelTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 96
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#241736'
+  ctx.fillRect(0, 0, 512, 96)
+  ctx.strokeStyle = 'rgba(253,244,236,0.85)'
+  ctx.fillStyle = 'rgba(253,244,236,0.85)'
+  ctx.lineWidth = 5
+  // Envelope glyph.
+  roundRectPath(ctx, 28, 22, 72, 52, 8)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(28, 28)
+  ctx.lineTo(64, 54)
+  ctx.lineTo(100, 28)
+  ctx.stroke()
+  ctx.font = '700 34px ui-monospace, monospace'
+  ctx.textAlign = 'left'
+  ctx.fillText('OUTGOING MAIL', 124, 62)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.anisotropy = 4
+  return texture
+}
+
+/** Insignia plaque for the console's front edge: COSMIC MAIL —
+ *  DELIVERY UNIT 01 in cream on a dark plate. */
+function makeInsigniaTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#241736'
+  ctx.fillRect(0, 0, 512, 128)
+  ctx.strokeStyle = 'rgba(255,217,168,0.55)'
+  ctx.lineWidth = 3
+  ctx.strokeRect(8, 8, 512 - 16, 128 - 16)
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#FDF4EC'
+  ctx.font = '800 42px system-ui, sans-serif'
+  ctx.fillText('COSMIC MAIL', 256, 56)
+  ctx.fillStyle = 'rgba(253,244,236,0.65)'
+  ctx.font = '600 24px ui-monospace, monospace'
+  ctx.fillText('DELIVERY UNIT 01', 256, 96)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.anisotropy = 4
+  return texture
+}
+
 /** Grayscale radial top for the console buttons (tinted per button). */
 function makeButtonTopTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
@@ -2143,7 +2285,17 @@ function TakeOffButton() {
   })
 
   return (
-    <group position={[0.15, 0, 0]}>
+    // Centred on the board's total width (x = 0), back row: bezel
+    // (r = 0.16) spans x -0.16..0.16, z -0.235..0.085. The lid
+    // hinge is at the back (z = -0.205); closed it covers
+    // z -0.20..0.05, and fully open (rotation.x = -1.9) its disc
+    // stays within x -0.125..0.125, z -0.287..-0.207, y 0.29..0.53
+    // — clear of the nav frame (x <= -0.218, top 0.245), of the
+    // indicator cluster (z >= 0.07) and of the passport tray
+    // (x >= 0.485) in every intermediate state. The hinge posts,
+    // pin and moving knuckle below keep the disc attached to a
+    // visible axle instead of floating over the button.
+    <group position={[CONSOLE_CENTER_X, 0, -0.075]}>
       {/* Bezel ring the big button sits in. */}
       <mesh position={[0, 0.232, 0]}>
         <cylinderGeometry args={[0.16, 0.16, 0.02, 24]} />
@@ -2170,9 +2322,33 @@ function TakeOffButton() {
           roughness={0.35}
         />
       </mesh>
+      {/* Hinge hardware that carries the lid: two gold posts
+          standing on the board/bezel back edge hold the lid's axle
+          pin at the lid pivot (y = 0.285, the disc's back edge).
+          Post tops stop at y = 0.27, just below the closed lid's
+          underside (0.2725), so the disc never touches them, and
+          the pin (r = 0.015, bottom y = 0.27) rests on the posts. */}
+      {[-0.09, 0.09].map((x) => (
+        <mesh key={x} position={[x, 0.2475, -0.13]}>
+          <boxGeometry args={[0.04, 0.045, 0.04]} />
+          <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.285, -0.13]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.015, 0.015, 0.24, 12]} />
+        <meshStandardMaterial color="#9A7433" roughness={0.4} metalness={0.6} />
+      </mesh>
       {/* Transparent hinged lid: closed over the button until a
           route is locked, then it flips up toward the window. */}
       <group ref={lidRef} position={[0, 0.285, -0.13]}>
+        {/* Moving hinge knuckle: a gold barrel around the axle at
+            the lid's back edge, so the disc is visibly attached to
+            the pin it rotates on. Its axis is the lid's rotation
+            axis, so it stays at the pivot in both states. */}
+        <mesh rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.08, 12]} />
+          <meshStandardMaterial color="#9A7433" roughness={0.4} metalness={0.6} />
+        </mesh>
         <mesh
           position={[0, 0, 0.13]}
           onPointerDown={(event) => event.stopPropagation()}
@@ -2213,7 +2389,13 @@ function CeilingStrip() {
   )
 }
 
-/** Console status light: a soft teal pulse on the board. */
+/** Console status light: a soft teal pulse on the board. The
+ *  sphere sits in a dark round socket, and a short arm links the
+ *  socket to the front face of the navigation frame, so the
+ *  indicator reads as part of the radar assembly instead of a
+ *  loose ball on the desk. `position` is the sphere centre; the
+ *  socket and arm are derived from it (socket top and arm top at
+ *  y = 0.245, flush with the nav frame top, on the board top). */
 function StatusLight({ position }: { position: [number, number, number] }) {
   const materialRef = useRef<THREE.MeshStandardMaterial>(null)
   useFrame((state) => {
@@ -2222,16 +2404,118 @@ function StatusLight({ position }: { position: [number, number, number] }) {
     material.emissiveIntensity = 0.8 + Math.sin(state.clock.elapsedTime * 2.2) * 0.5
   })
   return (
-    <mesh position={position}>
-      <sphereGeometry args={[0.035, 12, 10]} />
-      <meshStandardMaterial
-        ref={materialRef}
-        color="#8FE3D8"
-        emissive="#8FE3D8"
-        emissiveIntensity={1}
-        toneMapped={false}
-      />
-    </mesh>
+    <group>
+      {/* Arm from the nav frame's front edge (z = 0.24) into the
+          socket: spans z 0.215..0.275, x width 0.05. */}
+      <mesh position={[position[0], 0.235, position[2] - 0.045]}>
+        <boxGeometry args={[0.05, 0.02, 0.06]} />
+        <meshStandardMaterial color="#1B1029" roughness={0.6} />
+      </mesh>
+      {/* Socket the sphere is seated in. */}
+      <mesh position={[position[0], 0.235, position[2]]}>
+        <cylinderGeometry args={[0.04, 0.045, 0.02, 16]} />
+        <meshStandardMaterial color="#1B1029" roughness={0.6} />
+      </mesh>
+      <mesh position={position}>
+        <sphereGeometry args={[0.035, 12, 10]} />
+        <meshStandardMaterial
+          ref={materialRef}
+          color="#8FE3D8"
+          emissive="#8FE3D8"
+          emissiveIntensity={1}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  )
+}
+
+/** Recessed status panel in the corridor between the launch
+ *  controls and the passport support (board x 0.26..0.42,
+ *  z -0.24..0.24). Three small lights with printed labels, driven
+ *  only by states the game already has: POWER is on whenever the
+ *  ship is out of the menu, ROUTE follows the confirmed route
+ *  (the same state that lifts the take-off lid), MAIL follows the
+ *  passport being onboard. No pointer handlers: indicators only. */
+function StatusPanel() {
+  const phase = useOnboardingStore((state) => state.phase)
+  const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
+  const passport = useOnboardingStore((state) => state.passport)
+  const powerRef = useRef<THREE.MeshStandardMaterial>(null)
+
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 256
+    canvas.height = 768
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#241736'
+    ctx.fillRect(0, 0, 256, 768)
+    ctx.strokeStyle = 'rgba(143,227,216,0.35)'
+    ctx.lineWidth = 3
+    ctx.strokeRect(6, 6, 256 - 12, 768 - 12)
+    // Labels sit right of the light discs (discs at canvas x ~64,
+    // labels centred at x ~168). Canvas top maps to the board's
+    // back edge, so POWER is at the back, MAIL at the front.
+    ctx.fillStyle = 'rgba(253,244,236,0.85)'
+    ctx.font = '700 40px ui-monospace, monospace'
+    ctx.textAlign = 'center'
+    for (const [index, label] of ['POWER', 'ROUTE', 'MAIL'].entries()) {
+      ctx.fillText(label, 168, 128 + index * 256)
+    }
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.anisotropy = 4
+    return tex
+  }, [])
+  useEffect(() => () => texture.dispose(), [texture])
+
+  useFrame((state) => {
+    const material = powerRef.current
+    if (!material) return
+    material.emissiveIntensity = 1 + Math.sin(state.clock.elapsedTime * 2.2) * 0.4
+  })
+
+  const lights: Array<{
+    z: number
+    color: string
+    active: boolean
+    pulse?: boolean
+  }> = [
+    { z: -0.15, color: '#8FE3D8', active: phase !== 'menu', pulse: true },
+    { z: 0, color: '#FFD9A8', active: routeConfirmed },
+    { z: 0.15, color: '#F2B5E2', active: passport !== null },
+  ]
+
+  return (
+    <group position={[0.34, 0, 0]}>
+      <mesh
+        position={[0, 0.229, 0]}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <boxGeometry args={[0.16, 0.008, 0.48]} />
+        <meshStandardMaterial color="#1B1029" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 0.236, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.15, 0.47]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+      {lights.map((light, index) => (
+        <mesh
+          key={index}
+          position={[-0.045, 0.239, light.z]}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <cylinderGeometry args={[0.02, 0.02, 0.012, 14]} />
+          <meshStandardMaterial
+            ref={light.pulse ? powerRef : undefined}
+            color={light.active ? light.color : '#3A3350'}
+            emissive={light.color}
+            emissiveIntensity={light.active ? 1.2 : 0.12}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
   )
 }
 
@@ -2291,6 +2575,8 @@ function CabinInterior() {
     const consoleTopTexture = makeConsoleTopTexture()
     const buttonTopTexture = makeButtonTopTexture()
     const mailDecalTexture = makeMailDecalTexture()
+    const slotLabelTexture = makeSlotLabelTexture()
+    const insigniaTexture = makeInsigniaTexture()
     const sideMat = new THREE.MeshStandardMaterial({ map: sideTexture, roughness: 0.6 })
     const consoleMats = [
       sideMat,
@@ -2314,10 +2600,12 @@ function CabinInterior() {
       floorTexture,
       sideTexture,
       mailDecalTexture,
+      slotLabelTexture,
+      insigniaTexture,
       consoleMats,
       buttonSand: buttonMats('#FFD9A8', '#8A6A3F'),
       buttonTeal: buttonMats('#8FE3D8', '#2F6B62'),
-      textures: [wallTexture, floorTexture, sideTexture, consoleTopTexture, buttonTopTexture, mailDecalTexture],
+      textures: [wallTexture, floorTexture, sideTexture, consoleTopTexture, buttonTopTexture, mailDecalTexture, slotLabelTexture, insigniaTexture],
     }
   }, [])
 
@@ -2466,8 +2754,9 @@ function CabinInterior() {
       {/* Control panel fixed in the room, dashboard tilt toward
           the pilot (the same in tutorial and hub views). */}
       <group position={[0.1, -1.15, -1.4]} rotation={[0.35, 0, 0]}>
-        {/* Wider base plate the board sits on. */}
-        <mesh position={[0, -0.28, 0]}>
+        {/* Wider base plate the board sits on: its top (y = -0.225)
+            is flush with the board bottom, so nothing floats. */}
+        <mesh position={[0, -0.265, 0]}>
           <boxGeometry args={[2.7, 0.08, 0.9]} />
           <meshStandardMaterial color="#2C1F45" roughness={0.6} />
         </mesh>
@@ -2488,22 +2777,58 @@ function CabinInterior() {
             <meshStandardMaterial color="#1B1029" roughness={0.8} />
           </mesh>
         ))}
-        <StatusLight position={[-1.12, 0.24, 0.15]} />
+        {/* Insignia plaque on the front edge, between the vents:
+            a dark plate (z 0.347..0.357) with the COSMIC MAIL —
+            DELIVERY UNIT 01 plate on its face. */}
+        <mesh position={[0, -0.02, 0.352]}>
+          <boxGeometry args={[0.64, 0.18, 0.01]} />
+          <meshStandardMaterial color="#241736" roughness={0.5} />
+        </mesh>
+        <mesh position={[0, -0.02, 0.359]}>
+          <planeGeometry args={[0.62, 0.16]} />
+          <meshBasicMaterial map={surfaces.insigniaTexture} toneMapped={false} />
+        </mesh>
+        {/* Status light on the strip of board in front of the screen
+            (screen front edge z = 0.24, board front edge z = 0.35),
+            centred in the navigation zone — never on the screen. */}
+        <StatusLight position={[NAV_ZONE_CENTER_X, CONSOLE_TOP_Y + 0.015, 0.29]} />
         {/* Navigation screen inset into the top face: THE navigation
             panel. At rest it is the idle radar; tapping it (or
             continuing a mission) leans the pilot in and the
-            destinations appear on this screen itself — no hologram. */}
-        <mesh position={[-0.6, 0.24, 0]}>
-          <boxGeometry args={[0.9, 0.04, 0.42]} />
+            destinations appear on this screen itself — no hologram.
+            Frame 0.94 x 0.48 centred in the left zone: a uniform
+            0.04 rim around the 0.86 x 0.40 screen plane, 0.11 from
+            the board edges front/back, flush with the board top
+            (0.225..0.245) so it reads as an inset, not a slab. */}
+        <mesh position={[NAV_ZONE_CENTER_X, 0.235, 0]}>
+          <boxGeometry args={[0.94, 0.02, 0.48]} />
           <meshBasicMaterial color="#0B2E29" toneMapped={false} />
         </mesh>
         <NavScreenOnBoard />
-        <RadarSweep position={[-0.6, 0.27, 0]} />
+        <RadarSweep position={[NAV_ZONE_CENTER_X, 0.264, 0]} />
         <TakeOffButton />
-        {/* Small filler buttons beside the big take-off button,
-            each seated in a dark bezel ring. */}
-        {[0.38, 0.53, 0.68].map((x, index) => (
-          <group key={index} position={[x, 0, 0]}>
+        {/* Recessed POWER / ROUTE / MAIL panel in the empty
+            corridor between the launch controls and the passport
+            support (see StatusPanel). */}
+        <StatusPanel />
+        {/* Three auxiliary indicators grouped symmetrically below
+            (in front of) the take-off button, in a shallow triangle
+            around the board centre x = 0: side buttons at
+            (+/-0.13, 0.135), apex button at (0, 0.215). Centre-to-
+            centre distances are 0.153 (side-to-apex) and 0.247
+            (side-to-main bezel), leaving ~0.022 edge-to-edge gaps;
+            the cluster spans x -0.195..0.195, 0.023 clear of the
+            nav frame (x <= -0.218) and 0.29 clear of the passport
+            tray (x >= 0.485). Raised toward the main button: its
+            front-most edge is now z = 0.28, 0.07 from the board's
+            front edge (was 0.025). The middle (apex) indicator
+            keeps the teal material, as before. */}
+        {[
+          [-0.13, 0.135],
+          [0, 0.215],
+          [0.13, 0.135],
+        ].map(([offsetX, z], index) => (
+          <group key={index} position={[CONSOLE_CENTER_X + offsetX, 0, z]}>
             <mesh position={[0, 0.232, 0]}>
               <cylinderGeometry args={[0.065, 0.065, 0.02, 14]} />
               <meshStandardMaterial color="#1B1029" roughness={0.6} />
@@ -2518,6 +2843,82 @@ function CabinInterior() {
           </group>
         ))}
         <PassportCard3D />
+        {/* Passport support, one piece with the console (right zone,
+            centre x = 0.725): a tray the card foot rests on, two side
+            cheeks the card leans between, and a back brace tilted at
+            the card's own lean so the card lies against it.
+            Tray 0.48 x 0.30, top at y = 0.25, centred on the card
+            foot (z = -0.10): the foot (y = 0.25) touches it without
+            piercing the board, with a visible margin all around.
+            Cheeks: inner faces 0.198 from centre, 0.016 clear of the
+            card backing (half-width 0.182), sitting on the tray.
+            Brace: same width as the tray, tilted -0.35 like the
+            card, centre 0.025 behind the card centre along its
+            normal, so a 0.013 gap keeps it from touching the card
+            while its lower end lands on the tray (y = 0.252). */}
+        <group position={[CARD_ZONE_CENTER_X, 0, 0]}>
+          <mesh
+            position={[0, 0.2375, -0.1]}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <boxGeometry args={[0.48, 0.025, 0.3]} />
+            <meshStandardMaterial color="#1B1029" roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.254, 0.042]}>
+            <boxGeometry args={[0.48, 0.008, 0.012]} />
+            <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
+          </mesh>
+          {[-0.215, 0.215].map((x) => (
+            <mesh
+              key={x}
+              position={[x, 0.28, -0.12]}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <boxGeometry args={[0.035, 0.06, 0.18]} />
+              <meshStandardMaterial color="#2C1F45" roughness={0.6} />
+            </mesh>
+          ))}
+          <mesh
+            position={[0, 0.44, -0.196]}
+            rotation={[-0.35, 0, 0]}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <boxGeometry args={[0.48, 0.4, 0.025]} />
+            <meshStandardMaterial color="#2C1F45" roughness={0.6} />
+          </mesh>
+        </group>
+        {/* Outgoing-mail slot in front of the passport tray, on
+            the same centre line as the card: a dark recess
+            (0.30 x 0.035, top y = 0.237) with thin gold lips, and
+            an OUTGOING MAIL label plate just in front of it
+            (z 0.185..0.245). Decorative only — no handlers, so it
+            cannot steal clicks from the card behind it. */}
+        <group position={[CARD_ZONE_CENTER_X, 0, 0]}>
+          <mesh
+            position={[0, 0.231, 0.135]}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <boxGeometry args={[0.3, 0.012, 0.035]} />
+            <meshBasicMaterial color="#0B0812" />
+          </mesh>
+          {[0.1135, 0.1565].map((z) => (
+            <mesh key={z} position={[0, 0.229, z]}>
+              <boxGeometry args={[0.3, 0.008, 0.008]} />
+              <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
+            </mesh>
+          ))}
+          <mesh
+            position={[0, 0.229, 0.215]}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <boxGeometry args={[0.3, 0.008, 0.06]} />
+            <meshStandardMaterial color="#1B1029" roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.236, 0.215]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.29, 0.05]} />
+            <meshBasicMaterial map={surfaces.slotLabelTexture} toneMapped={false} />
+          </mesh>
+        </group>
       </group>
 
       <CabinPip />
