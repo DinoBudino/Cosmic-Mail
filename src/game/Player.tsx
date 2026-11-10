@@ -79,6 +79,8 @@ export function Player() {
   const motionRef = useRef(0)
   /** Boot thrust + vertical velocity, read by AstronautModel for glow/pose. */
   const flightRef = useRef({ thrust: 0, vy: 0, airborne: 0 })
+  /** Signed yaw intent, read by AstronautModel for Turn_Left/Turn_Right. */
+  const turnRef = useRef(0)
   const verticalRef = useRef<VerticalState>({ y: 0, vy: 0, grounded: true })
   const prevBoot = useRef(false)
   const cameraTarget = useRef(new THREE.Vector3())
@@ -265,8 +267,11 @@ export function Player() {
       )
       let difference = targetYaw - yaw.current
       difference = Math.atan2(Math.sin(difference), Math.cos(difference))
+      turnRef.current = difference
       yaw.current += difference * (1 - Math.exp(-PLAYER.turnSpeed * dt))
       player.rotation.y = yaw.current
+    } else {
+      turnRef.current = 0
     }
 
     motionRef.current = Math.min(horizontalSpeed / (PLAYER.moveSpeed * PLAYER.runSpeedMultiplier), 1)
@@ -315,7 +320,11 @@ export function Player() {
         )}
 
         <Suspense fallback={null}>
-          <AstronautModel motionRef={motionRef} flightRef={flightRef} />
+          <AstronautModel
+            motionRef={motionRef}
+            flightRef={flightRef}
+            turnRef={turnRef}
+          />
         </Suspense>
       </group>
     </>

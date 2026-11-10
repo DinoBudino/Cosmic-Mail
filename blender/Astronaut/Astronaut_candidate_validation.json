@@ -1,0 +1,152 @@
+{
+  "candidate": "/home/dinobudino/Documentos/TEST/cosmic-mail/blender/astronaut_refined_candidate.blend",
+  "height": 1.502,
+  "bounds_min": [
+    -0.424,
+    -0.3139,
+    -0.0
+  ],
+  "bounds_max": [
+    0.424,
+    0.383,
+    1.502
+  ],
+  "body_verts": 7910,
+  "body_tris": 15568,
+  "bones": 25,
+  "actions": {
+    "Idle": {
+      "frames": [
+        1.0,
+        61.0
+      ],
+      "seconds": 2.0
+    },
+    "Walk": {
+      "frames": [
+        1.0,
+        25.0
+      ],
+      "seconds": 0.8
+    },
+    "Run": {
+      "frames": [
+        1.0,
+        19.0
+      ],
+      "seconds": 0.6
+    },
+    "Turn_Left": {
+      "frames": [
+        1.0,
+        16.0
+      ],
+      "seconds": 0.5
+    },
+    "Turn_Right": {
+      "frames": [
+        1.0,
+        16.0
+      ],
+      "seconds": 0.5
+    },
+    "Jump": {
+      "frames": [
+        1.0,
+        28.0
+      ],
+      "seconds": 0.9
+    },
+    "Interact": {
+      "frames": [
+        1.0,
+        37.0
+      ],
+      "seconds": 1.2
+    },
+    "Wave": {
+      "frames": [
+        1.0,
+        46.0
+      ],
+      "seconds": 1.5
+    },
+    "PickUp": {
+      "frames": [
+        1.0,
+        40.0
+      ],
+      "seconds": 1.3
+    },
+    "Celebrate": {
+      "frames": [
+        1.0,
+        52.0
+      ],
+      "seconds": 1.7
+    }
+  },
+  "loops": {
+    "Idle": 0.0,
+    "Walk": 0.0,
+    "Run": 0.0
+  },
+  "ground_contact": {
+    "Idle": -0.0,
+    "Walk": -0.0,
+    "Run": -0.0,
+    "Turn_Left": -5e-06,
+    "Turn_Right": -5e-06,
+    "Jump": -0.0,
+    "Interact": -0.0,
+    "Wave": -5e-06,
+    "PickUp": -0.0,
+    "Celebrate": -6e-06
+  },
+  "root_drift": {
+    "Idle": 0.0,
+    "Walk": 0.0,
+    "Run": 0.0,
+    "Turn_Left": 0.0,
+    "Turn_Right": 0.0,
+    "Jump": 0.0,
+    "Interact": 0.0,
+    "Wave": 0.0,
+    "PickUp": 0.0,
+    "Celebrate": 0.0
+  },
+  "max_influences": 2,
+  "unweighted_vertices": 0,
+  "other_meshes": {
+    "AST_Backpack": {
+      "verts": 2356,
+      "tris": 4488,
+      "materials": 7
+    },
+    "AST_Harness": {
+      "verts": 1252,
+      "tris": 2360,
+      "materials": 5
+    },
+    "AST_Helmet": {
+      "verts": 3424,
+      "tris": 6480,
+      "materials": 9
+    },
+    "AST_Insignias": {
+      "verts": 312,
+      "tris": 608,
+      "materials": 3
+    },
+    "AST_Scarf": {
+      "verts": 908,
+      "tris": 1776,
+      "materials": 2
+    },
+    "AST_Visor": {
+      "verts": 1370,
+      "tris": 2520,
+      "materials": 2
+    }
+  }
+}

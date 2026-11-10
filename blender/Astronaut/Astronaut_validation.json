@@ -1,0 +1,681 @@
+{
+  "raw": {
+    "file_bytes": 2001216,
+    "glb_version": 2,
+    "declared_length": 2001216,
+    "mesh_space_bounds_min": [
+      -0.424,
+      0,
+      -0.383
+    ],
+    "mesh_space_bounds_max": [
+      0.424,
+      1.502,
+      0.3139
+    ],
+    "height": 1.502,
+    "triangles": 35320,
+    "meshes": 13,
+    "nodes": 41,
+    "materials": [
+      "AST_Coral_Trim",
+      "AST_Gold_Hardware",
+      "AST_Gold_Soft",
+      "AST_Harness_Leather",
+      "AST_Cream_Suit",
+      "AST_Envelope_Cream",
+      "AST_Burgundy_Scarf",
+      "AST_Lavender_Gloves",
+      "AST_Lavender_Deep",
+      "AST_Boot_Sole",
+      "AST_Cream_Helmet",
+      "AST_Dark_Gray",
+      "AST_Antenna_Glow",
+      "AST_Thruster_Glow",
+      "AST_Visor_Black"
+    ],
+    "skins": 1,
+    "joints": 27,
+    "animations": {
+      "Celebrate": {
+        "start": 0,
+        "end": 1.7,
+        "duration": 1.7,
+        "channels": 81
+      },
+      "Flying": {
+        "start": 0,
+        "end": 1.2,
+        "duration": 1.2,
+        "channels": 81
+      },
+      "Idle": {
+        "start": 0,
+        "end": 2,
+        "duration": 2,
+        "channels": 81
+      },
+      "Interact": {
+        "start": 0,
+        "end": 1.2,
+        "duration": 1.2,
+        "channels": 81
+      },
+      "Jump": {
+        "start": 0,
+        "end": 0.9,
+        "duration": 0.9,
+        "channels": 81
+      },
+      "Landing": {
+        "start": 0,
+        "end": 0.8,
+        "duration": 0.8,
+        "channels": 81
+      },
+      "PickUp": {
+        "start": 0,
+        "end": 1.3,
+        "duration": 1.3,
+        "channels": 81
+      },
+      "Run": {
+        "start": 0,
+        "end": 0.6,
+        "duration": 0.6,
+        "channels": 81
+      },
+      "Takeoff": {
+        "start": 0,
+        "end": 0.8,
+        "duration": 0.8,
+        "channels": 81
+      },
+      "Turn_Left": {
+        "start": 0,
+        "end": 0.5,
+        "duration": 0.5,
+        "channels": 81
+      },
+      "Turn_Right": {
+        "start": 0,
+        "end": 0.5,
+        "duration": 0.5,
+        "channels": 81
+      },
+      "Walk": {
+        "start": 0,
+        "end": 0.8,
+        "duration": 0.8,
+        "channels": 81
+      },
+      "Wave": {
+        "start": 0,
+        "end": 1.5,
+        "duration": 1.5,
+        "channels": 81
+      }
+    },
+    "node_names": [
+      "Backpack",
+      "Helmet",
+      "Neck",
+      "Scarf_Tip",
+      "Scarf_Base",
+      "Hand_L",
+      "Forearm_L",
+      "UpperArm_L",
+      "Shoulder_L",
+      "Hand_R",
+      "Forearm_R",
+      "UpperArm_R",
+      "Shoulder_R",
+      "UpperBody",
+      "Spine",
+      "ThrusterSocket_L",
+      "Toe_L",
+      "Foot_L",
+      "LowerLeg_L",
+      "UpperLeg_L",
+      "ThrusterSocket_R",
+      "Toe_R",
+      "Foot_R",
+      "LowerLeg_R",
+      "UpperLeg_R",
+      "Hips",
+      "Root",
+      "AST_Backpack",
+      "AST_Body",
+      "AST_Harness",
+      "AST_Helmet",
+      "AST_Insignias",
+      "AST_Scarf",
+      "AST_ThrusterCore_L",
+      "AST_ThrusterCore_R",
+      "AST_ThrusterHousing_L",
+      "AST_ThrusterHousing_R",
+      "AST_ThrusterRing_L",
+      "AST_ThrusterRing_R",
+      "AST_Visor",
+      "CM_Astronaut_Armature"
+    ],
+    "visor": {
+      "baseColorFactor": [
+        0.0027317428030073643,
+        0.0027317428030073643,
+        0.004024717025458813,
+        1
+      ],
+      "alphaMode": "OPAQUE",
+      "metallic": 0.05999999865889549,
+      "roughness": 0.12999999523162842,
+      "doubleSided": true
+    }
+  },
+  "import": {
+    "objects": [
+      [
+        "AST_Backpack",
+        "MESH"
+      ],
+      [
+        "AST_Body",
+        "MESH"
+      ],
+      [
+        "AST_Harness",
+        "MESH"
+      ],
+      [
+        "AST_Helmet",
+        "MESH"
+      ],
+      [
+        "AST_Insignias",
+        "MESH"
+      ],
+      [
+        "AST_Scarf",
+        "MESH"
+      ],
+      [
+        "AST_ThrusterCore_L",
+        "MESH"
+      ],
+      [
+        "AST_ThrusterCore_R",
+        "MESH"
+      ],
+      [
+        "AST_ThrusterHousing_L",
+        "MESH"
+      ],
+      [
+        "AST_ThrusterHousing_R",
+        "MESH"
+      ],
+      [
+        "AST_ThrusterRing_L",
+        "MESH"
+      ],
+      [
+        "AST_ThrusterRing_R",
+        "MESH"
+      ],
+      [
+        "AST_Visor",
+        "MESH"
+      ],
+      [
+        "CM_Astronaut_Armature",
+        "ARMATURE"
+      ],
+      [
+        "Icosphere",
+        "MESH"
+      ]
+    ],
+    "armature": "CM_Astronaut_Armature",
+    "bones": 27,
+    "bounds_min": [
+      -0.424,
+      -0.312,
+      -0.0
+    ],
+    "bounds_max": [
+      0.424,
+      0.3833,
+      1.5023
+    ],
+    "height": 1.5023,
+    "actions": {
+      "Idle": {
+        "frame_range": [
+          0.0,
+          60.0
+        ],
+        "seconds": 2.0
+      },
+      "Walk": {
+        "frame_range": [
+          0.0,
+          24.0
+        ],
+        "seconds": 0.8
+      },
+      "Run": {
+        "frame_range": [
+          0.0,
+          18.0
+        ],
+        "seconds": 0.6
+      },
+      "Turn_Left": {
+        "frame_range": [
+          0.0,
+          15.0
+        ],
+        "seconds": 0.5
+      },
+      "Turn_Right": {
+        "frame_range": [
+          0.0,
+          15.0
+        ],
+        "seconds": 0.5
+      },
+      "Jump": {
+        "frame_range": [
+          0.0,
+          27.0
+        ],
+        "seconds": 0.9
+      },
+      "Interact": {
+        "frame_range": [
+          0.0,
+          36.0
+        ],
+        "seconds": 1.2
+      },
+      "Wave": {
+        "frame_range": [
+          0.0,
+          45.0
+        ],
+        "seconds": 1.5
+      },
+      "PickUp": {
+        "frame_range": [
+          0.0,
+          39.0
+        ],
+        "seconds": 1.3
+      },
+      "Celebrate": {
+        "frame_range": [
+          0.0,
+          51.0
+        ],
+        "seconds": 1.7
+      },
+      "Takeoff": {
+        "frame_range": [
+          0.0,
+          24.0
+        ],
+        "seconds": 0.8
+      },
+      "Flying": {
+        "frame_range": [
+          0.0,
+          36.0
+        ],
+        "seconds": 1.2
+      },
+      "Landing": {
+        "frame_range": [
+          0.0,
+          24.0
+        ],
+        "seconds": 0.8
+      }
+    },
+    "material_names": [
+      "AST_Antenna_Glow",
+      "AST_Boot_Sole",
+      "AST_Burgundy_Scarf",
+      "AST_Coral_Trim",
+      "AST_Cream_Helmet",
+      "AST_Cream_Suit",
+      "AST_Dark_Gray",
+      "AST_Envelope_Cream",
+      "AST_Gold_Hardware",
+      "AST_Gold_Soft",
+      "AST_Harness_Leather",
+      "AST_Lavender_Deep",
+      "AST_Lavender_Gloves",
+      "AST_Thruster_Glow",
+      "AST_Visor_Black"
+    ],
+    "visor_imported_base": [
+      0.00273,
+      0.00273,
+      0.00402,
+      1.0
+    ],
+    "loops": {
+      "Idle": 0.0,
+      "Walk": 0.0,
+      "Run": 0.0,
+      "Flying": 0.0
+    },
+    "ground_contact": {
+      "Idle": -0.0,
+      "Walk": -0.0,
+      "Run": -0.0,
+      "Turn_Left": -0.0,
+      "Turn_Right": -0.0,
+      "Jump": -0.0,
+      "Interact": -0.0,
+      "Wave": -1e-05,
+      "PickUp": -0.0,
+      "Celebrate": -1e-05,
+      "Takeoff": -0.0,
+      "Flying": 0.02066,
+      "Landing": -1e-05
+    },
+    "socket_follow": {
+      "ThrusterSocket_L": {
+        "Walk": {
+          "positions": [
+            [
+              0.1001,
+              -0.1407,
+              0.0654
+            ],
+            [
+              0.1076,
+              0.2196,
+              0.1086
+            ],
+            [
+              0.1001,
+              -0.1407,
+              0.0654
+            ]
+          ],
+          "spread": 0.36296
+        },
+        "Run": {
+          "positions": [
+            [
+              0.097,
+              -0.2202,
+              0.0749
+            ],
+            [
+              0.1081,
+              0.2891,
+              0.1329
+            ],
+            [
+              0.097,
+              -0.2202,
+              0.0749
+            ]
+          ],
+          "spread": 0.51271
+        },
+        "Takeoff": {
+          "positions": [
+            [
+              0.105,
+              0.015,
+              0.002
+            ],
+            [
+              0.104,
+              0.0253,
+              0.0459
+            ],
+            [
+              0.104,
+              0.0169,
+              0.04
+            ]
+          ],
+          "spread": 0.0451
+        },
+        "Flying": {
+          "positions": [
+            [
+              0.1041,
+              0.0242,
+              0.0403
+            ],
+            [
+              0.1038,
+              0.0096,
+              0.0398
+            ],
+            [
+              0.1041,
+              0.0242,
+              0.0403
+            ]
+          ],
+          "spread": 0.01461
+        },
+        "Landing": {
+          "positions": [
+            [
+              0.104,
+              0.0169,
+              0.04
+            ],
+            [
+              0.1048,
+              0.1264,
+              0.084
+            ],
+            [
+              0.105,
+              0.015,
+              0.002
+            ]
+          ],
+          "spread": 0.13833
+        }
+      },
+      "ThrusterSocket_R": {
+        "Walk": {
+          "positions": [
+            [
+              -0.1076,
+              0.2196,
+              0.1086
+            ],
+            [
+              -0.1001,
+              -0.1407,
+              0.0654
+            ],
+            [
+              -0.1076,
+              0.2196,
+              0.1086
+            ]
+          ],
+          "spread": 0.36296
+        },
+        "Run": {
+          "positions": [
+            [
+              -0.1081,
+              0.2891,
+              0.1329
+            ],
+            [
+              -0.097,
+              -0.2202,
+              0.0749
+            ],
+            [
+              -0.1081,
+              0.2891,
+              0.1329
+            ]
+          ],
+          "spread": 0.51271
+        },
+        "Takeoff": {
+          "positions": [
+            [
+              -0.105,
+              0.015,
+              0.002
+            ],
+            [
+              -0.104,
+              0.0253,
+              0.0459
+            ],
+            [
+              -0.104,
+              0.0169,
+              0.04
+            ]
+          ],
+          "spread": 0.0451
+        },
+        "Flying": {
+          "positions": [
+            [
+              -0.1041,
+              0.0242,
+              0.0403
+            ],
+            [
+              -0.1038,
+              0.0096,
+              0.0398
+            ],
+            [
+              -0.1041,
+              0.0242,
+              0.0403
+            ]
+          ],
+          "spread": 0.01461
+        },
+        "Landing": {
+          "positions": [
+            [
+              -0.104,
+              0.0169,
+              0.04
+            ],
+            [
+              -0.1048,
+              0.1264,
+              0.084
+            ],
+            [
+              -0.105,
+              0.015,
+              0.002
+            ]
+          ],
+          "spread": 0.13833
+        }
+      }
+    },
+    "root_drift": {
+      "Idle": 0.0,
+      "Walk": 0.0,
+      "Run": 0.0,
+      "Turn_Left": 0.0,
+      "Turn_Right": 0.0,
+      "Jump": 0.0,
+      "Interact": 0.0,
+      "Wave": 0.0,
+      "PickUp": 0.0,
+      "Celebrate": 0.0,
+      "Takeoff": 0.0,
+      "Flying": 0.0,
+      "Landing": 0.0
+    },
+    "pose_changes": 1.8825
+  },
+  "sockets": {
+    "ThrusterSocket_L": {
+      "parent": "Foot_L",
+      "rest_head": [
+        0.105,
+        0.0154,
+        0.0023
+      ],
+      "rest_exhaust": [
+        0.0,
+        0.0018,
+        -1.0
+      ],
+      "flying_exhaust": [
+        [
+          -0.0019,
+          0.0993,
+          -0.9951
+        ],
+        [
+          -0.0026,
+          0.0657,
+          -0.9978
+        ],
+        [
+          -0.0019,
+          0.0993,
+          -0.9951
+        ]
+      ]
+    },
+    "ThrusterSocket_R": {
+      "parent": "Foot_R",
+      "rest_head": [
+        -0.105,
+        0.0154,
+        0.0023
+      ],
+      "rest_exhaust": [
+        -0.0,
+        0.0018,
+        -1.0
+      ],
+      "flying_exhaust": [
+        [
+          0.0019,
+          0.0993,
+          -0.9951
+        ],
+        [
+          0.0026,
+          0.0657,
+          -0.9978
+        ],
+        [
+          0.0019,
+          0.0993,
+          -0.9951
+        ]
+      ]
+    }
+  },
+  "nozzles": {
+    "AST_ThrusterHousing_L": 0.004,
+    "AST_ThrusterHousing_R": 0.004,
+    "AST_ThrusterRing_L": 0.00154,
+    "AST_ThrusterRing_R": 0.00154,
+    "AST_ThrusterCore_L": 0.002,
+    "AST_ThrusterCore_R": 0.002
+  }
+}

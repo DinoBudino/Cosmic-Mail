@@ -9,6 +9,7 @@ import { explorerHologramSvg } from '../ui/onboarding/explorerHologramTexture'
 import { introHologramSvg } from '../ui/onboarding/introHologramTexture'
 import { routineDioramaSvg } from '../ui/onboarding/routineDioramaTexture'
 import { WindowHologram } from './WindowHologram'
+import { HubPip, type HubPipExpression } from './HubPipModel'
 import { useGameStore } from '../store/gameStore'
 import { isNavigationUnlocked, useOnboardingStore } from '../store/onboardingStore'
 import {
@@ -1117,7 +1118,7 @@ function MailShip() {
   )
 }
 
-type CabinExpression = 'curious' | 'happy' | 'thinking' | 'surprised'
+type CabinExpression = 'welcome' | 'curious' | 'happy' | 'thinking' | 'surprised'
 
 /** Narrative pose for Cabin PIP: reusable acting targets (position,
  *  tilt, gaze yaw and motion energy), damped every frame so moves
@@ -1149,7 +1150,7 @@ const HUB_POSE: PipPose = { x: 0.9, y: 0.14, z: -2.2, scale: 0.85, roll: 0.02, p
  * the projection — never as obstacles in front of it.
  */
 const PIP_ANCHORS = {
-  centerFocus: { x: 0.02, y: 0.2, z: -2.12, scale: 1.28 },
+  centerFocus: { x: 0, y: 0.2, z: -2.12, scale: 1.28 },
   // Side anchors sit just outside the window rim on screen (the
   // window edge projects to ~75% of half-width), lower than the
   // hologram band, so PIP never covers the projection.
@@ -1170,8 +1171,10 @@ const INTRO_ANCHORS: Record<IntroMoment, PipAnchorName> = {
 }
 
 const INTRO_POSES: Record<IntroMoment, PipPose> = {
-  // Welcome: settles into the centre, curious tilt, close to camera.
-  welcome: { ...PIP_ANCHORS.centerFocus, roll: -0.07, pitch: 0.05, yaw: 0.08, bob: 0.085, sway: 0.045, antenna: 0.08, lambda: 1.4 },
+  // Welcome: dead-centre, upright and directly facing the player.
+  // No roll/pitch/yaw and no lateral sway; only a soft float and a
+  // one-shot greeting hop keep him alive.
+  welcome: { ...PIP_ANCHORS.centerFocus, roll: 0, pitch: 0, yaw: 0, bob: 0.09, sway: 0, antenna: 0.07, lambda: 2 },
   // Explorers: right presenter, gaze toward the destinations.
   explorers: { ...PIP_ANCHORS.rightPresenter, roll: 0.05, pitch: 0.03, yaw: -0.2, bob: 0.07, sway: 0.035, antenna: 0.06, lambda: 1.8 },
   // Forgotten: left reflective, low and quiet beside the rover.
@@ -1199,7 +1202,10 @@ function expressionForPhase(phase: string, dialogueIndex = 0): CabinExpression {
     case 'intro': {
       // Cinematic intro reactions, driven by the subtitle line index.
       const moment = introMomentForLine(dialogueIndex)
-      if (moment === 'welcome' || moment === 'invitation') return 'happy'
+      // Welcome deliberately keeps the round eyes open and looks straight
+      // at the player, with the friendly open smile from the atlas.
+      if (moment === 'welcome') return 'welcome'
+      if (moment === 'invitation') return 'happy'
       if (moment === 'forgotten') return 'thinking'
       if (moment === 'reflection') return 'surprised'
       return 'curious'
@@ -1216,23 +1222,21 @@ function expressionForPhase(phase: string, dialogueIndex = 0): CabinExpression {
 }
 
 /**
- * PIP in miniature, in the same expressive language as the in-game
- * Companion: cream shell, dark screen face, pink eyes, antenna. Eyes
- * blink, the mouth follows the expression, and the body floats with a
- * happy wiggle when the moment calls for it.
+ * PIP in the onboarding cabin, rendered from the production GLB
+ * (PIP_RetroSpacePost). The cabin owns narrative staging: anchors,
+ * facing the player, bob, body sway and the celebration hop. The loaded
+ * model owns its face, blink, talking mouth, antenna and scarf tails.
  */
 function CabinPip() {
   const groupRef = useRef<THREE.Group>(null)
-  const eyeLeftRef = useRef<THREE.Mesh>(null)
-  const eyeRightRef = useRef<THREE.Mesh>(null)
-  const mouthRef = useRef<THREE.Mesh>(null)
-  const antennaRef = useRef<THREE.Group>(null)
   const phase = useOnboardingStore((state) => state.phase)
+  const boardingStage = useOnboardingStore((state) => state.boardingStage)
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const pipTalking = useOnboardingStore((state) => state.pipTalking)
   const tutorialDone = useOnboardingStore((state) => state.tutorialDone)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const expression = expressionForPhase(phase, dialogueIndex)
+  const hubExpression: HubPipExpression = expression === 'thinking' ? 'thoughtful' : expression
   const isIntro = phase === 'intro'
   const moment: IntroMoment | null = isIntro ? introMomentForLine(dialogueIndex) : null
   // Narrative acting target: intro poses per moment, otherwise the
@@ -1256,12 +1260,17 @@ function CabinPip() {
   // the instant he finished a line or the player clicked the bubble.
   const bobAmpRef = useRef(0.07)
   const swayAmpRef = useRef(0.03)
-  const antennaAmpRef = useRef(0.05)
   // Current acting pose (position/tilt/gaze), damped toward the target.
   const poseRef = useRef<PipPose>({ ...TUTORIAL_POSE })
   // Small celebration hop when the invitation hands over to reflection.
   const prevMomentRef = useRef<IntroMoment | null>(null)
   const hopStartRef = useRef(-1)
+  // Welcome must start dead-centre and upright, so the first welcome
+  // frame snaps to the acting target instead of damping in from the
+  // previous pose. The one-shot hop is a friendly greeting, not a tilt.
+  const welcomeSnappedRef = useRef(false)
+  const welcomeGreetedRef = useRef(false)
+  const welcomeGreetRef = useRef(-1)
 
   useFrame((state, delta) => {
     const group = groupRef.current
@@ -1279,32 +1288,72 @@ function CabinPip() {
     pose.pitch = damp(pose.pitch, targetPose.pitch, 4, delta)
     pose.yaw = damp(pose.yaw, targetPose.yaw, 4, delta)
 
+    const isWelcome = phase === 'intro' && dialogueIndex === 0
+    if (isWelcome && !welcomeSnappedRef.current) {
+      Object.assign(pose, targetPose)
+      bobAmpRef.current = targetPose.bob
+      swayAmpRef.current = targetPose.sway
+      welcomeSnappedRef.current = true
+      // Orient from the final welcome position so the very first frame
+      // already looks straight at the player.
+      group.position.set(pose.x, pose.y, pose.z)
+      group.scale.setScalar(pose.scale)
+    } else if (!isWelcome) {
+      welcomeSnappedRef.current = false
+      welcomeGreetedRef.current = false
+      welcomeGreetRef.current = -1
+    }
+    // Greet only once the cabin cut has happened: the hop was previously
+    // spent during the approach and never seen by the player.
+    if (isWelcome && boardingStage === 'cabin' && !welcomeGreetedRef.current && !reducedMotion) {
+      welcomeGreetedRef.current = true
+      welcomeGreetRef.current = time
+    }
+
     if (moment && prevMomentRef.current === 'invitation' && moment === 'reflection') {
       hopStartRef.current = time
     }
     prevMomentRef.current = moment
 
-    group.lookAt(state.camera.position)
-    // Gaze + body tilt on top of facing the player.
-    group.rotateX(pose.pitch)
-    group.rotateY(pose.yaw)
-    group.rotateZ(pose.roll)
+    if (isWelcome) {
+      // The welcome camera is dead ahead on the cabin centreline. Keep the
+      // model at identity so the first visible frame is exactly front-on,
+      // independent of useFrame ordering during the cabin cut.
+      group.rotation.set(0, 0, 0)
+    } else {
+      group.lookAt(state.camera.position)
+      // Gaze + body tilt on top of facing the player.
+      group.rotateX(pose.pitch)
+      group.rotateY(pose.yaw)
+      group.rotateZ(pose.roll)
+    }
 
     let hop = 0
+    if (!reducedMotion && welcomeGreetRef.current >= 0) {
+      // Small hello bounce, purely vertical: the greeting never tilts him.
+      const greetT = time - welcomeGreetRef.current
+      if (greetT < 0.75) {
+        hop += Math.sin((greetT / 0.75) * Math.PI) * 0.03 * (1 - greetT / 0.75)
+      } else {
+        welcomeGreetRef.current = -1
+      }
+    }
     if (!reducedMotion && hopStartRef.current >= 0) {
       const hopT = time - hopStartRef.current
-      if (hopT < 0.9) hop = Math.sin((hopT / 0.9) * Math.PI) * 0.11 * (1 - hopT / 0.9)
+      if (hopT < 0.9) hop += Math.sin((hopT / 0.9) * Math.PI) * 0.11 * (1 - hopT / 0.9)
       else hopStartRef.current = -1
     }
 
-    // Glide between poses, around the floating bob.
+    // Glide between poses, around the floating bob. Welcome keeps a soft
+    // float but no lateral sway, so he stays upright and dead-centre.
     group.position.x = pose.x
     group.position.z = pose.z
     group.scale.setScalar(pose.scale)
     if (!reducedMotion) {
-      bobAmpRef.current = damp(bobAmpRef.current, talking ? 0.11 : targetPose.bob, 5, delta)
-      swayAmpRef.current = damp(swayAmpRef.current, talking ? 0.06 : targetPose.sway, 5, delta)
-      antennaAmpRef.current = damp(antennaAmpRef.current, talking ? 0.18 : targetPose.antenna, 5, delta)
+      const bobTarget = isWelcome ? targetPose.bob : talking ? 0.11 : targetPose.bob
+      const swayTarget = isWelcome ? 0 : talking ? 0.06 : targetPose.sway
+      bobAmpRef.current = damp(bobAmpRef.current, bobTarget, 5, delta)
+      swayAmpRef.current = damp(swayAmpRef.current, swayTarget, 5, delta)
       // Fixed frequencies: only the amplitudes blend, never the phase.
       group.position.y = pose.y + Math.sin(time * 1.9) * bobAmpRef.current + hop
       // Additive sway ON TOP of the pose roll — an absolute
@@ -1313,93 +1362,25 @@ function CabinPip() {
     } else {
       group.position.y = pose.y
     }
-    // Blink: eyes squash briefly every few seconds.
-    const blink = !reducedMotion && time % 3.4 > 3.25
-    const eyeScaleY = blink ? 0.12 : expression === 'happy' ? 0.75 : 1
-    eyeLeftRef.current?.scale.set(1, eyeScaleY, 1)
-    eyeRightRef.current?.scale.set(1, eyeScaleY, 1)
-    // Mouth: while talking it opens and closes like syllables; at rest it
-    // settles into the expression (line, smile, open only when surprised).
-    // The transform itself is damped so line swaps never pop.
-    const mouth = mouthRef.current
-    if (mouth) {
-      let targetX = 1.6
-      let targetY = 0.32
-      if (talking) {
-        const syllable = Math.abs(Math.sin(time * 13) * 0.7 + Math.sin(time * 7.3) * 0.3)
-        targetX = 1.15 - syllable * 0.25
-        targetY = 0.3 + syllable * 1.1
-      } else if (expression === 'surprised') {
-        targetX = 0.6
-        targetY = 1.6
-      } else if (expression === 'happy') {
-        targetX = 1.7
-        targetY = 0.6
-      } else if (expression === 'thinking') {
-        targetX = 0.5
-        targetY = 0.45
-      }
-      const mouthLambda = talking ? 18 : 10
-      mouth.scale.x = damp(mouth.scale.x, targetX, mouthLambda, delta)
-      mouth.scale.y = damp(mouth.scale.y, targetY, mouthLambda, delta)
-    }
-    // Antenna wiggles while talking, like the in-game PIP (fixed
-    // frequency + blended amplitude, so no phase jump on toggle).
-    if (antennaRef.current) {
-      antennaRef.current.rotation.z = Math.sin(time * 4) * antennaAmpRef.current
-    }
+    // Facial expression, blink, talking mouth, antenna and scarf movement
+    // now live inside HubPipModel; the cabin keeps only placement and pose.
   })
 
   return (
     <group ref={groupRef} position={[0.05, 0.18, -2.35]} scale={1.15}>
-      {/* Shell */}
-      <mesh>
-        <sphereGeometry args={[0.32, 28, 20]} />
-        <meshStandardMaterial color="#F2EAE5" roughness={0.55} />
-      </mesh>
-      {/* Screen face: protrudes past the shell so the dark screen reads */}
-      <mesh position={[0, 0.02, 0.20]} scale={[1, 0.82, 0.7]}>
-        <sphereGeometry args={[0.24, 24, 18]} />
-        <meshStandardMaterial color="#17172E" roughness={0.35} />
-      </mesh>
-      {/* Eyes */}
-      <mesh ref={eyeLeftRef} position={[-0.085, 0.06, 0.36]}>
-        <sphereGeometry args={[0.035, 10, 8]} />
-        <meshBasicMaterial color="#F2B5E2" toneMapped={false} />
-      </mesh>
-      <mesh ref={eyeRightRef} position={[0.085, 0.06, 0.36]}>
-        <sphereGeometry args={[0.035, 10, 8]} />
-        <meshBasicMaterial color="#F2B5E2" toneMapped={false} />
-      </mesh>
-      {/* Mouth */}
-      <mesh ref={mouthRef} position={[0, -0.06, 0.36]}>
-        <sphereGeometry args={[0.045, 10, 8]} />
-        <meshBasicMaterial color="#F2B5E2" toneMapped={false} />
-      </mesh>
-      {/* Antenna */}
-      <group ref={antennaRef} position={[0.14, 0.30, 0]}>
-        <mesh position={[0, 0.08, 0]}>
-          <cylinderGeometry args={[0.012, 0.012, 0.16, 8]} />
-          <meshStandardMaterial color="#75658C" roughness={0.5} />
-        </mesh>
-        <mesh position={[0, 0.17, 0]}>
-          <sphereGeometry args={[0.03, 10, 8]} />
-          <meshBasicMaterial color="#F2B5E2" toneMapped={false} />
-        </mesh>
-      </group>
-      {/* Side stabilizers + warm thruster dot */}
-      <mesh position={[-0.34, -0.05, 0]}>
-        <sphereGeometry args={[0.07, 12, 10]} />
-        <meshStandardMaterial color="#75658C" roughness={0.5} />
-      </mesh>
-      <mesh position={[0.34, -0.05, 0]}>
-        <sphereGeometry args={[0.07, 12, 10]} />
-        <meshStandardMaterial color="#75658C" roughness={0.5} />
-      </mesh>
-      <mesh position={[0, -0.33, 0]}>
-        <sphereGeometry args={[0.045, 10, 8]} />
-        <meshBasicMaterial color="#FFBA70" toneMapped={false} />
-      </mesh>
+      {/*
+        Legacy procedural CabinPip visual is disabled here.
+        The production PIP GLB now represents the companion in the hub;
+        the previous primitive shell/eyes/antenna block was removed from
+        this mount point and remains available in git history.
+      */}
+      <HubPip
+        expression={hubExpression}
+        talking={pipTalking && !reducedMotion}
+        reducedMotion={reducedMotion}
+        antennaAmplitude={targetPose.antenna}
+        scale={0.64}
+      />
     </group>
   )
 }

@@ -1,0 +1,92 @@
+{
+  "asset_name": "PIP_RetroSpacePost",
+  "generated_utc": "2026-11-10T02:30:19Z",
+  "blender_version": "5.2.3 LTS",
+  "blender_file_created": true,
+  "blender_file_size_bytes": 812569,
+  "glb_file_created": true,
+  "glb_file_size_bytes": 928524,
+  "glb_header_valid": true,
+  "glb_bin_chunk_present": true,
+  "glb_parse_validated": true,
+  "triangle_count": 16928,
+  "triangle_count_blend_evaluated": 16928,
+  "mesh_count": 37,
+  "node_count": 51,
+  "material_count": 18,
+  "texture_count": 4,
+  "image_count": 3,
+  "animation_count": 0,
+  "morph_target_count": 0,
+  "root_node": "PIP_ROOT",
+  "required_nodes_present": true,
+  "missing_nodes": [],
+  "orientation_validated": true,
+  "orientation_checks": {
+    "root_scale_unit": true,
+    "eye_l_forward_positive_z": true,
+    "antenna_orb_up_positive_y": true
+  },
+  "forward_axis_after_export": "+Z",
+  "up_axis_after_export": "+Y",
+  "root_scale": [
+    1,
+    1,
+    1
+  ],
+  "facial_controls_strategy": "independent emissive texture-atlas offset per Eye_L, Eye_R and Mouth",
+  "facial_materials": {
+    "PIP_Eye_L": true,
+    "PIP_Eye_R": true,
+    "PIP_Mouth": true
+  },
+  "facial_controls_validated": true,
+  "texture_transform_count": 3,
+  "expression_count": 8,
+  "mouth_openness_levels": 4,
+  "embedded_textures_validated": true,
+  "cameras_in_glb": false,
+  "lights_in_glb": false,
+  "extensions_used": [
+    "KHR_materials_emissive_strength",
+    "KHR_texture_transform"
+  ],
+  "preview_renders": [
+    "PIP_preview_front.png",
+    "PIP_preview_threequarter.png",
+    "PIP_preview_side.png",
+    "PIP_preview_back.png",
+    "PIP_preview_welcome.png",
+    "PIP_preview_welcome_face.png",
+    "PIP_preview_expressions.png",
+    "PIP_preview_glb_reimport.png"
+  ],
+  "notes": [
+    "Final visual pass compared front, three-quarter, side, back and expression renders against the supplied character sheet.",
+    "The reference sheet is not embedded in the asset; only the generated atlases are packed.",
+    "No baked animation clips are exported; hover/bob/antenna/scarf motion is procedural on the exported pivots.",
+    "Preview cameras, lights and floor are excluded from the GLB.",
+    "Independent re-import render of the exported GLB is included in previews."
+  ],
+  "glb_reimport": {
+    "glb_reimport_validated": true,
+    "imported_objects": 51,
+    "imported_meshes": 37,
+    "imported_materials": 18,
+    "imported_images": 3,
+    "required_nodes_present": true,
+    "missing_nodes": [],
+    "facial_materials_present": {
+      "PIP_Eye_L": true,
+      "PIP_Eye_R": true,
+      "PIP_Mouth": true
+    },
+    "mapping_nodes_in_materials": 3,
+    "render": "previews/PIP_preview_glb_reimport.png",
+    "notes": [
+      "Independent re-import of the exported GLB in a fresh Blender scene.",
+      "The re-import render is a visual check of the exported materials and hierarchy."
+    ]
+  },
+  "glb_reimport_validated": true
+}
