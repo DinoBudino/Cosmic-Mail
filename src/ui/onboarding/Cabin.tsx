@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   DISCOVERY_QUESTIONS,
-  getTrait,
+  INTRO_LINES,
+  getExplorer,
+  getHeroForTrait,
 } from '../../data/personalization'
 import { speakPip, stopPipVoice } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
@@ -13,28 +15,47 @@ function useDialogueLines(): string[] {
   const phase = useOnboardingStore((state) => state.phase)
   const questionIndex = useOnboardingStore((state) => state.questionIndex)
   const traitId = useOnboardingStore((state) => state.trait)
+  const explorerId = useOnboardingStore((state) => state.explorerId)
+  const explorerPreviewId = useOnboardingStore((state) => state.explorerPreviewId)
   const tutorialDone = useOnboardingStore((state) => state.tutorialDone)
   const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
 
   switch (phase) {
+    case 'intro':
+      return [...INTRO_LINES]
     case 'questions': {
-      // PIP asks the question himself: lead-in line, then the question.
+      // PIP asks the question himself: lead-in line, then the
+      // question. Q1 goes straight to the question — the intro
+      // already greeted the child ("Welcome aboard" would repeat).
       const question = DISCOVERY_QUESTIONS[questionIndex]
       if (!question) return []
-      return [question.pipIntro, question.question]
+      return questionIndex === 0 ? [question.question] : [question.pipIntro, question.question]
     }
     case 'reveal':
       return ['The stars have spoken...']
-    case 'explorer':
-      return [
-        traitId
-          ? `You and these explorers share the same ${getTrait(traitId).name} spirit. Which one's story feels most like yours?`
-          : 'Which one feels most like you?',
-      ]
-    case 'module':
-      return ['Pick one special module. The others will wait for future missions!']
+    case 'explorer': {
+      if (!traitId) return ['Which explorer feels like you?']
+      // Follow the hero CURRENTLY SHOWN in the window: the carousel
+      // preview when browsing, otherwise the assigned hero. The
+      // recorded line for each hero already exists (cabin-explorer-*),
+      // so the voice always matches the visible character.
+      const shownId = explorerPreviewId ?? explorerId
+      let hero = getHeroForTrait(traitId)
+      if (shownId) {
+        try {
+          hero = getExplorer(shownId)
+        } catch {
+          // Unknown preview id: keep the assigned hero.
+        }
+      }
+      // History first, then the fictional power it inspires. Each
+      // hero has its own recordings for both lines, so the voice
+      // always matches the character visible in the window.
+      return [hero.meetLine, hero.powerLine]
+    }
     case 'name':
-      return ["Everything is ready, but wait! Don't forget: without your name, this letter can't take off. Sign it, carrier!"]
+      // Warm, short invitation: the card itself carries the rest.
+      return ['One last thing, carrier! Every letter needs a name. What should I call you?']
     case 'hub':
       // Route confirmed: PIP's one-line all-set cue pointing at the
       // big red button (“Press the red button”) — the tutorial itself
@@ -48,9 +69,11 @@ function useDialogueLines(): string[] {
       // the pilot taps the navigation panel.
       if (!tutorialDone) {
         return [
-          'This is your passport, carrier — your name, your spirit, your stamps.',
+          // Soft arrival beat, so the hub does not start mid-topic.
+          'Look, carrier — your Cosmic Mail passport is ready!',
+          'It holds your name, your power, your hero and your stamps.',
           'And this green screen is navigation. Moon and Deep Space are still sleeping — Mars is ready.',
-          'When you are ready, tap the radar screen and choose.',
+          'When you land, find the silent machines and deliver their letters. When you are ready, tap the radar screen and choose.',
         ]
       }
       return []
@@ -177,7 +200,7 @@ export function Cabin({ children }: { children: ReactNode }) {
       // whose rendered top is what the bubble must clear. The bubble's
       // current lift is compensated so re-measuring stays stable.
       const panel = content.querySelector<HTMLElement>(
-        '.tablet, .shipping-label, .onboarding__panel',
+        '.tablet, .shipping-label, .onboarding__panel, .routine__selector, .routine-reveal__panel',
       )
       if (!panel) {
         setLiftPx(0)
@@ -186,7 +209,9 @@ export function Cabin({ children }: { children: ReactNode }) {
       const bubbleBottom = bubble.getBoundingClientRect().bottom
       const overlap = bubbleBottom - (panel.getBoundingClientRect().top - 14)
       setLiftPx((current) => {
-        const desired = Math.max(0, current + overlap)
+        // Capped so the bubble never climbs back onto PIP's face: if
+        // the panel is very tall, the panel compacts instead.
+        const desired = Math.min(120, Math.max(0, current + overlap))
         return Math.abs(desired - current) < 1 ? current : desired
       })
     }
@@ -236,9 +261,9 @@ export function Cabin({ children }: { children: ReactNode }) {
     <div className="cabin">
       <div className="boarding__veil" aria-hidden="true" />
 
-      {!signing && lines.length > 0 && (
+      {!signing && lines.length > 0 && phase !== 'intro' && (
       <div
-        className={`pip-bubble-wrap${phase === 'hub' && (passportDetailOpen || routeOpen) ? ' is-hidden' : ''}`}
+        className={`pip-bubble-wrap${phase === 'questions' || phase === 'reveal' ? ' pip-bubble-wrap--mid' : ''}${phase === 'explorer' ? ' pip-bubble-wrap--hero' : ''}${phase === 'hub' && (passportDetailOpen || routeOpen) ? ' is-hidden' : ''}`}
         ref={bubbleRef}
         style={{ transform: liftPx > 0 ? `translateY(${-liftPx}px)` : undefined }}
       >

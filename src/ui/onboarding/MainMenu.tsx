@@ -102,7 +102,7 @@ export function MainMenu() {
         <h1 id="menu-title" className="menu__title">
           COSMIC MAIL
         </h1>
-        <p className="menu__tagline">Letters to the Forgotten Explorers</p>
+        <p className="menu__tagline">Abandoned, but not forgotten</p>
         <span className="menu__divider" aria-hidden="true">
           ✦
         </span>

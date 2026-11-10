@@ -1,11 +1,11 @@
 /**
  * Personalization data for the explorer discovery ritual.
  *
- * Content only — no React, no rendering. Aligned with the team design
- * document "Flujo Cartero Cósmico": five traits, two historical
- * explorers per trait, and the four mission items with their real-world
- * NASA inspirations. Historical profiles use widely verified facts; avoid
- * dates or claims that would need a fresh source check before publishing.
+ * Content only — no React, no rendering. Five powers, one historical
+ * hero per power. The hero IS the power's real-world face; there is no
+ * separate mission module. Historical profiles use widely verified
+ * facts; avoid dates or claims that would need a fresh source check
+ * before publishing.
  */
 
 export type TraitId = 'brave' | 'observant' | 'methodical' | 'careful' | 'reflective'
@@ -180,92 +180,122 @@ export interface HistoricalExplorer {
   id: string
   name: string
   trait: TraitId
-  /** Every trait pairs one girl and one boy explorer. */
+  /** Informative only: the hero's gender is shown on the card, never a filter. */
   gender: 'girl' | 'boy'
+  /** Why this person represents their power, in one kid-friendly line. */
   bio: string
+  /** PIP's restored memory line when the fragment is recovered. */
+  memoryLine: string
+  /** Short spoken version of `bio` for PIP's explorer-step line. */
+  spokenBio: string
+  /** Brief history line for PIP (recorded per hero). */
+  meetLine: string
+  /** How that history inspires the hero's power (recorded per hero). */
+  powerLine: string
   accent: string
 }
 
+/**
+ * PIP's cinematic introduction, shown before the Routine Check:
+ * five narrative moments over these ten subtitle lines.
+ * Premise (NASA Space Apps Challenge 2026 — "Abandoned but not Forgotten"):
+ * NASA left machines across the Moon, Mars and deep space; when their
+ * missions ended they fell silent. The child is the new Cosmic Mail
+ * carrier who will visit them and deliver their letters so their
+ * stories are heard again. Letters are a fictional storytelling device;
+ * the machine facts linked from the sites are the real NASA record.
+ * These lines are recorded (see pipVoice.ts cabin-intro-* keys) and
+ * spoken by Intro.tsx as each subtitle appears.
+ */
+export const INTRO_LINES: readonly string[] = [
+  "Hi! I'm PIP, your cabin buddy. Welcome aboard Cosmic Mail!",
+  'Long ago, explorers traveled to the Moon, Mars, and far beyond.',
+  "They were machines, sent to discover things humans couldn't see.",
+  'Some of their missions have ended.',
+  'But their stories are still out there, waiting to be remembered.',
+  "That's where you come in!",
+  "You'll travel across space and deliver letters to these forgotten explorers. Will you help me?",
+  'Every explorer sees the universe in a different way.',
+  "Before we begin, let's discover your explorer spirit.",
+]
+
+export type IntroMoment = 'welcome' | 'explorers' | 'forgotten' | 'invitation' | 'reflection'
+
+/** Which cinematic moment a subtitle line belongs to (shared by the
+ *  intro visuals in Intro.tsx and PIP's reactions in MenuScene). */
+export function introMomentForLine(index: number): IntroMoment {
+  if (index <= 0) return 'welcome'
+  if (index <= 2) return 'explorers'
+  if (index <= 4) return 'forgotten'
+  if (index <= 6) return 'invitation'
+  return 'reflection'
+}
+
+/**
+ * One hero per power. The hero IS the power's real-world face: the
+ * Routine Check assigns one, and recovering a memory fragment in Mars
+ * restores another (see onboardingStore.collectMemory).
+ */
 export const HISTORICAL_EXPLORERS: readonly HistoricalExplorer[] = [
   {
-    id: 'valentina-tereshkova',
-    name: 'Valentina Tereshkova',
+    id: 'sally-ride',
+    name: 'Sally Ride',
     trait: 'brave',
     gender: 'girl',
-    bio: 'The first woman in space. In 1963 she orbited Earth alone aboard Vostok 6, spending almost three days in space on her historic flight.',
+    bio: 'Sally Ride became the first American woman in space in 1983.',
+    memoryLine: 'I became the first American woman in space in 1983.',
+    spokenBio: 'She became the first woman in space in 1983',
+    meetLine: 'Sally Ride became the first American woman in space in 1983.',
+    powerLine: 'Her courage inspires Second Chance: make one mistake without starting over!',
     accent: '#f4b4df',
-  },
-  {
-    id: 'yuri-gagarin',
-    name: 'Yuri Gagarin',
-    trait: 'brave',
-    gender: 'boy',
-    bio: 'The first human in space. In 1961 he orbited Earth aboard Vostok 1, and his brave flight opened the way for every explorer who followed.',
-    accent: '#b8a6d9',
   },
   {
     id: 'mae-jemison',
     name: 'Mae Jemison',
     trait: 'observant',
     gender: 'girl',
-    bio: 'A doctor and astronaut who became the first African American woman in space in 1992. She studied how bodies behave in zero gravity aboard the Space Shuttle Endeavour.',
+    bio: 'Mae Jemison traveled into space in 1992. She was both a scientist and an astronaut.',
+    memoryLine: 'I traveled into space in 1992 and studied how bodies behave in zero gravity.',
+    spokenBio: 'She traveled into space in 1992',
+    meetLine: 'Mae Jemison traveled into space in 1992. She was both a scientist and an astronaut.',
+    powerLine: 'Her curiosity inspires Explorer Vision: reveal important clues!',
     accent: '#f2b28c',
-  },
-  {
-    id: 'chris-hadfield',
-    name: 'Chris Hadfield',
-    trait: 'observant',
-    gender: 'boy',
-    bio: 'A Canadian astronaut who commanded the International Space Station. He photographed Earth from orbit and shared how our planet looks from space with the whole world.',
-    accent: '#ffd9a8',
   },
   {
     id: 'katherine-johnson',
     name: 'Katherine Johnson',
     trait: 'methodical',
     gender: 'girl',
-    bio: 'A NASA mathematician who calculated trajectories for spaceflights, including John Glenn’s orbit around Earth. Her precise numbers helped astronauts fly safely.',
+    bio: 'Katherine Johnson used mathematics to calculate important spaceflight paths.',
+    memoryLine: 'My careful calculations helped astronauts travel safely.',
+    spokenBio: 'She used mathematics to calculate important spaceflight paths',
+    meetLine: 'Katherine Johnson used mathematics to calculate important spaceflight paths.',
+    powerLine: 'Her careful math inspires Mission Plan: follow clear steps to solve challenges!',
     accent: '#ffd9a8',
-  },
-  {
-    id: 'wernher-von-braun',
-    name: 'Wernher von Braun',
-    trait: 'methodical',
-    gender: 'boy',
-    bio: 'A rocket scientist who built spacecraft step by step, testing every part with care. His methodical work helped rockets carry astronauts to the Moon.',
-    accent: '#f2b28c',
   },
   {
     id: 'margaret-hamilton',
     name: 'Margaret Hamilton',
     trait: 'careful',
     gender: 'girl',
-    bio: 'A computer scientist who led the team that wrote the software for the Apollo Guidance Computer. Her careful testing kept every step of the Moon missions safe.',
+    bio: 'Margaret Hamilton led a team that developed software for the Apollo missions.',
+    memoryLine: 'I led a team that wrote software for the Apollo missions.',
+    spokenBio: 'She led a team that developed software for the Apollo missions',
+    meetLine: 'Margaret Hamilton led a team that developed software for the Apollo missions.',
+    powerLine: 'Her attention to detail inspires Safety Check: spot a possible mistake before acting!',
     accent: '#b8a6d9',
-  },
-  {
-    id: 'michael-collins',
-    name: 'Michael Collins',
-    trait: 'careful',
-    gender: 'boy',
-    bio: 'The Apollo 11 command module pilot who orbited the Moon alone while his crewmates landed. His careful flying brought everyone home safely.',
-    accent: '#f4b4df',
   },
   {
     id: 'carl-sagan',
     name: 'Carl Sagan',
     trait: 'reflective',
     gender: 'boy',
-    bio: 'An astronomer and writer who thought deeply about humanity’s place in the universe. He inspired the famous “Pale Blue Dot” photograph of Earth from far away.',
+    bio: 'Carl Sagan studied planets and inspired people to explore big questions about the universe.',
+    memoryLine: 'I helped people ask big questions about the universe.',
+    spokenBio: 'He studied planets and inspired people to ask big questions',
+    meetLine: 'Carl Sagan studied planets and inspired people to explore big questions about the universe.',
+    powerLine: 'His curiosity inspires Time to Think: slow down danger and pause to decide!',
     accent: '#f2b28c',
-  },
-  {
-    id: 'sally-ride',
-    name: 'Sally Ride',
-    trait: 'reflective',
-    gender: 'girl',
-    bio: 'The first American woman in space in 1983. After her flights she became a science teacher who thought deeply about how to inspire the next explorers.',
-    accent: '#ffd9a8',
   },
 ]
 
@@ -273,65 +303,17 @@ export function explorersForTrait(trait: TraitId): readonly HistoricalExplorer[]
   return HISTORICAL_EXPLORERS.filter((entry) => entry.trait === trait)
 }
 
+/** The single hero who represents a power (one hero per power). */
+export function getHeroForTrait(trait: TraitId): HistoricalExplorer {
+  const hero = HISTORICAL_EXPLORERS.find((entry) => entry.trait === trait)
+  if (!hero) throw new Error(`No hero for trait: ${trait}`)
+  return hero
+}
+
 export function getExplorer(id: string): HistoricalExplorer {
   const explorer = HISTORICAL_EXPLORERS.find((entry) => entry.id === id)
   if (!explorer) throw new Error(`Unknown explorer: ${id}`)
   return explorer
-}
-
-/* ------------------------------------------------------------------ */
-/* Mission modules (first item) — from the design document             */
-/* ------------------------------------------------------------------ */
-
-export interface MissionModule {
-  id: string
-  name: string
-  /** Hologram glyph shown on the tablet. */
-  glyph: string
-  ability: string
-  inspiration: string
-  accent: string
-}
-
-export const MISSION_MODULES: readonly MissionModule[] = [
-  {
-    id: 'meteor-shield',
-    glyph: '🛡️',
-    name: 'Meteor Shield',
-    ability: 'Survive one slip without starting over.',
-    inspiration: 'Inspired by Whipple shields, the protective layers that guard spacecraft from tiny meteor hits.',
-    accent: '#ffd9a8',
-  },
-  {
-    id: 'explorer-visor',
-    glyph: '🔭',
-    name: 'Explorer Visor',
-    ability: 'Highlights the path and the key point ahead.',
-    inspiration: 'Inspired by the cameras and sensors that help rovers spot what matters on alien ground.',
-    accent: '#f4b4df',
-  },
-  {
-    id: 'wrist-checklist',
-    glyph: '📋',
-    name: 'Wrist Checklist',
-    ability: 'Shows your mission plan step by step.',
-    inspiration: 'Inspired by the checklists Apollo astronauts wore strapped to their wrists.',
-    accent: '#f2b28c',
-  },
-  {
-    id: 'mission-clock',
-    glyph: '⏱️',
-    name: 'Mission Clock',
-    ability: 'Slows danger down so you can pause and think.',
-    inspiration: 'Inspired by the mission timers that help space crews plan every second of a flight.',
-    accent: '#b8a6d9',
-  },
-]
-
-export function getModule(id: string): MissionModule {
-  const module = MISSION_MODULES.find((entry) => entry.id === id)
-  if (!module) throw new Error(`Unknown module: ${id}`)
-  return module
 }
 
 /* ------------------------------------------------------------------ */
@@ -349,4 +331,5 @@ export function isValidExplorerName(raw: string): boolean {
 }
 
 export const STAMP_SLOTS = 12
-export const MODULE_SLOTS = 4
+/** Total hero memories in the archive (one per power). */
+export const MEMORY_SLOTS = 5

@@ -20,6 +20,13 @@ export interface MarsObject {
   position: WorldPosition
   state: ObjectState
   description: string
+  /**
+   * The machine's own voice, in first person. This is the fictional
+   * storytelling frame of Cosmic Mail (letters that bring silent
+   * artifacts back to life); `description` and `sources` carry the
+   * real NASA record.
+   */
+  artifactVoice: string
   sources: readonly string[]
   lastReviewed: string
 }
@@ -44,6 +51,7 @@ export const MARS_OBJECTS: readonly MarsObject[] = [
     state: 'available',
     description:
       'A NASA rover that explored Meridiani Planum from 2004 to 2018, far beyond its planned 90-day mission.',
+    artifactVoice: 'I was planned for 90 days… and I drove for almost 15 years. The dust covered my solar panels, but I kept going.',
     sources: ['https://science.nasa.gov/mission/mer-opportunity/'],
     lastReviewed: '2026-11-08',
   },
@@ -55,6 +63,7 @@ export const MARS_OBJECTS: readonly MarsObject[] = [
     state: 'coming-soon',
     description:
       "NASA's first successful Mars lander. Viking 1 operated on the surface from 1976 to 1982.",
+    artifactVoice: 'I was the first to land and speak from Mars. My radio still waits for a letter that never came.',
     sources: ['https://science.nasa.gov/mission/viking/'],
     lastReviewed: '2026-11-08',
   },
@@ -66,6 +75,7 @@ export const MARS_OBJECTS: readonly MarsObject[] = [
     state: 'available',
     description:
       'The first aircraft to fly on another planet. It completed 72 flights between 2021 and 2024.',
+    artifactVoice: 'Seventy-two little flights over Jezero… I showed everyone that flying on Mars is possible.',
     sources: [
       'https://science.nasa.gov/mission/mars-2020-perseverance/ingenuity-mars-helicopter/',
     ],
@@ -79,6 +89,7 @@ export const MARS_OBJECTS: readonly MarsObject[] = [
     state: 'available',
     description:
       'A lander that listened for marsquakes and studied the interior of Mars between 2018 and 2022.',
+    artifactVoice: 'I sat very still and listened to the planet breathe. Every marsquake told me a new secret.',
     sources: ['https://science.nasa.gov/mission/insight/'],
     lastReviewed: '2026-11-08',
   },

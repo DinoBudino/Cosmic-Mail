@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { mulberry32 } from './random'
 import { destinationPlanetKind, ZONES, type PlanetKind } from '../data/zones'
-import { getExplorer, getModule, getTrait } from '../data/personalization'
+import { DISCOVERY_QUESTIONS, getExplorer, getTrait, introMomentForLine, type IntroMoment } from '../data/personalization'
+import { explorerHologramSvg } from '../ui/onboarding/explorerHologramTexture'
+import { introHologramSvg } from '../ui/onboarding/introHologramTexture'
+import { routineDioramaSvg } from '../ui/onboarding/routineDioramaTexture'
+import { WindowHologram } from './WindowHologram'
 import { useGameStore } from '../store/gameStore'
 import { isNavigationUnlocked, useOnboardingStore } from '../store/onboardingStore'
 import {
@@ -1115,11 +1119,93 @@ function MailShip() {
 
 type CabinExpression = 'curious' | 'happy' | 'thinking' | 'surprised'
 
-function expressionForPhase(phase: string): CabinExpression {
+/** Narrative pose for Cabin PIP: reusable acting targets (position,
+ *  tilt, gaze yaw and motion energy), damped every frame so moves
+ *  ease in/out instead of teleporting. The intro poses free the
+ *  centre of the frame for the hologram of the moment. */
+interface PipPose {
+  x: number
+  y: number
+  z: number
+  scale: number
+  roll: number
+  pitch: number
+  yaw: number
+  bob: number
+  sway: number
+  antenna: number
+  lambda: number
+}
+
+const TUTORIAL_POSE: PipPose = { x: 0.05, y: 0.18, z: -2.35, scale: 1.15, roll: 0.02, pitch: 0, yaw: 0, bob: 0.07, sway: 0.03, antenna: 0.05, lambda: 2 }
+const HUB_POSE: PipPose = { x: 0.9, y: 0.14, z: -2.2, scale: 0.85, roll: 0.02, pitch: 0, yaw: 0, bob: 0.07, sway: 0.03, antenna: 0.05, lambda: 2 }
+
+/**
+ * Staging anchors for the cinematic intro. The window's centre is a
+ * protected safe zone for the hologram of the moment; PIP only
+ * occupies the centre anchor in Welcome, when he is the sole focus.
+ * Side anchors sit near the window's inner rim, smaller and slightly
+ * lower than the tutorial spot, so they read as presenters beside
+ * the projection — never as obstacles in front of it.
+ */
+const PIP_ANCHORS = {
+  centerFocus: { x: 0.02, y: 0.2, z: -2.12, scale: 1.28 },
+  // Side anchors sit just outside the window rim on screen (the
+  // window edge projects to ~75% of half-width), lower than the
+  // hologram band, so PIP never covers the projection.
+  leftPresenter: { x: -1.18, y: -0.35, z: -2.28, scale: 0.9 },
+  rightPresenter: { x: 1.18, y: -0.35, z: -2.28, scale: 0.9 },
+  leftReflective: { x: -1.18, y: -0.38, z: -2.34, scale: 0.88 },
+  rightReflective: { x: 1.18, y: -0.32, z: -2.34, scale: 0.88 },
+} as const
+
+type PipAnchorName = keyof typeof PIP_ANCHORS
+
+const INTRO_ANCHORS: Record<IntroMoment, PipAnchorName> = {
+  welcome: 'centerFocus',
+  explorers: 'rightPresenter',
+  forgotten: 'leftReflective',
+  invitation: 'leftPresenter',
+  reflection: 'rightReflective',
+}
+
+const INTRO_POSES: Record<IntroMoment, PipPose> = {
+  // Welcome: settles into the centre, curious tilt, close to camera.
+  welcome: { ...PIP_ANCHORS.centerFocus, roll: -0.07, pitch: 0.05, yaw: 0.08, bob: 0.085, sway: 0.045, antenna: 0.08, lambda: 1.4 },
+  // Explorers: right presenter, gaze toward the destinations.
+  explorers: { ...PIP_ANCHORS.rightPresenter, roll: 0.05, pitch: 0.03, yaw: -0.2, bob: 0.07, sway: 0.035, antenna: 0.06, lambda: 1.8 },
+  // Forgotten: left reflective, low and quiet beside the rover.
+  forgotten: { ...PIP_ANCHORS.leftReflective, roll: 0.04, pitch: 0.12, yaw: 0.12, bob: 0.025, sway: 0.012, antenna: 0.02, lambda: 1.6 },
+  // Invitation: left presenter leaning toward the letter.
+  invitation: { ...PIP_ANCHORS.leftPresenter, roll: -0.04, pitch: 0.08, yaw: 0.1, bob: 0.08, sway: 0.04, antenna: 0.09, lambda: 1.8 },
+  // Reflection: right reflective, contemplating the constellation.
+  reflection: { ...PIP_ANCHORS.rightReflective, roll: 0.06, pitch: -0.04, yaw: -0.16, bob: 0.06, sway: 0.03, antenna: 0.07, lambda: 1.7 },
+}
+
+function poseForIntro(moment: IntroMoment, lineIndex: number): PipPose {
+  const base: PipPose = { ...INTRO_POSES[moment], ...PIP_ANCHORS[INTRO_ANCHORS[moment]] }
+  // Gaze shifts with the words: Moon first, then the rest; envelope
+  // first, then the child's face on the question line.
+  if (moment === 'explorers') return { ...base, yaw: lineIndex <= 1 ? -0.34 : -0.1 }
+  if (moment === 'invitation') return { ...base, pitch: lineIndex >= 6 ? 0 : 0.08, yaw: 0 }
+  if (moment === 'reflection') return { ...base, yaw: lineIndex >= 8 ? 0 : -0.16 }
+  return base
+}
+
+function expressionForPhase(phase: string, dialogueIndex = 0): CabinExpression {
   switch (phase) {
     case 'reveal':
       return 'surprised'
-    case 'module':
+    case 'intro': {
+      // Cinematic intro reactions, driven by the subtitle line index.
+      const moment = introMomentForLine(dialogueIndex)
+      if (moment === 'welcome' || moment === 'invitation') return 'happy'
+      if (moment === 'forgotten') return 'thinking'
+      if (moment === 'reflection') return 'surprised'
+      return 'curious'
+    }
+    case 'explorer':
+      return dialogueIndex >= 0 ? 'happy' : 'curious'
     case 'passport':
       return 'happy'
     case 'name':
@@ -1142,45 +1228,90 @@ function CabinPip() {
   const mouthRef = useRef<THREE.Mesh>(null)
   const antennaRef = useRef<THREE.Group>(null)
   const phase = useOnboardingStore((state) => state.phase)
+  const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const pipTalking = useOnboardingStore((state) => state.pipTalking)
   const tutorialDone = useOnboardingStore((state) => state.tutorialDone)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
-  const expression = expressionForPhase(phase)
-  // Framing spot: dead ahead and bigger during the tutorial ritual,
-  // gliding to the diagonal hub spot once the tutorial is done.
-  const pipTarget = tutorialDone
-    ? { x: 0.9, y: 0.14, z: -2.2, scale: 0.85 }
-    : { x: 0.05, y: 0.18, z: -2.35, scale: 1.15 }
+  const expression = expressionForPhase(phase, dialogueIndex)
+  const isIntro = phase === 'intro'
+  const moment: IntroMoment | null = isIntro ? introMomentForLine(dialogueIndex) : null
+  // Narrative acting target: intro poses per moment, otherwise the
+  // tutorial spot or the diagonal hub spot once the tutorial is done.
+  // During the Routine Check and its reveal, PIP steps aside as a
+  // presenter beside the window diorama — never over it.
+  const targetPose: PipPose = isIntro && moment
+    ? poseForIntro(moment, dialogueIndex)
+    : phase === 'questions'
+      ? { ...PIP_ANCHORS.rightPresenter, roll: 0.05, pitch: 0.03, yaw: -0.18, bob: 0.06, sway: 0.03, antenna: 0.06, lambda: 1.8 }
+      : phase === 'reveal'
+        ? { ...PIP_ANCHORS.rightReflective, roll: 0.06, pitch: -0.04, yaw: -0.14, bob: 0.06, sway: 0.03, antenna: 0.07, lambda: 1.7 }
+        : phase === 'explorer'
+          // Admiring the hero beside the window, then facing the child.
+          ? { ...PIP_ANCHORS.leftPresenter, roll: -0.05, pitch: 0.04, yaw: 0.12, bob: 0.07, sway: 0.035, antenna: 0.08, lambda: 1.7 }
+          : tutorialDone
+            ? HUB_POSE
+            : TUTORIAL_POSE
   // Smoothed amplitudes: talking <-> resting blends over ~0.5s instead
   // of switching frequencies, which used to make PIP jump (reposition)
   // the instant he finished a line or the player clicked the bubble.
   const bobAmpRef = useRef(0.07)
   const swayAmpRef = useRef(0.03)
   const antennaAmpRef = useRef(0.05)
+  // Current acting pose (position/tilt/gaze), damped toward the target.
+  const poseRef = useRef<PipPose>({ ...TUTORIAL_POSE })
+  // Small celebration hop when the invitation hands over to reflection.
+  const prevMomentRef = useRef<IntroMoment | null>(null)
+  const hopStartRef = useRef(-1)
 
   useFrame((state, delta) => {
     const group = groupRef.current
     if (!group) return
     const time = state.clock.elapsedTime
-    group.lookAt(state.camera.position)
-    // Pip rotation in the cabin
-    group.rotateZ(0.02)
-    const talking = pipTalking && !reducedMotion
     const damp = THREE.MathUtils.damp
-    // Glide between the tutorial spot and the hub spot, around the
-    // floating bob.
-    group.position.x = damp(group.position.x, pipTarget.x, 2, delta)
-    group.position.z = damp(group.position.z, pipTarget.z, 2, delta)
-    group.scale.setScalar(damp(group.scale.x, pipTarget.scale, 2, delta))
+    const talking = pipTalking && !reducedMotion
+    const pose = poseRef.current
+    const moveLambda = reducedMotion ? 10 : targetPose.lambda
+    pose.x = damp(pose.x, targetPose.x, moveLambda, delta)
+    pose.y = damp(pose.y, targetPose.y, moveLambda, delta)
+    pose.z = damp(pose.z, targetPose.z, moveLambda, delta)
+    pose.scale = damp(pose.scale, targetPose.scale, moveLambda, delta)
+    pose.roll = damp(pose.roll, targetPose.roll, 4, delta)
+    pose.pitch = damp(pose.pitch, targetPose.pitch, 4, delta)
+    pose.yaw = damp(pose.yaw, targetPose.yaw, 4, delta)
+
+    if (moment && prevMomentRef.current === 'invitation' && moment === 'reflection') {
+      hopStartRef.current = time
+    }
+    prevMomentRef.current = moment
+
+    group.lookAt(state.camera.position)
+    // Gaze + body tilt on top of facing the player.
+    group.rotateX(pose.pitch)
+    group.rotateY(pose.yaw)
+    group.rotateZ(pose.roll)
+
+    let hop = 0
+    if (!reducedMotion && hopStartRef.current >= 0) {
+      const hopT = time - hopStartRef.current
+      if (hopT < 0.9) hop = Math.sin((hopT / 0.9) * Math.PI) * 0.11 * (1 - hopT / 0.9)
+      else hopStartRef.current = -1
+    }
+
+    // Glide between poses, around the floating bob.
+    group.position.x = pose.x
+    group.position.z = pose.z
+    group.scale.setScalar(pose.scale)
     if (!reducedMotion) {
-      bobAmpRef.current = damp(bobAmpRef.current, talking ? 0.11 : 0.07, 5, delta)
-      swayAmpRef.current = damp(swayAmpRef.current, talking ? 0.06 : 0.03, 5, delta)
-      antennaAmpRef.current = damp(antennaAmpRef.current, talking ? 0.18 : 0.05, 5, delta)
+      bobAmpRef.current = damp(bobAmpRef.current, talking ? 0.11 : targetPose.bob, 5, delta)
+      swayAmpRef.current = damp(swayAmpRef.current, talking ? 0.06 : targetPose.sway, 5, delta)
+      antennaAmpRef.current = damp(antennaAmpRef.current, talking ? 0.18 : targetPose.antenna, 5, delta)
       // Fixed frequencies: only the amplitudes blend, never the phase.
-      group.position.y = pipTarget.y + Math.sin(time * 1.9) * bobAmpRef.current
-      // Additive sway ON TOP of the knob roll from rotateZ above — an
-      // absolute assignment here used to erase the roll every frame.
+      group.position.y = pose.y + Math.sin(time * 1.9) * bobAmpRef.current + hop
+      // Additive sway ON TOP of the pose roll — an absolute
+      // assignment here used to erase the roll every frame.
       group.rotation.z += Math.sin(time * 2.4) * swayAmpRef.current
+    } else {
+      group.position.y = pose.y
     }
     // Blink: eyes squash briefly every few seconds.
     const blink = !reducedMotion && time % 3.4 > 3.25
@@ -1338,7 +1469,6 @@ function makePassportTexture(passport: {
   explorerName: string
   trait: string
   explorerId: string
-  moduleId: string
   missionNumber: number
 }): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
@@ -1379,9 +1509,8 @@ function makePassportTexture(passport: {
   ctx.font = '600 18px ui-monospace, monospace'
   const fields: [string, string][] = [
     ['EXPLORER', passport.explorerName],
-    ['SPIRIT', passport.trait],
-    ['MOST LIKE', passport.explorerId],
-    ['FIRST MODULE', passport.moduleId],
+    ['POWER', passport.trait],
+    ['HERO', passport.explorerId],
   ]
   fields.forEach(([label, value], index) => {
     const y = 140 + index * 78
@@ -1810,10 +1939,27 @@ function drawNavScreen(
 /** Passport card pinned on the cabin wall; click opens the detail view. */
 function PassportCard3D() {
   const passport = useOnboardingStore((state) => state.passport)
+  const phase = useOnboardingStore((state) => state.phase)
   const detailOpen = useOnboardingStore((state) => state.passportDetailOpen)
   const setPassportDetailOpen = useOnboardingStore((state) => state.setPassportDetailOpen)
   const [hovered, setHovered] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
+  const appearRef = useRef(0)
+  const glowRef = useRef<THREE.PointLight>(null)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+
+  // The freshly issued passport materializes on its tray: a short
+  // rise + scale-in with a warm glow, so the hub handoff is not a cut.
+  useFrame((_, delta) => {
+    const group = groupRef.current
+    if (!group) return
+    appearRef.current = Math.min(1, appearRef.current + delta / (reducedMotion ? 0.01 : 0.75))
+    const eased = 1 - Math.pow(1 - appearRef.current, 3)
+    const baseScale = 0.55 * (hovered ? 1.06 : 1)
+    group.scale.setScalar(baseScale * (0.55 + 0.45 * eased))
+    group.position.y = 0.449 + (1 - eased) * 0.12
+    if (glowRef.current) glowRef.current.intensity = (1 - eased) * 2.2
+  })
 
   // Only the card face ABOVE the slot is clickable: without this,
   // clicks through/under the board still hit the part of the plane
@@ -1835,7 +1981,6 @@ function PassportCard3D() {
       explorerName: passport.explorerName,
       trait: getTrait(passport.trait).name,
       explorerId: getExplorer(passport.explorerId).name,
-      moduleId: getModule(passport.moduleId).name,
       missionNumber: passport.missionNumber,
     })
   }, [passport])
@@ -1855,8 +2000,12 @@ function PassportCard3D() {
   //   foot z = -0.173 + 0.212 * sin(0.35) = -0.100
 
   // While the detail is open, the 3D card leaves the console (it is
-  // "in hand" now, not duplicated on the desk).
-  if (!passport || !texture || detailOpen) return null
+  // "in hand" now, not duplicated on the desk). During the ritual
+  // (new mission: intro → questions → name) the previous passport is
+  // NOT on the console: it belongs to the hub, and a new mission must
+  // not start with the old card already standing there.
+  const onConsole = phase === 'hub' || phase === 'launching' || phase === 'playing'
+  if (!passport || !texture || detailOpen || !onConsole) return null
   return (
     // Standing on its support tray in the right zone, leaning
     // back like a card propped on the dashboard.
@@ -1866,6 +2015,8 @@ function PassportCard3D() {
       rotation={[-0.35, 0, 0]}
       scale={0.55 * (hovered ? 1.06 : 1)}
     >
+      {/* Warm pulse while the card settles (fades to zero). */}
+      <pointLight ref={glowRef} position={[0, 0.1, 0.28]} color="#FFD9A8" distance={0.9} intensity={2.2} />
       <mesh position={[0, 0, -0.012]}>
         <planeGeometry args={[0.66, 0.83]} />
         <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
@@ -2519,6 +2670,41 @@ function StatusPanel() {
   )
 }
 
+/** Window projections (cinematic intro, Routine Check dioramas and
+ *  the historical hero card), rendered inside the cabin window as
+ *  circular meshes behind PIP. */
+function MemoryWindowHolograms() {
+  const phase = useOnboardingStore((state) => state.phase)
+  const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
+  const questionIndex = useOnboardingStore((state) => state.questionIndex)
+  const focus = useOnboardingStore((state) => state.routineFocus)
+  const explorerId = useOnboardingStore((state) => state.explorerId)
+  const previewId = useOnboardingStore((state) => state.explorerPreviewId)
+
+  const introSvg =
+    phase === 'intro' ? introHologramSvg(introMomentForLine(dialogueIndex)) : null
+  const routineSvg =
+    phase === 'questions' ? routineDioramaSvg(DISCOVERY_QUESTIONS[questionIndex]?.id ?? '', focus) : null
+  const heroSvg = (() => {
+    if (phase !== 'explorer') return null
+    const id = previewId ?? explorerId
+    if (!id) return null
+    try {
+      return explorerHologramSvg(getExplorer(id))
+    } catch {
+      return null
+    }
+  })()
+
+  return (
+    <>
+      {phase === 'intro' && <WindowHologram svg={introSvg} />}
+      {phase === 'questions' && <WindowHologram svg={routineSvg} />}
+      {phase === 'explorer' && <WindowHologram svg={heroSvg} />}
+    </>
+  )
+}
+
 /**
  * Real cockpit interior, visible only during the cabin steps: a dark
  * wall with a round window hole (Mars and the stars show through it),
@@ -2526,9 +2712,12 @@ function StatusPanel() {
  */
 function CabinInterior() {
   const phase = useOnboardingStore((state) => state.phase)
+  const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const boardingStage = useOnboardingStore((state) => state.boardingStage)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const groupRef = useRef<THREE.Group>(null)
+  const windowDarkRef = useRef<THREE.MeshBasicMaterial>(null)
+  const windowRimRef = useRef<THREE.MeshBasicMaterial>(null)
   // The launch countdown happens INSIDE the cabin (seated, PIP
   // talking); from liftoff on, the wide menu shot returns.
   const cabin =
@@ -2537,12 +2726,41 @@ function CabinInterior() {
 
   // Visibility is driven per-frame: the launch stage changes without
   // a React re-render, so the render-time flag alone is not enough.
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current
     if (!group) return
     group.visible =
       (phase !== 'menu' && phase !== 'launching' && boardingStage === 'cabin') ||
       (phase === 'launching' && inCabinStage(launchClock.value, reducedMotion))
+
+    // Cosmic Memory Window: during the cinematic intro (except the
+    // Welcome moment) the glass darkens to ~85% so the hologram
+    // stage reads inside the window. The planet stays behind the
+    // dimming, the gold frame and PIP/console lighting are untouched.
+    // Leaving the intro (Skip/Back/Routine Check) fades it back out.
+    const inMemoryWindow =
+      (phase === 'intro' && introMomentForLine(dialogueIndex) !== 'welcome') ||
+      phase === 'questions' ||
+      phase === 'reveal' ||
+      phase === 'explorer'
+    const darkTarget = inMemoryWindow ? 0.85 : 0
+    const lambda = reducedMotion ? 8 : 1.8
+    if (windowDarkRef.current) {
+      windowDarkRef.current.opacity = THREE.MathUtils.damp(
+        windowDarkRef.current.opacity,
+        darkTarget,
+        lambda,
+        delta,
+      )
+    }
+    if (windowRimRef.current) {
+      windowRimRef.current.opacity = THREE.MathUtils.damp(
+        windowRimRef.current.opacity,
+        darkTarget * 0.4,
+        lambda,
+        delta,
+      )
+    }
   })
 
   // Front wall of the cube: 8 wide, 4.6 high, with the wide window
@@ -2723,6 +2941,34 @@ function CabinInterior() {
           depthWrite={false}
         />
       </mesh>
+      {/* Memory Window dimming: a dark disc just in front of the
+          glass (behind the gold frame rings at z=-4.44/-4.42), so
+          the hologram stage reads inside the window while Earth
+          remains barely visible behind it. */}
+      <mesh position={[0, 0.3, -4.46]} renderOrder={2}>
+        <circleGeometry args={[1.68, 48]} />
+        <meshBasicMaterial
+          ref={windowDarkRef}
+          color="#070512"
+          transparent
+          opacity={0}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh position={[0, 0.3, -4.45]} renderOrder={3}>
+        <torusGeometry args={[1.62, 0.012, 8, 64]} />
+        <meshBasicMaterial
+          ref={windowRimRef}
+          color="#8FE3D8"
+          transparent
+          opacity={0}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Routine Check hologram: behind PIP, inside the round window. */}
+      <MemoryWindowHolograms />
 
       {/* Cosmic Mail identity decal on the front wall. */}
       <mesh position={[-2.7, 1.05, -4.48]}>

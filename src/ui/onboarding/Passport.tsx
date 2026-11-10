@@ -1,8 +1,7 @@
 import {
-  MODULE_SLOTS,
+  MEMORY_SLOTS,
   STAMP_SLOTS,
   getExplorer,
-  getModule,
   getTrait,
 } from '../../data/personalization'
 import { useOnboardingStore } from '../../store/onboardingStore'
@@ -16,7 +15,13 @@ export function Passport({ pinned = false }: { pinned?: boolean }) {
 
   const trait = getTrait(passport.trait)
   const explorer = getExplorer(passport.explorerId)
-  const module = getModule(passport.moduleId)
+  const stamps = passport.stamps.map((id) => {
+    try {
+      return getExplorer(id)
+    } catch {
+      return null
+    }
+  })
 
   return (
     <section
@@ -49,36 +54,42 @@ export function Passport({ pinned = false }: { pinned?: boolean }) {
             <dd>{passport.explorerName}</dd>
           </div>
           <div className="passport__field">
-            <dt>Spirit</dt>
+            <dt>Power</dt>
             <dd>
               {trait.sigil} {trait.name}
             </dd>
           </div>
           <div className="passport__field">
-            <dt>Most like</dt>
-            <dd>{explorer.name}</dd>
+            <dt>Hero</dt>
+            <dd>
+              {explorer.name} · {explorer.gender === 'girl' ? 'woman' : 'man'}
+            </dd>
           </div>
           <div className="passport__field">
-            <dt>First module</dt>
-            <dd>{module.name}</dd>
+            <dt>Memories</dt>
+            <dd>
+              {passport.unlockedExplorerIds.length}/{MEMORY_SLOTS}
+            </dd>
           </div>
         </dl>
 
         <p className="passport__slot-label">Mission stamps</p>
-        <div className="passport__stamps" aria-label={`${STAMP_SLOTS} stamp slots, all empty for now`}>
-          {Array.from({ length: STAMP_SLOTS }, (_, index) => (
-            <span key={index} className="passport__stamp" aria-hidden="true" />
-          ))}
-        </div>
-
-        <p className="passport__slot-label">Mission modules</p>
-        <div className="passport__modules" aria-label={`${MODULE_SLOTS} module slots, one unlocked`}>
-          <span className="passport__module is-unlocked">{module.name}</span>
-          {Array.from({ length: MODULE_SLOTS - 1 }, (_, index) => (
-            <span key={index} className="passport__module" aria-hidden="true">
-              Locked
-            </span>
-          ))}
+        <div
+          className="passport__stamps"
+          aria-label={`${stamps.length} of ${STAMP_SLOTS} stamp slots filled`}
+        >
+          {Array.from({ length: STAMP_SLOTS }, (_, index) => {
+            const stamp = stamps[index]
+            return (
+              <span
+                key={index}
+                className={`passport__stamp${stamp ? ' is-filled' : ''}`}
+                aria-hidden="true"
+              >
+                {stamp ? getTrait(stamp.trait).sigil : ''}
+              </span>
+            )
+          })}
         </div>
       </div>
 

@@ -4,9 +4,9 @@ import { Cabin } from './Cabin'
 import { DiscoveryQuestions } from './DiscoveryQuestions'
 import { ExplorerProfiles } from './ExplorerProfiles'
 import { Hub } from './Hub'
+import { Intro } from './Intro'
 import { LaunchSequence } from './LaunchSequence'
 import { MainMenu } from './MainMenu'
-import { ModulePicker } from './ModulePicker'
 import { NamePrompt } from './NamePrompt'
 import { TraitReveal } from './TraitReveal'
 import './onboarding.css'
@@ -17,8 +17,8 @@ import './onboarding.css'
 const MenuScene = lazy(() => import('../../game/MenuScene'))
 
 /**
- * The pre-game ritual: main menu, then the cabin steps (questions,
- * reveal, explorer, module, name, passport). The 3D world is not
+ * The pre-game ritual: main menu, then the cabin steps (intro,
+ * questions, reveal, explorer, name, passport). The 3D world is not
  * mounted until `playing`.
  */
 export function Onboarding() {
@@ -94,10 +94,10 @@ export function Onboarding() {
         </button>
       ) : (
         <Cabin>
+          {phase === 'intro' && <Intro />}
           {phase === 'questions' && <DiscoveryQuestions />}
           {phase === 'reveal' && <TraitReveal />}
           {phase === 'explorer' && <ExplorerProfiles />}
-          {phase === 'module' && <ModulePicker />}
           {phase === 'name' && <NamePrompt />}
           {phase === 'hub' && <Hub />}
         </Cabin>

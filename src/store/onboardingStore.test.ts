@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useOnboardingStore } from './onboardingStore'
+import { migrateExplorerId, useOnboardingStore } from './onboardingStore'
 
 function resetStore() {
   useOnboardingStore.setState({
@@ -10,7 +10,6 @@ function resetStore() {
     questionIndex: 0,
     trait: null,
     explorerId: null,
-    moduleId: null,
     dialogueIndex: 0,
     routeOpen: false,
     selectedZoneId: null,
@@ -18,30 +17,58 @@ function resetStore() {
   })
 }
 
+function completeRitual(trait: 'brave' | 'careful' | 'observant' | 'methodical' = 'brave') {
+  const store = () => useOnboardingStore.getState()
+  store().startMission()
+  store().continueFromIntro()
+  for (let i = 0; i < 4; i += 1) store().answerQuestion(trait)
+  store().continueFromReveal()
+  store().confirmExplorer(store().explorerId!)
+  store().submitName('Ada')
+}
+
+describe('roster migration', () => {
+  it('maps the removed Valentina id to Sally Ride and leaves other ids alone', () => {
+    expect(migrateExplorerId('valentina-tereshkova')).toBe('sally-ride')
+    expect(migrateExplorerId('mae-jemison')).toBe('mae-jemison')
+    expect(migrateExplorerId('katherine-johnson')).toBe('katherine-johnson')
+  })
+})
+
 describe('onboarding flow', () => {
   beforeEach(resetStore)
+
+  it('opens with the intro before the routine check', () => {
+    const store = () => useOnboardingStore.getState()
+    store().startMission()
+    expect(store().phase).toBe('intro')
+    expect(store().boardingStage).toBe('approach')
+    // A new beginning runs the tutorial again.
+    expect(store().tutorialDone).toBe(false)
+
+    store().continueFromIntro()
+    expect(store().phase).toBe('questions')
+  })
 
   it('walks through the full ritual to the hub, signing the name last', () => {
     const store = () => useOnboardingStore.getState()
 
     store().startMission()
+    expect(store().phase).toBe('intro')
+    store().continueFromIntro()
     expect(store().phase).toBe('questions')
-    // Approach flight first, then a clean cut into the cabin.
-    expect(store().boardingStage).toBe('approach')
-    // A new beginning runs the tutorial again.
-    expect(store().tutorialDone).toBe(false)
 
     for (let i = 0; i < 4; i += 1) store().answerQuestion('brave')
     expect(store().phase).toBe('reveal')
     expect(store().trait).toBe('brave')
 
     store().continueFromReveal()
+    // The power's hero is assigned automatically on leaving the reveal.
+    expect(store().explorerId).toBe('sally-ride')
     expect(store().phase).toBe('explorer')
 
-    store().confirmExplorer('valentina-tereshkova')
-    expect(store().phase).toBe('module')
-
-    store().confirmModule('meteor-shield')
+    // Keeping the assigned hero goes straight to the name step: no module.
+    store().confirmExplorer('sally-ride')
     expect(store().phase).toBe('name')
     expect(store().passport).toBeNull()
 
@@ -50,21 +77,60 @@ describe('onboarding flow', () => {
     expect(store().passport).toMatchObject({
       explorerName: 'Ada',
       trait: 'brave',
-      explorerId: 'valentina-tereshkova',
-      moduleId: 'meteor-shield',
+      explorerId: 'sally-ride',
+      unlockedExplorerIds: ['sally-ride'],
+      stamps: [],
+      memorySites: [],
       missionNumber: 1,
       destination: null,
     })
 
     // PIP has reached the "tap the radar screen" line: unlocked.
-    store().setDialogueIndex(2)
+    store().setDialogueIndex(3)
     store().selectZone('mars')
     store().takeOff()
     // The red button starts the lift-off cinematic, not the world.
     expect(store().phase).toBe('launching')
     expect(store().passport?.destination).toBe('mars')
+    // First take-off: PIP only remembers the active hero.
+    expect(store().passport?.unlockedExplorerIds).toEqual(['sally-ride'])
     store().finishLaunch()
     expect(store().phase).toBe('playing')
+  })
+
+  it('choosing another hero also changes the power', () => {
+    const store = () => useOnboardingStore.getState()
+    completeRitual('brave')
+    expect(store().trait).toBe('brave')
+
+    // A locked hero cannot be switched to from the archive.
+    store().switchHero('mae-jemison')
+    expect(store().trait).toBe('brave')
+
+    // After recovering her memory, switching swaps hero AND power.
+    expect(store().collectMemory('opportunity')).toBe('mae-jemison')
+    store().switchHero('mae-jemison')
+    expect(store().explorerId).toBe('mae-jemison')
+    expect(store().trait).toBe('observant')
+    expect(store().passport?.trait).toBe('observant')
+  })
+
+  it('collecting a memory restores the next locked hero once per site', () => {
+    const store = () => useOnboardingStore.getState()
+    completeRitual('brave')
+
+    expect(store().collectMemory('opportunity')).toBe('mae-jemison')
+    expect(store().collectMemory('opportunity')).toBeNull()
+    expect(store().passport?.unlockedExplorerIds).toEqual([
+      'sally-ride',
+      'mae-jemison',
+    ])
+    expect(store().passport?.stamps).toEqual(['mae-jemison'])
+    expect(store().passport?.memorySites).toEqual(['opportunity'])
+
+    expect(store().collectMemory('insight')).toBe('katherine-johnson')
+    expect(store().collectMemory('ingenuity')).toBe('margaret-hamilton')
+    expect(store().passport?.unlockedExplorerIds).toHaveLength(4)
   })
 
   it('finishLaunch only ends an active launch (Skip is safe to repeat)', () => {
@@ -76,10 +142,10 @@ describe('onboarding flow', () => {
   it('rejects short names and keeps the signing step', () => {
     const store = () => useOnboardingStore.getState()
     store().startMission()
+    store().continueFromIntro()
     for (let i = 0; i < 4; i += 1) store().answerQuestion('careful')
     store().continueFromReveal()
-    store().confirmExplorer('michael-collins')
-    store().confirmModule('mission-clock')
+    store().confirmExplorer(store().explorerId!)
     expect(store().phase).toBe('name')
 
     store().submitName(' x ')
@@ -90,6 +156,7 @@ describe('onboarding flow', () => {
   it('goes back one question at a time and replaces the answer', () => {
     const store = () => useOnboardingStore.getState()
     store().startMission()
+    store().continueFromIntro()
     store().answerQuestion('brave')
     store().answerQuestion('careful')
     expect(store().questionIndex).toBe(2)
@@ -101,33 +168,35 @@ describe('onboarding flow', () => {
     expect(store().questionIndex).toBe(2)
   })
 
-  it('goes back from reveal to the last question and from name to module', () => {
+  it('goes back from reveal to the last question, from questions to intro, and from name to explorer', () => {
     const store = () => useOnboardingStore.getState()
     store().startMission()
+    store().continueFromIntro()
     for (let i = 0; i < 4; i += 1) store().answerQuestion('observant')
     store().goBack()
     expect(store().phase).toBe('questions')
     expect(store().questionIndex).toBe(3)
     expect(store().trait).toBeNull()
 
+    store().goBack()
+    store().goBack()
+    store().goBack()
+    store().goBack()
+    expect(store().phase).toBe('intro')
+
+    store().continueFromIntro()
     for (let i = 0; i < 4; i += 1) store().answerQuestion('observant')
     store().continueFromReveal()
-    store().confirmExplorer('mae-jemison')
-    store().confirmModule('explorer-visor')
+    store().confirmExplorer(store().explorerId!)
     expect(store().phase).toBe('name')
     store().goBack()
-    expect(store().phase).toBe('module')
+    expect(store().phase).toBe('explorer')
   })
 
   it('continueMission lands on the hub initial view, with no dialogue', () => {
     const store = () => useOnboardingStore.getState()
 
-    store().startMission()
-    for (let i = 0; i < 4; i += 1) store().answerQuestion('brave')
-    store().continueFromReveal()
-    store().confirmExplorer('valentina-tereshkova')
-    store().confirmModule('meteor-shield')
-    store().submitName('Ada')
+    completeRitual('brave')
     expect(store().phase).toBe('hub')
     expect(store().routeOpen).toBe(false)
 
@@ -143,7 +212,7 @@ describe('onboarding flow', () => {
     // Only tapping the navigation panel on the board leans the camera
     // in (routeOpen), where destinations can be chosen — and only
     // once PIP has said "tap the radar screen" (dialogue index 2).
-    store().setDialogueIndex(2)
+    store().setDialogueIndex(3)
     store().setRouteOpen(true)
     expect(store().routeOpen).toBe(true)
     store().selectZone('mars')
@@ -157,7 +226,7 @@ describe('onboarding flow', () => {
 
   it('clearSelection returns the navigation screen to the cards', () => {
     const store = () => useOnboardingStore.getState()
-    useOnboardingStore.setState({ phase: 'hub', dialogueIndex: 2 })
+    useOnboardingStore.setState({ phase: 'hub', dialogueIndex: 3 })
     store().selectZone('mars')
     expect(store().selectedZoneId).toBe('mars')
     store().clearSelection()
@@ -167,10 +236,10 @@ describe('onboarding flow', () => {
   it('submitName clears the signing window so the hub tour can speak', () => {
     const store = () => useOnboardingStore.getState()
     store().startMission()
+    store().continueFromIntro()
     for (let i = 0; i < 4; i += 1) store().answerQuestion('brave')
     store().continueFromReveal()
-    store().confirmExplorer('valentina-tereshkova')
-    store().confirmModule('meteor-shield')
+    store().confirmExplorer(store().explorerId!)
     // PIP's warning opened the signing window.
     store().setSigning(true)
     expect(store().signing).toBe(true)
@@ -181,7 +250,7 @@ describe('onboarding flow', () => {
 
   it('the take-off lid only opens after SELECT confirms the route', () => {
     const store = () => useOnboardingStore.getState()
-    useOnboardingStore.setState({ phase: 'hub', dialogueIndex: 2 })
+    useOnboardingStore.setState({ phase: 'hub', dialogueIndex: 3 })
     store().selectZone('mars')
     // Previewing a destination does not confirm it.
     expect(store().routeConfirmed).toBe(false)
@@ -196,8 +265,9 @@ describe('onboarding flow', () => {
     const store = () => useOnboardingStore.getState()
     useOnboardingStore.setState({ phase: 'hub', dialogueIndex: 0, tutorialDone: false, routeConfirmed: false })
 
-    // Lines 0 (passport) and 1 (navigation intro): panel inert.
-    for (const index of [0, 1]) {
+    // Lines 0-2 (passport arrival, passport contents and navigation
+    // intro): panel inert.
+    for (const index of [0, 1, 2]) {
       store().setDialogueIndex(index)
       store().setRouteOpen(true)
       expect(store().routeOpen).toBe(false)
@@ -205,8 +275,8 @@ describe('onboarding flow', () => {
       expect(store().selectedZoneId).toBeNull()
     }
 
-    // Line 2 ("tap the radar screen"): the side view and the cards unlock.
-    store().setDialogueIndex(2)
+    // Line 3 ("tap the radar screen"): the side view and cards unlock.
+    store().setDialogueIndex(3)
     store().setRouteOpen(true)
     expect(store().routeOpen).toBe(true)
     store().selectZone('mars')
@@ -226,12 +296,7 @@ describe('onboarding flow', () => {
 
   it('resetJourney clears the passport and returns to the menu', () => {
     const store = () => useOnboardingStore.getState()
-    store().startMission()
-    for (let i = 0; i < 4; i += 1) store().answerQuestion('methodical')
-    store().continueFromReveal()
-    store().confirmExplorer('katherine-johnson')
-    store().confirmModule('wrist-checklist')
-    store().submitName('Bo')
+    completeRitual('methodical')
     expect(store().passport).not.toBeNull()
 
     store().setTutorialDone(true)

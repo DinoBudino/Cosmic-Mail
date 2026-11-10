@@ -25,39 +25,68 @@ OUT = os.environ.get("PIP_AUDIO_DIR", os.path.join(SCRIPT_DIR, "..", "public", "
 
 KO = Kokoro(os.path.join(KOKORO_DIR, "model.onnx"), os.path.join(KOKORO_DIR, "voices.bin"))
 
-# Keep in sync with src/data/marsObjects.ts (REGION_INFO[*].pipMessage)
-# and src/data/personalization.ts + src/ui/onboarding/Cabin.tsx (ritual).
+# Keep in sync with AUDIO_KEYS in src/game/pipVoice.ts.
+# Sources: src/data/marsObjects.ts (REGION_INFO[*].pipMessage),
+# src/data/personalization.ts (INTRO_LINES + HISTORICAL_EXPLORERS),
+# src/ui/onboarding/Cabin.tsx (ritual lines, hub tour),
+# src/ui/onboarding/LaunchSequence.tsx (LAUNCH_MEMORY_LOSS_LINE),
+# src/ui/SiteInteraction.tsx (hero.memoryLine).
+# NOTE: question keys keep their historic numbering (q4/q5 files hold
+# the current Q3/Q4 texts); the game matches on exact text.
 PHRASES = [
     ("opportunity", "Wow! Valley of Echoes! Look, old rover tracks!"),
     ("insight", "Hush now! Silent Plains. Listen with me!"),
     ("ingenuity", "First Flight Dunes! Whoa. The sky is so wide here."),
     ("viking1", "Ancient Lands. Whoa! This place feels old."),
     ("welcome", "Hi! I am Pip, your mail companion."),
+    # --- Cinematic intro (INTRO_LINES in personalization.ts) ---
+    ("cabin-intro-1", "Hi! I'm PIP, your cabin buddy. Welcome aboard Cosmic Mail!"),
+    ("cabin-intro-2", "Long ago, explorers traveled to the Moon, Mars, and far beyond."),
+    ("cabin-intro-3", "They were machines, sent to discover things humans couldn't see."),
+    ("cabin-intro-4", "Some of their missions have ended."),
+    ("cabin-intro-5", "But their stories are still out there, waiting to be remembered."),
+    ("cabin-intro-6", "That's where you come in!"),
+    ("cabin-intro-8", "You'll travel across space and deliver letters to these forgotten explorers. Will you help me?"),
+    ("cabin-intro-9", "Every explorer sees the universe in a different way."),
+    ("cabin-intro-10", "Before we begin, let's discover your explorer spirit."),
     # --- Cabin ritual dialogue (src/ui/onboarding/Cabin.tsx) ---
     ("cabin-welcome", "Welcome aboard! Quick check before we fly."),
     ("cabin-q1", "You open your eyes on a quiet night sky. What calls you first?"),
     ("cabin-q2-intro", "Something strange is under our feet."),
     ("cabin-q2", "You find a tiny door on Mars that was not there before. What do you do?"),
-    ("cabin-q3-intro", "Every explorer meets a tricky moment. It is okay!"),
-    ("cabin-q3", "A storm is coming and your map is upside down. How do you feel?"),
     ("cabin-q4-intro", "Friends make every mission brighter, do not you think?"),
     ("cabin-q4", "A little robot is lost and cannot find its way home. What do you do?"),
     ("cabin-q5-intro", "One last light, then the stars will show us something special."),
     ("cabin-q5", "At the end of the mission, what would make you smile most?"),
     ("cabin-reveal", "The stars have spoken..."),
-    ("cabin-explorer-brave", "You and these explorers share the same Brave Explorer spirit. Which one's story feels most like yours?"),
-    ("cabin-explorer-observant", "You and these explorers share the same Observant Explorer spirit. Which one's story feels most like yours?"),
-    ("cabin-explorer-methodical", "You and these explorers share the same Methodical Explorer spirit. Which one's story feels most like yours?"),
-    ("cabin-explorer-careful", "You and these explorers share the same Careful Explorer spirit. Which one's story feels most like yours?"),
-    ("cabin-explorer-reflective", "You and these explorers share the same Reflective Explorer spirit. Which one's story feels most like yours?"),
-    ("cabin-module", "Pick one special module. The others will wait for future missions!"),
-    ("cabin-name", "Everything is ready, but wait! Don't forget: without your name, this letter can't take off. Sign it, carrier!"),
-    ("cabin-passport", "Your passport is ready! Tap below and choose our route, carrier."),
+    ("cabin-name", "One last thing, carrier! Every letter needs a name. What should I call you?"),
+    # Explorer step: history first, then the power it inspires.
+    ("cabin-hero-sally-story", "Sally Ride became the first American woman in space in 1983."),
+    ("cabin-hero-sally-power", "Her courage inspires Second Chance: make one mistake without starting over!"),
+    ("cabin-hero-mae-story", "Mae Jemison traveled into space in 1992. She was both a scientist and an astronaut."),
+    ("cabin-hero-mae-power", "Her curiosity inspires Explorer Vision: reveal important clues!"),
+    ("cabin-hero-katherine-story", "Katherine Johnson used mathematics to calculate important spaceflight paths."),
+    ("cabin-hero-katherine-power", "Her careful math inspires Mission Plan: follow clear steps to solve challenges!"),
+    ("cabin-hero-margaret-story", "Margaret Hamilton led a team that developed software for the Apollo missions."),
+    ("cabin-hero-margaret-power", "Her attention to detail inspires Safety Check: spot a possible mistake before acting!"),
+    ("cabin-hero-carl-story", "Carl Sagan studied planets and inspired people to explore big questions about the universe."),
+    ("cabin-hero-carl-power", "His curiosity inspires Time to Think: slow down danger and pause to decide!"),
     # Hub tour + route confirmation (src/ui/onboarding/Cabin.tsx).
-    ("cabin-hub-1", "This is your passport, carrier — your name, your spirit, your stamps."),
+    ("cabin-hub-0", "Look, carrier — your Cosmic Mail passport is ready!"),
+    ("cabin-hub-1", "It holds your name, your power, your hero and your stamps."),
     ("cabin-hub-2", "And this green screen is navigation. Moon and Deep Space are still sleeping — Mars is ready."),
-    ("cabin-hub-3", "When you are ready, tap the radar screen and choose."),
+    ("cabin-hub-3", "When you land, find the silent machines and deliver their letters. When you are ready, tap the radar screen and choose."),
+    ("cabin-explorer-fallback", "Which explorer feels like you?"),
     ("cabin-all-set", "All set, carrier! Press the red button to take off!"),
+    # Launch: archive damage warning (LaunchSequence.tsx).
+    ("cabin-launch-memory", "Warning! My hero archive took a hit entering Mars. I only remember your current hero — the others are lost as memory fragments near the silent machines!"),
+    # Restored hero memories (SiteInteraction.tsx, hero.memoryLine).
+    # Explorer presentation lines are subtitle-only (no recordings).
+    ("cabin-memory-sally", "I became the first American woman in space in 1983."),
+    ("cabin-memory-mae", "I traveled into space in 1992 and studied how bodies behave in zero gravity."),
+    ("cabin-memory-katherine", "My careful calculations helped astronauts travel safely."),
+    ("cabin-memory-margaret", "I led a team that wrote software for the Apollo missions."),
+    ("cabin-memory-carl", "I helped people ask big questions about the universe."),
 ]
 
 # Voice id -> folder name used by the game (see src/game/pipVoice.ts).

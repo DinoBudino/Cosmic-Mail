@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { speakPip } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { ZONES } from '../../data/zones'
@@ -20,8 +21,14 @@ import { PipAvatar } from '../PipSpeech'
  * brief fact card, and the destination caption, driven by the same
  * shared clock the scene reads.
  */
+export const LAUNCH_MEMORY_LOSS_LINE =
+  'Warning! My hero archive took a hit entering Mars. I only remember your current hero — the others are lost as memory fragments near the silent machines!'
+
 export function LaunchSequence() {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const voiceEnabled = useGameStore((state) => state.voiceEnabled)
+  const voiceName = useGameStore((state) => state.voiceName)
+  const memoryLossSpokenRef = useRef(false)
   const finishLaunch = useOnboardingStore((state) => state.finishLaunch)
   const destinationId = useOnboardingStore((state) => state.passport?.destination ?? 'mars')
   const destination = ZONES.find((zone) => zone.id === destinationId) ?? ZONES[1]!
@@ -70,6 +77,16 @@ export function LaunchSequence() {
     return () => setPipTalking(false)
   }, [elapsed, reducedMotion, setPipTalking])
 
+  // The archive-damage warning is spoken once, when the exterior
+  // cruise starts (see AUDIO_KEYS in pipVoice.ts).
+  useEffect(() => {
+    if (memoryLossSpokenRef.current) return
+    if (stage === 'accelerate' || stage === 'arrive') {
+      memoryLossSpokenRef.current = true
+      speakPip(LAUNCH_MEMORY_LOSS_LINE, voiceName, voiceEnabled)
+    }
+  }, [stage, voiceName, voiceEnabled])
+
   // Skip with Escape as well as the on-screen button.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -90,6 +107,12 @@ export function LaunchSequence() {
       {inCabinStage(elapsed, reducedMotion) && (
         <p className="launch__caption pip-bubble-wrap-like">
           <PipAvatar /> <span><strong>PIP:</strong> Buckle up, {explorerName || 'carrier'} — hold on tight!</span>
+        </p>
+      )}
+
+      {(stage === 'accelerate' || stage === 'arrive') && (
+        <p className="launch__caption pip-bubble-wrap-like">
+          <PipAvatar /> <span><strong>PIP:</strong> {LAUNCH_MEMORY_LOSS_LINE}</span>
         </p>
       )}
 

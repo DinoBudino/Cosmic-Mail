@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOnboardingStore } from '../../store/onboardingStore'
+import { MemoryArchive } from './MemoryArchive'
 import { Passport } from './Passport'
 import { RouteSelect } from './RouteSelect'
 
@@ -94,6 +95,7 @@ export function Hub() {
             onAnimationEnd={closing ? finishClose : undefined}
           >
             <Passport pinned />
+            <MemoryArchive />
           </div>
         </div>
       )}

@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import {
   computeTrait,
   explorersForTrait,
+  getExplorer,
+  getHeroForTrait,
+  HISTORICAL_EXPLORERS,
   isValidExplorerName,
   sanitizeExplorerName,
   type TraitId,
@@ -10,11 +13,11 @@ import { clearInput } from '../game/input'
 
 export type OnboardingPhase =
   | 'menu'
+  | 'intro'
   | 'name'
   | 'questions'
   | 'reveal'
   | 'explorer'
-  | 'module'
   | 'passport'
   | 'hub'
   | 'launching'
@@ -23,7 +26,7 @@ export type OnboardingPhase =
 /** Within the cabin phases: first the approach to the ship, then inside. */
 export type BoardingStage = 'approach' | 'cabin'
 
-const STORAGE_KEY = 'cosmic-mail:explorer:v1'
+const STORAGE_KEY = 'cosmic-mail:explorer:v2'
 const TUTORIAL_KEY = 'cosmic-mail:tutorial:v1'
 
 function loadTutorialDone(): boolean {
@@ -49,7 +52,12 @@ export interface ExplorerPassport {
   explorerName: string
   trait: TraitId
   explorerId: string
-  moduleId: string
+  /** Heroes whose memory fragments PIP has recovered (includes the active hero). */
+  unlockedExplorerIds: string[]
+  /** Stamp ids earned (hero ids), shown in the passport stamp slots. */
+  stamps: string[]
+  /** Mars site ids that already gave their memory fragment. */
+  memorySites: string[]
   missionNumber: number
   /** Chosen route destination, set at takeoff. */
   destination: string | null
@@ -69,6 +77,19 @@ function isTraitId(value: unknown): value is TraitId {
   )
 }
 
+/**
+ * Roster migrations: the catalog replaced Valentina Tereshkova (Brave)
+ * with Sally Ride. Only ids that no longer exist are rewritten; every
+ * other saved field of the player's passport is left untouched.
+ */
+const LEGACY_EXPLORER_IDS: Readonly<Record<string, string>> = {
+  'valentina-tereshkova': 'sally-ride',
+}
+
+export function migrateExplorerId(id: string): string {
+  return LEGACY_EXPLORER_IDS[id] ?? id
+}
+
 function loadPassport(): ExplorerPassport | null {
   if (typeof window === 'undefined') return null
   try {
@@ -82,24 +103,33 @@ function loadPassport(): ExplorerPassport | null {
       typeof record.explorerName !== 'string' ||
       !isValidExplorerName(record.explorerName) ||
       !isTraitId(record.trait) ||
-      typeof record.explorerId !== 'string' ||
-      typeof record.moduleId !== 'string'
+      typeof record.explorerId !== 'string'
     ) {
       return null
     }
+    const migrate = migrateExplorerId
+    const asStringArray = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === 'string').map(migrate)
+        : []
     // Legacy passports may reference explorers that no longer exist
     // (roster changes): fall back to the first explorer of the saved
     // trait instead of crashing getExplorer() later.
+    const savedExplorerId = migrate(record.explorerId)
     const knownExplorer = explorersForTrait(record.trait).some(
-      (explorer) => explorer.id === record.explorerId,
+      (explorer) => explorer.id === savedExplorerId,
     )
+    const explorerId = knownExplorer
+      ? savedExplorerId
+      : (explorersForTrait(record.trait)[0]?.id ?? savedExplorerId)
+    const unlocked = [...new Set(asStringArray(record.unlockedExplorerIds))]
     return {
       explorerName: sanitizeExplorerName(record.explorerName),
       trait: record.trait,
-      explorerId: knownExplorer
-        ? record.explorerId
-        : (explorersForTrait(record.trait)[0]?.id ?? record.explorerId),
-      moduleId: record.moduleId,
+      explorerId,
+      unlockedExplorerIds: unlocked.includes(explorerId) ? unlocked : [...unlocked, explorerId],
+      stamps: [...new Set(asStringArray(record.stamps))],
+      memorySites: asStringArray(record.memorySites),
       missionNumber:
         typeof record.missionNumber === 'number' && record.missionNumber > 0
           ? Math.floor(record.missionNumber)
@@ -165,20 +195,42 @@ interface OnboardingState {
   /** Passport detail overlay open over the 3D cabin card. */
   passportDetailOpen: boolean
   setPassportDetailOpen: (open: boolean) => void
+  /**
+   * Ephemeral Routine Check focus (a choice id), read by the 3D
+   * hologram inside the window. Never persisted: focusing must not
+   * record a vote or survive a reload.
+   */
+  routineFocus: string | null
+  setRoutineFocus: (choiceId: string | null) => void
+  /**
+   * Ephemeral hero shown in the explorer hologram (recommendation or
+   * a carousel preview). NEVER persisted: only confirmExplorer()
+   * commits a hero + trait.
+   */
+  explorerPreviewId: string | null
+  setExplorerPreview: (explorerId: string | null) => void
   passport: ExplorerPassport | null
   explorerName: string
   answers: TraitId[]
   questionIndex: number
   trait: TraitId | null
   explorerId: string | null
-  moduleId: string | null
   startMission: () => void
+  continueFromIntro: () => void
   submitName: (name: string) => void
   answerQuestion: (trait: TraitId) => void
   goBack: () => void
   continueFromReveal: () => void
   confirmExplorer: (explorerId: string) => void
-  confirmModule: (moduleId: string) => void
+  /**
+   * Recover the memory fragment at a Mars site. Restores the next
+   * locked hero in catalog order, adds its stamp, and returns the
+   * restored hero id (or null when this site already gave a fragment
+   * or every hero is already recovered).
+   */
+  collectMemory: (siteId: string) => string | null
+  /** Switch the active hero/power to an already-recovered memory. */
+  switchHero: (explorerId: string) => void
   enterWorld: () => void
   continueMission: () => void
   resetJourney: () => void
@@ -192,6 +244,9 @@ interface OnboardingState {
  * trigger either. Returning carriers (tutorial done) and a route
  * already confirmed with SELECT are always unlocked.
  */
+/** Hub tour line that explicitly invites tapping the radar screen. */
+export const HUB_UNLOCK_DIALOGUE_INDEX = 3
+
 export function isNavigationUnlocked(state: {
   phase: OnboardingPhase
   tutorialDone: boolean
@@ -200,7 +255,8 @@ export function isNavigationUnlocked(state: {
 }): boolean {
   if (state.phase !== 'hub') return false
   if (state.tutorialDone || state.routeConfirmed) return true
-  return state.dialogueIndex >= 2
+  // Line 4 of the tour ("tap the radar screen and choose") unlocks it.
+  return state.dialogueIndex >= HUB_UNLOCK_DIALOGUE_INDEX
 }
 
 const initialPassport = loadPassport()
@@ -233,6 +289,10 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   },
   passportDetailOpen: false,
   setPassportDetailOpen: (passportDetailOpen) => set({ passportDetailOpen }),
+  routineFocus: null,
+  setRoutineFocus: (routineFocus) => set({ routineFocus }),
+  explorerPreviewId: null,
+  setExplorerPreview: (explorerPreviewId) => set({ explorerPreviewId }),
   openRoute: () => {
     clearInput()
     set({ phase: 'hub', routeOpen: false, selectedZoneId: null, routeConfirmed: false, dialogueIndex: 0 })
@@ -242,9 +302,16 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     set({ selectedZoneId })
   },
   takeOff: () => {
-    const { passport, selectedZoneId } = get()
+    const { passport, selectedZoneId, tutorialDone } = get()
     if (!passport || !selectedZoneId) return
-    const updated: ExplorerPassport = { ...passport, destination: selectedZoneId }
+    // First take-off: entering Mars damages PIP's hero archive. Only
+    // the active hero stays in memory; the rest must be recovered
+    // from memory fragments at the Mars sites.
+    const updated: ExplorerPassport = {
+      ...passport,
+      destination: selectedZoneId,
+      unlockedExplorerIds: tutorialDone ? passport.unlockedExplorerIds : [passport.explorerId],
+    }
     savePassport(updated)
     // The tutorial ends with the first trip to a planet: taking off
     // is what marks it done (forever), not the hub tour lines.
@@ -265,7 +332,6 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   questionIndex: 0,
   trait: null,
   explorerId: null,
-  moduleId: null,
 
   startMission: () => {
     clearInput()
@@ -273,18 +339,26 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     // the frontal framing and the hub tour apply), and no controls
     // or passport card exist until the ritual is finished.
     saveTutorialDone(false)
-    set({ phase: 'questions', boardingStage: 'approach', dialogueIndex: 0, signing: false, answers: [], questionIndex: 0, trait: null, explorerId: null, moduleId: null, explorerName: '', tutorialDone: false })
+    set({ phase: 'intro', boardingStage: 'approach', dialogueIndex: 0, signing: false, answers: [], questionIndex: 0, trait: null, explorerId: null, explorerName: '', tutorialDone: false })
+  },
+
+  continueFromIntro: () => {
+    if (get().phase !== 'intro') return
+    clearInput()
+    set({ phase: 'questions', dialogueIndex: 0 })
   },
 
   submitName: (name) => {
     if (!isValidExplorerName(name)) return
-    const { trait, explorerId, moduleId } = get()
-    if (!trait || !explorerId || !moduleId) return
+    const { trait, explorerId } = get()
+    if (!trait || !explorerId) return
     const passport: ExplorerPassport = {
       explorerName: sanitizeExplorerName(name),
       trait,
       explorerId,
-      moduleId,
+      unlockedExplorerIds: [explorerId],
+      stamps: [],
+      memorySites: [],
       missionNumber: get().passport?.missionNumber ?? 1,
       destination: null,
     }
@@ -309,38 +383,77 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   goBack: () => {
     const { phase, questionIndex } = get()
     clearInput()
-    if (phase === 'questions' && questionIndex > 0) {
+    if (phase === 'intro') {
+      set({ phase: 'menu' })
+    } else if (phase === 'questions' && questionIndex > 0) {
       set({ questionIndex: questionIndex - 1, dialogueIndex: 0 })
     } else if (phase === 'questions') {
-      set({ phase: 'menu' })
+      set({ phase: 'intro', dialogueIndex: 0 })
     } else if (phase === 'reveal') {
       set({ phase: 'questions', questionIndex: 3, trait: null })
     } else if (phase === 'explorer') {
       set({ phase: 'reveal' })
-    } else if (phase === 'module') {
-      set({ phase: 'explorer' })
     } else if (phase === 'name') {
-      set({ phase: 'module', signing: false })
+      set({ phase: 'explorer', signing: false })
     } else if (phase === 'hub') {
       set({ phase: 'menu' })
     }
   },
 
   continueFromReveal: () => {
-    if (get().phase !== 'reveal' || !get().trait) return
+    const trait = get().trait
+    if (get().phase !== 'reveal' || !trait) return
     clearInput()
-    set({ phase: 'explorer' })
+    // The power's hero is assigned automatically; the child may keep
+    // it or replace it in the explorer step (which also swaps power).
+    set({ explorerId: getHeroForTrait(trait).id, phase: 'explorer' })
   },
 
   confirmExplorer: (explorerId) => {
+    let hero: ReturnType<typeof getExplorer>
+    try {
+      hero = getExplorer(explorerId)
+    } catch {
+      return
+    }
     clearInput()
-    set({ explorerId, phase: 'module' })
+    // Choosing another hero also chooses that hero's power: hero and
+    // power are the same choice, never two separate ones.
+    set({ explorerId, trait: hero.trait, signing: false, phase: 'name' })
   },
 
-  confirmModule: (moduleId) => {
-    if (!get().trait || !get().explorerId) return
+  collectMemory: (siteId) => {
+    const { passport } = get()
+    if (!passport) return null
+    if (passport.memorySites.includes(siteId)) return null
+    const next = HISTORICAL_EXPLORERS.find(
+      (entry) => !passport.unlockedExplorerIds.includes(entry.id),
+    )
+    if (!next) return null
+    const updated: ExplorerPassport = {
+      ...passport,
+      unlockedExplorerIds: [...passport.unlockedExplorerIds, next.id],
+      stamps: passport.stamps.includes(next.id) ? passport.stamps : [...passport.stamps, next.id],
+      memorySites: [...passport.memorySites, siteId],
+    }
+    savePassport(updated)
+    set({ passport: updated })
+    return next.id
+  },
+
+  switchHero: (explorerId) => {
+    const { passport } = get()
+    if (!passport || !passport.unlockedExplorerIds.includes(explorerId)) return
+    let hero: ReturnType<typeof getExplorer>
+    try {
+      hero = getExplorer(explorerId)
+    } catch {
+      return
+    }
+    const updated: ExplorerPassport = { ...passport, explorerId, trait: hero.trait }
+    savePassport(updated)
     clearInput()
-    set({ moduleId, signing: false, phase: 'name' })
+    set({ passport: updated, explorerId, trait: hero.trait })
   },
 
   enterWorld: () => {
@@ -371,7 +484,6 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       questionIndex: 0,
       trait: null,
       explorerId: null,
-      moduleId: null,
       tutorialDone: false,
     })
   },

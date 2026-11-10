@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { MARS_OBJECTS, REGION_INFO, type ObjectState } from '../data/marsObjects'
+import { getExplorer, getTrait } from '../data/personalization'
+import { speakPip } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
+import { useOnboardingStore } from '../store/onboardingStore'
 
 const STATE_LABELS: Record<ObjectState, string> = {
   available: 'Available to explore',
@@ -18,6 +21,11 @@ export function SiteInteraction() {
   const openSite = useGameStore((state) => state.openNearbySite)
   const closeSite = useGameStore((state) => state.closeSite)
   const startChallenge = useGameStore((state) => state.startChallenge)
+  const passport = useOnboardingStore((state) => state.passport)
+  const voiceEnabled = useGameStore((state) => state.voiceEnabled)
+  const voiceName = useGameStore((state) => state.voiceName)
+  const collectMemory = useOnboardingStore((state) => state.collectMemory)
+  const switchHero = useOnboardingStore((state) => state.switchHero)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const active = MARS_OBJECTS.find((site) => site.id === activeId)
   const nearby = MARS_OBJECTS.find((site) => site.id === nearbyId)
@@ -32,6 +40,15 @@ export function SiteInteraction() {
       if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
     }
   }, [activeId])
+
+  // Memory fragment: one per site, restores the next locked hero.
+  const memoryAlreadyCollected = Boolean(
+    active && passport?.memorySites.includes(active.id),
+  )
+  const canCollectMemory = Boolean(
+    active && passport && active.state !== 'coming-soon' && !memoryAlreadyCollected,
+  )
+  const restoredHeroId = passport?.stamps[passport.stamps.length - 1]
 
   return (
     <>
@@ -68,6 +85,9 @@ export function SiteInteraction() {
             <button type="button" className="settings-close" aria-label="Close explorer information" onClick={closeSite}>×</button>
           </div>
           <p id="site-description" className="settings-description">{active.description}</p>
+          <blockquote className="site-voice">
+            <span aria-hidden="true">“</span>{active.artifactVoice}<span aria-hidden="true">”</span>
+          </blockquote>
           <p className="settings-hint">This is a stylized memorial scene. These missions are no longer operating. Letters and rescues in the game are fictional, not real transmissions.</p>
           <nav aria-label="NASA mission sources" className="site-sources">
             {active.sources.map((source, index) => <a key={source} href={source} target="_blank" rel="noopener noreferrer">NASA mission source{active.sources.length > 1 ? ` ${index + 1}` : ''} ↗</a>)}
@@ -76,8 +96,37 @@ export function SiteInteraction() {
             <p className="site-preview">Coming soon — this explorer’s activity is not available yet.</p>
           ) : (
             <>
-              <button type="button" className="site-action" onClick={() => startChallenge(active.id)} disabled={preview}>Preview future challenge</button>
-              {preview && <p className="site-preview" role="status">Challenge not available yet. This preview awards no rescue, letter delivery or stamp. You can keep exploring.</p>}
+              <button type="button" className="site-action" onClick={() => startChallenge(active.id)} disabled={preview}>Deliver letter</button>
+              {preview && <p className="site-preview" role="status">Letter delivery is coming soon. This preview awards no stamp yet. You can keep exploring.</p>}
+              {canCollectMemory && (
+                <button
+                  type="button"
+                  className="site-action site-action--memory"
+                  onClick={() => {
+                    const restoredId = collectMemory(active.id)
+                    if (restoredId) {
+                      try {
+                        speakPip(getExplorer(restoredId).memoryLine, voiceName, voiceEnabled)
+                      } catch {
+                        // Store changed under us; subtitles still show.
+                      }
+                    }
+                  }}
+                >
+                  🧠 Recover memory fragment
+                </button>
+              )}
+              {memoryAlreadyCollected && passport && (
+                <p className="site-preview" role="status">
+                  Memory fragment recovered · {passport.unlockedExplorerIds.length}/5 heroes restored.
+                  {restoredHeroId && (
+                    <>
+                      {' '}Last restored: {(() => { try { const h = getExplorer(restoredHeroId); return `${h.name} · ${getTrait(h.trait).sigil} ${getTrait(h.trait).name}` } catch { return '' } })()}
+                      . <button type="button" className="site-link" onClick={() => switchHero(restoredHeroId)}>Use this hero</button>
+                    </>
+                  )}
+                </p>
+              )}
             </>
           )}
           <button type="button" className="settings-resume" onClick={closeSite}>Return to exploring</button>

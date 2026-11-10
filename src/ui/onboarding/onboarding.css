@@ -1883,32 +1883,180 @@
   opacity: 0.75;
 }
 
-.shipping-label__seal {
-  position: absolute;
-  right: 18px;
-  bottom: 64px;
-  margin: 0;
-  padding: 6px 12px;
-  border: 2px solid #c97a63;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #8a4a3a;
-  opacity: 0;
-  transform: rotate(-8deg) scale(1.6);
+/* ------------------------------------------------------------ Name ceremony */
+
+/* The label unfolds from a small closed letter into the shipping
+   label (one animation, ~1s), then settles. */
+.shipping-label-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 480px;
   pointer-events: none;
 }
 
-.shipping-label.is-sealed .shipping-label__seal {
-  animation: seal-slam 320ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+.shipping-label.is-arriving {
+  animation: name-arrive 1050ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes seal-slam {
-  from { opacity: 0; transform: rotate(-8deg) scale(1.6); }
-  to { opacity: 1; transform: rotate(-8deg) scale(1); }
+@keyframes name-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) rotate(-1.2deg) scale(0.62);
+    clip-path: inset(42% 0 46% 0 round 6px);
+  }
+  26% {
+    opacity: 1;
+    transform: translateY(-6dvh) rotate(-1.2deg) scale(0.7);
+    clip-path: inset(24% 0 30% 0 round 6px);
+  }
+  62% {
+    transform: translateY(-11dvh) rotate(-1.2deg) scale(0.92);
+    clip-path: inset(4% 0 6% 0 round 6px);
+  }
+  100% {
+    transform: translateY(-13dvh) rotate(-1.2deg) scale(1);
+    clip-path: inset(0 0 0 0 round 6px);
+  }
+}
+
+/* Signature: warm ink glow once the name is valid. */
+.shipping-label__signature { position: relative; }
+.shipping-label__ink {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(201, 122, 99, 0.9), transparent);
+  opacity: 0;
+  transition: opacity 240ms ease;
+  pointer-events: none;
+}
+.shipping-label__signature.is-valid .shipping-label__ink { opacity: 1; }
+.shipping-label__signature.is-valid .shipping-label__input {
+  color: #5f2f24;
+  text-shadow: 0 0 14px rgba(201, 122, 99, 0.35);
+}
+.shipping-label__hint {
+  margin: 4px 0 0;
+  min-height: 1em;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: #a3675a;
+}
+
+/* Postmark pressed onto the paper (no agency logos). */
+.shipping-label__postmark {
+  position: absolute;
+  right: 22px;
+  bottom: 58px;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  width: 76px;
+  height: 76px;
+  border: 2px solid #a8452f;
+  border-radius: 50%;
+  color: #a8452f;
+  font-family: var(--font-mono);
+  transform: rotate(-12deg) scale(1.7);
+  opacity: 0;
+  pointer-events: none;
+}
+.shipping-label__postmark-envelope { font-size: 1.1rem; line-height: 1; }
+.shipping-label__postmark-text { font-size: 0.42rem; font-weight: 700; letter-spacing: 0.1em; }
+.shipping-label__postmark-star { font-size: 0.6rem; line-height: 1; }
+
+.shipping-label.is-sealed .shipping-label__postmark {
+  animation: postmark-press 460ms cubic-bezier(0.2, 1.25, 0.35, 1) both;
+}
+
+@keyframes postmark-press {
+  0% { opacity: 0; transform: rotate(-12deg) scale(1.7); }
+  55% { opacity: 1; transform: rotate(-12deg) scale(0.94); }
+  75% { transform: rotate(-12deg) scale(1.03); }
+  100% { opacity: 0.92; transform: rotate(-12deg) scale(1); }
+}
+
+/* Soft ink bleed that stays after the press. */
+.shipping-label__ink-mark {
+  position: absolute;
+  right: 34px;
+  bottom: 70px;
+  width: 54px;
+  height: 54px;
+  margin: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 69, 47, 0.18), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+.shipping-label.is-sealed .shipping-label__ink-mark {
+  animation: ink-bleed 700ms ease-out 260ms both;
+}
+@keyframes ink-bleed {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
+/* PIP's welcome, under the label (never over it). */
+.shipping-label__welcome {
+  position: absolute;
+  left: 50%;
+  bottom: -9dvh;
+  transform: translateX(-50%);
+  margin: 0;
+  width: max-content;
+  max-width: 90vw;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 217, 168, 0.4);
+  border-radius: 999px;
+  background: rgba(13, 8, 24, 0.85);
+  color: var(--cream);
+  font-size: 0.92rem;
+  text-align: center;
+  animation: name-welcome 420ms ease both;
+}
+@keyframes name-welcome {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Farewell: the sealed label folds and glides toward the passport
+   support on the right of the console, then fades. */
+.shipping-label.is-departing {
+  animation: name-depart 620ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  pointer-events: none;
+}
+@keyframes name-depart {
+  0% { opacity: 1; transform: translateY(-13dvh) rotate(-1.2deg) scale(1); clip-path: inset(0 0 0 0 round 6px); }
+  35% { opacity: 1; transform: translateY(-12dvh) rotate(0deg) scale(0.8); clip-path: inset(18% 0 22% 0 round 6px); }
+  100% { opacity: 0; transform: translate(26vw, 4dvh) rotate(7deg) scale(0.24); clip-path: inset(44% 0 44% 0 round 6px); }
+}
+
+@media (max-height: 760px) {
+  .shipping-label__welcome { bottom: -7dvh; }
+}
+@media (max-width: 640px) {
+  .shipping-label-stage { max-width: 94vw; }
+  .shipping-label__welcome { bottom: -12dvh; font-size: 0.84rem; }
+  @keyframes name-depart {
+    0% { opacity: 1; transform: translateY(-13dvh) rotate(-1.2deg) scale(1); clip-path: inset(0 0 0 0 round 6px); }
+    35% { opacity: 1; transform: translateY(-12dvh) rotate(0deg) scale(0.8); clip-path: inset(18% 0 22% 0 round 6px); }
+    100% { opacity: 0; transform: translate(12vw, 10dvh) rotate(7deg) scale(0.3); clip-path: inset(44% 0 44% 0 round 6px); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shipping-label.is-arriving,
+  .shipping-label.is-departing,
+  .shipping-label.is-sealed .shipping-label__postmark,
+  .shipping-label.is-sealed .shipping-label__ink-mark,
+  .shipping-label__welcome { animation: none; }
+  .shipping-label.is-sealed .shipping-label__postmark { opacity: 0.92; transform: rotate(-12deg) scale(1); }
 }
 
 .shipping-label__cta {
@@ -1999,6 +2147,10 @@
    dismiss, shrinks back toward it — one continuous motion. */
 .passport-detail__card {
   animation: passport-zoom-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Passport + memory archive can be taller than small viewports. */
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  width: min(680px, 100%);
 }
 
 .passport-detail__card.is-closing {
@@ -2073,3 +2225,309 @@
 @media (prefers-reduced-motion: reduce) { .launch__countdown, .launch__fact, .launch__destination { animation: none; } }
 .launch__caption { display: flex; align-items: center; gap: 10px; }
 .launch__caption .pip-avatar { width: 30px; height: 30px; flex: none; }
+
+/* ------------------------------------------------------------ Cinematic intro */
+.cine { position: relative; z-index: 1; width: min(880px, 96vw); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 16px; pointer-events: none; }
+/* Memory Window stage: the hologram lives INSIDE the cabin window
+   (fixed over the circular window area), never pegged to the bottom
+   frame. The cabin's frontal tutorial camera keeps the window
+   centred in the upper-middle of the screen. This fixed box is the
+   hologram safe zone (centerMain): PIP's side anchors keep him
+   outside it, so the projection is always the protagonist. */
+.cine__stage { position: fixed; left: 50%; transform: translateX(-50%); top: clamp(70px, 10dvh, 140px);
+  width: min(660px, 88vw); height: clamp(250px, 38dvh, 400px); display: grid; place-items: center; pointer-events: none; z-index: 2; }
+/* The generic .holo-scene cap (130px) must not shrink the stage
+   holograms: inside the window they own the safe zone. */
+.cine__stage .holo-scene { max-width: none; }
+.cine .identity__back { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: calc(16px + env(safe-area-inset-left, 0px)); z-index: 6; pointer-events: auto; }
+.cine__destinations { display: flex; align-items: flex-end; justify-content: center; gap: clamp(12px, 4vw, 44px); }
+.cine__destination { display: grid; justify-items: center; gap: 2px; width: clamp(120px, 19vw, 195px); animation: intro-in 520ms ease both; filter: drop-shadow(0 10px 26px rgba(143,227,216,.22)); }
+.cine__destination:nth-child(2) { animation-delay: 350ms; }
+.cine__destination:nth-child(3) { animation-delay: 700ms; }
+.cine__destination-name { font-size: .78rem; letter-spacing: .16em; text-transform: uppercase; color: var(--cream-dim); }
+.cine__forgotten { display: grid; justify-items: center; gap: 8px; animation: intro-in 700ms ease both; }
+.cine__forgotten .holo-scene { width: clamp(260px, 40vw, 460px); filter: drop-shadow(0 12px 30px rgba(255,217,168,.28)); }
+.cine__phrase { margin: 0; max-width: 92%; text-align: center; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(.9rem, 2.2vw, 1.15rem); letter-spacing: .22em; text-transform: uppercase; color: #FFD9A8; text-shadow: 0 0 18px rgba(255,217,168,.45); animation: intro-in 900ms ease both; }
+.cine__envelope { perspective: 600px; animation: intro-in 600ms ease both; }
+.cine__envelope .holo-scene { width: clamp(230px, 34vw, 380px); animation: envelope-turn 7s ease-in-out infinite; filter: drop-shadow(0 14px 34px rgba(255,217,168,.38)); }
+.cine__envelope .holo-scene.is-facing { animation: none; transform: rotateY(0deg) scale(1.14) translateY(4px); filter: drop-shadow(0 18px 42px rgba(255,217,168,.55)); }
+@keyframes envelope-turn { 0%,100% { transform: rotateY(-16deg); } 50% { transform: rotateY(16deg); } }
+.cine__constellation { position: relative; animation: intro-in 700ms ease both; }
+.cine__constellation::before { content: ''; position: absolute; inset: -18% -8%; z-index: -1;
+  background: radial-gradient(closest-side, rgba(184,166,217,.22), rgba(143,227,216,.08) 55%, transparent 75%); }
+.cine__constellation .holo-scene { width: clamp(340px, 54vw, 580px); filter: drop-shadow(0 0 22px rgba(184,166,217,.35)); }
+.rover-light { animation: rover-light 5s ease-in-out infinite; }
+@keyframes rover-light { 0%, 35% { opacity: 1; } 60%, 100% { opacity: .08; } }
+.constellation-lines { stroke-dasharray: 3 4; }
+
+/* Subtitle bar: bottom of the screen, independent of PIP's 3D spot. */
+.cine__subtitle { width: min(680px, 94vw); pointer-events: auto; padding: 10px 16px 12px; border: 1px solid rgba(143,227,216,.32); border-radius: 18px;
+  background: rgba(13, 8, 24, .88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 24px 50px -22px rgba(5,2,10,.95), 0 0 28px -10px rgba(143,227,216,.3); }
+.cine__subtitle-head { display: flex; align-items: center; gap: 10px; }
+.cine__subtitle-name { font-size: .72rem; font-weight: 800; letter-spacing: .28em; color: #FFD9A8; }
+.cine__replay, .cine__skip { margin-left: auto; padding: 6px 10px; border: 1px solid transparent; border-radius: 999px; background: none; color: var(--cream-dim); font: inherit; font-size: .82rem; cursor: pointer; }
+.cine__skip { margin-left: 0; }
+.cine__replay:hover, .cine__skip:hover { color: var(--cream); border-color: rgba(253,244,236,.25); }
+.cine__subtitle-text { margin: 4px 0 0; font-size: clamp(.98rem, 2.4vw, 1.12rem); line-height: 1.42; color: var(--cream); min-height: 2.2em; }
+.cine__actions { display: flex; justify-content: center; margin-top: 8px; }
+.cine__action { min-height: 46px; padding: 10px 24px; font-size: 1rem; box-shadow: 0 0 26px -6px rgba(143,227,216,.55); }
+.cine__action:focus-visible { outline: 2px solid #8FE3D8; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .cine__stage { top: clamp(72px, 12dvh, 130px); height: clamp(220px, 34dvh, 300px); width: 94vw; }
+  .cine__destination { width: clamp(88px, 26vw, 120px); }
+  .cine__subtitle { padding: 12px 14px 14px; }
+}
+
+.holo-scene { width: 100%; max-width: 130px; height: auto; display: block; }
+.holo-star { animation: holo-twinkle 3.2s ease-in-out infinite; }
+@keyframes holo-twinkle { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+.holo-shine { transform-origin: 60px 62px; animation: holo-spin 24s linear infinite; }
+.holo-orbit { transform-origin: 60px 60px; animation: holo-spin 13s linear infinite; }
+.holo-float { animation: holo-bob 5.5s ease-in-out infinite; }
+@keyframes holo-spin { to { transform: rotate(360deg); } }
+@keyframes holo-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes intro-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .cine__destination, .cine__forgotten, .cine__phrase, .cine__envelope, .cine__constellation { animation: none; }
+  .cine__envelope .holo-scene, .holo-star, .holo-shine, .holo-orbit, .holo-float, .rover-light { animation: none; }
+}
+
+/* ------------------------------------------------------------ Reveal evidence + hero */
+.reveal__evidence { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 0; color: var(--cream-dim); font-size: .85rem; }
+.reveal__chip { padding: 3px 8px; border: 1px solid rgba(253,244,236,.2); border-radius: 999px; background: rgba(255,255,255,.05); color: var(--cream); font-size: .8rem; }
+.reveal__hero { margin: 10px 0 0; line-height: 1.45; color: var(--cream); }
+.reveal__hero strong { color: var(--rose-200); }
+
+/* ------------------------------------------------------------ Explorer choice */
+.explorer__intro { margin: 4px 0 10px; color: var(--cream-dim); line-height: 1.45; }
+.explorer__intro strong { color: var(--cream); }
+.explorer__others-label { color: var(--cream-dim); font-size: .9rem; text-align: center; }
+.holo-card--active { border-color: var(--accent, var(--rose-200)); box-shadow: 0 0 0 1px var(--accent, var(--rose-200)) inset; }
+.holo-grid--single { grid-template-columns: 1fr; }
+.explorer__assigned { max-width: 460px; margin: 0 auto; width: 100%; }
+
+/* ------------------------------------------------------------ Memory archive */
+.memory-archive { margin-top: 14px; }
+.memory-archive__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.memory-card { display: grid; gap: 3px; text-align: left; padding: 12px; border: 1px solid rgba(253,244,236,.18); border-radius: 14px; background: rgba(27,16,41,.7); color: var(--cream); cursor: pointer; }
+.memory-card:disabled { cursor: default; opacity: .85; }
+.memory-card.is-locked { opacity: .62; filter: grayscale(.5); }
+.memory-card.is-active { border-color: var(--accent, var(--rose-200)); box-shadow: 0 0 0 1px var(--accent, var(--rose-200)) inset; }
+.memory-card__glyph { font-size: 1.3rem; }
+.memory-card__name { font-weight: 750; }
+.memory-card__trait, .memory-card__bio { color: var(--cream-dim); font-size: .82rem; line-height: 1.35; }
+
+/* ------------------------------------------------------------ Sites: artifact voice + memory */
+.site-voice { margin: 12px 0; padding: 12px 14px; border-left: 3px solid var(--rose-200); border-radius: 0 12px 12px 0; background: rgba(255,255,255,.05); font-style: italic; line-height: 1.45; }
+.site-action--memory { margin-top: 8px; }
+.site-link { padding: 0; border: none; background: none; color: var(--rose-200); font: inherit; font-weight: 750; cursor: pointer; text-decoration: underline; }
+
+/* Passport stamps now carry the hero sigil */
+.passport__stamp { display: grid; place-items: center; font-size: 1rem; }
+.passport__stamp.is-filled { color: var(--cream); border-style: solid; }
+
+/* ------------------------------------------------------------ Routine Check */
+.routine { width: min(760px, 96vw); }
+/* During the Routine Check / reveal the diorama owns the window, so
+   PIP's bubble sits in the band between the window and the selector
+   (the adaptive lift in Cabin.tsx still clears the panel). */
+.cabin .pip-bubble-wrap--mid { margin-top: clamp(280px, 50dvh, 500px); }
+@media (max-height: 700px) { .cabin .pip-bubble-wrap--mid { margin-top: 44dvh; } }
+@media (max-width: 640px) { .cabin .pip-bubble-wrap--mid { margin-top: clamp(220px, 42dvh, 320px); } }
+
+/* Explorer phase: the hero card owns the window, so the bubble waits
+   BELOW the circular frame with clear air before the action dock,
+   never over the name, emblem or bio. */
+.cabin .pip-bubble-wrap--hero { margin-top: clamp(300px, 61dvh, 660px); }
+@media (max-height: 800px) { .cabin .pip-bubble-wrap--hero { margin-top: 58dvh; } }
+@media (max-height: 650px) { .cabin .pip-bubble-wrap--hero { margin-top: 54dvh; } }
+@media (max-width: 640px) { .cabin .pip-bubble-wrap--hero { margin-top: clamp(240px, 56dvh, 380px); } }
+/* Diorama stage: fixed over the Cosmic Memory Window, like the
+   cinematic intro holograms. */
+.routine__stage { position: fixed; left: 50%; transform: translateX(-50%); top: clamp(70px, 10dvh, 140px);
+  width: min(660px, 88vw); height: clamp(250px, 38dvh, 400px); display: grid; place-items: center; pointer-events: none; z-index: 2; }
+/* NOTE: the diorama now renders inside the 3D window (MenuScene
+   RoutineHologram), so it is no longer a DOM overlay. */
+@media (max-width: 640px) { .routine__stage { top: clamp(72px, 12dvh, 130px); height: clamp(220px, 34dvh, 300px); width: 94vw; } }
+
+/* Diorama focus reactions (visual only; neutral when unfocused). */
+.diorama-path, .diorama-route, .diorama-star, .diorama-backpack, .diorama-meaning,
+.diorama-clues, .diorama-steps, .diorama-perimeter, .diorama-door, .diorama-map,
+.diorama-signal, .diorama-robot, .diorama-secret, .diorama-ship, .diorama-letter { transition: opacity 300ms ease, filter 300ms ease, transform 450ms ease; }
+.diorama-path { opacity: .55; }
+.diorama-path.is-lit { opacity: 1; filter: drop-shadow(0 0 8px #8FE3D8); }
+.diorama-route { opacity: .3; }
+.diorama-route.is-lit { opacity: 1; filter: drop-shadow(0 0 6px #F4B4DF); }
+.diorama-star { opacity: .85; }
+.diorama-star.is-lit { filter: drop-shadow(0 0 14px #FFD9A8); }
+.diorama-backpack { opacity: .8; }
+.diorama-backpack.is-lit { opacity: 1; filter: drop-shadow(0 0 10px #FFD9A8); }
+.diorama-meaning { opacity: .35; }
+.diorama-meaning.is-lit { opacity: 1; filter: drop-shadow(0 0 8px #B8A6D9); }
+.diorama-clues { opacity: .35; }
+.diorama-clues.is-lit { opacity: 1; filter: drop-shadow(0 0 8px #FFD9A8); }
+.diorama-steps { opacity: .3; }
+.diorama-steps.is-lit { opacity: 1; }
+.diorama-perimeter { opacity: .25; }
+.diorama-perimeter.is-lit { opacity: 1; filter: drop-shadow(0 0 8px #8FE3D8); }
+.diorama-door { transform-origin: 182px 117px; }
+.diorama-door-panel { transition: transform 450ms ease; transform-origin: 186px 117px; }
+.diorama-door.is-open .diorama-door-panel { transform: perspective(300px) rotateY(-38deg); }
+.diorama-door.is-dim { opacity: .55; }
+.diorama-map { opacity: .3; }
+.diorama-map.is-lit { opacity: 1; }
+.diorama-signal { opacity: .3; }
+.diorama-signal.is-lit { opacity: 1; filter: drop-shadow(0 0 8px #FFD9A8); }
+.diorama-robot { transform-origin: 160px 130px; }
+.diorama-robot.is-turned { transform: rotateY(14deg); }
+.diorama-secret { opacity: .35; }
+.diorama-secret.is-lit { opacity: 1; filter: drop-shadow(0 0 10px #F4B4DF); }
+.diorama-ship { transition: transform 500ms ease; }
+.diorama-ship.is-advanced { transform: translate(14px, -8px); }
+.diorama-letter { opacity: .8; }
+.diorama-letter.is-lit { opacity: 1; filter: drop-shadow(0 0 12px #FFD9A8); }
+
+/* Game selector under the window. */
+.routine__selector { width: min(560px, 94vw); margin-top: auto; margin-bottom: clamp(40px, 8dvh, 96px); pointer-events: auto; opacity: 0; transform: translateY(10px); transition: opacity 320ms ease, transform 320ms ease; }
+.routine__selector.is-ready { opacity: 1; transform: none; }
+
+/* The holographic console: one glass surface with corner brackets,
+   a header divider and a fixed description well, so the choices read
+   as a single diegetic control instead of floating web bars. */
+.routine__panel { position: relative; padding: 12px 14px 10px; border: 1px solid rgba(143,227,216,.34); border-radius: 18px;
+  background: linear-gradient(170deg, rgba(44,80,96,.62), rgba(16,10,28,.9) 58%, rgba(30,20,46,.86));
+  box-shadow: 0 26px 48px -26px rgba(5,2,10,.95), 0 0 26px -12px rgba(143,227,216,.45), inset 0 1px 0 rgba(216,244,240,.16);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.routine__corner { position: absolute; width: 14px; height: 14px; border: 1.5px solid rgba(143,227,216,.75); pointer-events: none; }
+.routine__corner--tl { top: 6px; left: 6px; border-right: 0; border-bottom: 0; border-radius: 4px 0 0 0; }
+.routine__corner--tr { top: 6px; right: 6px; border-left: 0; border-bottom: 0; border-radius: 0 4px 0 0; }
+.routine__corner--bl { bottom: 6px; left: 6px; border-right: 0; border-top: 0; border-radius: 0 0 0 4px; }
+.routine__corner--br { bottom: 6px; right: 6px; border-left: 0; border-top: 0; border-radius: 0 0 4px 0; }
+
+.routine__header { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 9px; padding: 0 2px 7px; color: var(--cream-dim);
+  font-size: .78rem; letter-spacing: .16em; text-transform: uppercase; border-bottom: 1px solid rgba(143,227,216,.22); }
+.routine__header > span:last-child { color: #8FE3D8; font-variant-numeric: tabular-nums; }
+.routine__choices { display: grid; gap: 7px; }
+.routine__choice { position: relative; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 7px 13px 7px 11px; border: 1px solid rgba(216,244,240,.14); border-radius: 11px;
+  background: rgba(12,7,22,.55); color: var(--cream); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.routine__choice::before { content: ''; position: absolute; left: 0; top: 18%; bottom: 18%; width: 2px; border-radius: 2px; background: transparent; transition: background 160ms ease; }
+.routine__choice:hover:not(:disabled), .routine__choice:focus-visible, .routine__choice.is-focused { border-color: rgba(143,227,216,.7); background: rgba(40,78,90,.6); box-shadow: 0 0 14px -6px rgba(143,227,216,.5); }
+.routine__choice:hover:not(:disabled)::before, .routine__choice:focus-visible::before, .routine__choice.is-focused::before { background: #8FE3D8; }
+.routine__choice.is-confirmed { border-color: rgba(255,217,168,.85); background: rgba(72,52,26,.62); box-shadow: 0 0 18px -6px rgba(255,217,168,.6); }
+.routine__choice.is-confirmed::before { background: #FFD9A8; }
+.routine__choice:focus-visible { outline: 2px solid rgba(143,227,216,.8); outline-offset: 2px; }
+.routine__choice:disabled { cursor: default; }
+.routine__choice-index { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; border: 1px solid rgba(143,227,216,.4); color: #8FE3D8; font-size: .78rem; font-weight: 700; transition: border-color 160ms ease, color 160ms ease, background 160ms ease; }
+.routine__choice.is-focused .routine__choice-index, .routine__choice.is-confirmed .routine__choice-index { background: rgba(143,227,216,.18); border-color: #8FE3D8; color: var(--cream); }
+.routine__choice-title { flex: 1; font-weight: 650; letter-spacing: .01em; }
+.routine__choice-check { color: #FFD9A8; font-weight: 800; }
+.routine__hint { margin: 9px 0 0; padding: 8px 10px 0; min-height: 2.3em; border-top: 1px solid rgba(143,227,216,.18); color: var(--cream);
+  font-size: .9rem; line-height: 1.35; text-align: center; }
+.routine__controls { margin: 4px 0 0; color: rgba(253,244,236,.42); font-size: .72rem; letter-spacing: .04em; text-align: center; }
+
+/* Reveal inside the window. */
+.routine-reveal__stage { display: grid; place-items: center; }
+.routine-reveal__lights { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; gap: clamp(18px, 5vw, 40px); }
+.routine-reveal__light { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; color: #8FE3D8; border: 1px solid rgba(143,227,216,.5); background: rgba(13,8,24,.6); animation: intro-in 420ms ease both; animation-delay: var(--delay, 0s); }
+.routine-reveal__light svg { width: 26px; height: 26px; }
+.routine-reveal__lights.is-gathered .routine-reveal__light { transform: translateY(-10px) scale(.82); opacity: .55; }
+.routine-reveal__sigil { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transform: scale(.7); transition: opacity 500ms ease, transform 500ms ease; }
+.routine-reveal__sigil.is-shown { opacity: 1; transform: scale(1); }
+.routine-reveal__sigil svg { width: clamp(110px, 20vw, 170px); height: auto; color: #FFD9A8; filter: drop-shadow(0 0 26px rgba(255,217,168,.5)); }
+.routine-reveal__copy { position: absolute; left: 0; right: 0; bottom: 6%; text-align: center; opacity: 0; transform: translateY(8px); transition: opacity 500ms ease, transform 500ms ease; }
+.routine-reveal__copy.is-shown { opacity: 1; transform: none; }
+.routine-reveal__over { margin: 0; color: var(--cream-dim); font-size: .85rem; letter-spacing: .18em; text-transform: uppercase; }
+.routine-reveal__name { margin: 4px 0 0; font-size: clamp(1.5rem, 4.5vw, 2.2rem); }
+.routine-reveal__description { margin: 4px auto 0; max-width: 480px; color: var(--cream-dim); line-height: 1.45; }
+.routine-reveal__panel { display: flex; justify-content: center; width: min(560px, 94vw); margin-top: auto; margin-bottom: clamp(44px, 9dvh, 110px); pointer-events: auto; }
+/* Compact action dock: one warm primary + one discreet secondary,
+   grouped on a slim holo bar so they never float loose over the
+   console plating. */
+.routine-reveal__dock { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%;
+  padding: 10px 14px 8px; border: 1px solid rgba(255,217,168,.28); border-radius: 18px;
+  background: linear-gradient(180deg, rgba(30,20,46,.82), rgba(13,8,24,.9));
+  box-shadow: 0 20px 40px -24px rgba(5,2,10,.95), inset 0 1px 0 rgba(255,217,168,.14);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  opacity: 0; transform: translateY(8px); transition: opacity 400ms ease, transform 400ms ease; }
+.routine-reveal__dock.is-shown { opacity: 1; transform: none; }
+
+/* Primary: warm gold ring, menu-selector language. */
+.reveal__primary { position: relative; min-height: 48px; padding: 12px 34px; border: 1px solid rgba(255,217,168,.75); border-radius: 999px;
+  background: rgba(255,217,168,.08); color: var(--cream); font: inherit; font-size: clamp(1rem, 2.4vw, 1.15rem); font-weight: 700; letter-spacing: .02em;
+  cursor: pointer; transition: background 180ms ease, box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease; }
+.reveal__primary::before { content: '✦'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #FFD9A8; opacity: .9; }
+.reveal__primary:hover:not(:disabled) { background: rgba(255,217,168,.16); border-color: #FFD9A8; box-shadow: 0 0 26px -6px rgba(255,217,168,.6); }
+.reveal__primary:focus-visible { outline: 2px solid rgba(255,217,168,.9); outline-offset: 3px; }
+.reveal__primary:active:not(:disabled) { transform: translateY(1px); }
+.reveal__primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
+
+/* Secondary: discreet, but clearly interactive (dotted underline). */
+.reveal__secondary { min-height: 34px; padding: 4px 14px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--cream-dim); font: inherit; font-size: .88rem; letter-spacing: .04em; cursor: pointer;
+  transition: color 160ms ease, background 160ms ease; }
+.reveal__secondary:hover { color: var(--cream); background: rgba(253,244,236,.06); }
+.reveal__secondary:focus-visible { outline: 2px solid rgba(143,227,216,.8); outline-offset: 2px; }
+.reveal__secondary:active { transform: translateY(1px); }
+.routine-reveal__choices { display: grid; gap: 5px; width: 100%; margin: 6px 0 0; padding: 8px 0 0; list-style: none; border-top: 1px solid rgba(255,217,168,.16); }
+.routine-reveal__chip { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid rgba(143,227,216,.28); border-radius: 12px; background: rgba(13,8,24,.72); font-size: .92rem; }
+.routine-reveal__chip svg { width: 20px; height: 20px; color: #8FE3D8; flex: none; }
+
+/* ------------------------------------------------------------ Explorer dock */
+/* The hero card itself lives in the 3D window; only this compact
+   action dock sits in the DOM, in the safe band above the console. */
+.quest.explorer { width: min(760px, 96vw); }
+.explorer__dock { display: flex; flex-direction: column; align-items: center; gap: 0; width: min(440px, 92vw);
+  margin-top: auto; margin-bottom: clamp(52px, 10dvh, 120px); padding: 8px 14px 6px; pointer-events: auto;
+  border: 1px solid rgba(255,217,168,.28); border-radius: 18px;
+  background: linear-gradient(180deg, rgba(30,20,46,.84), rgba(13,8,24,.92));
+  box-shadow: 0 20px 40px -24px rgba(5,2,10,.95), inset 0 1px 0 rgba(255,217,168,.14);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.explorer__carousel-row { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+.explorer__step { display: grid; place-items: center; width: 46px; height: 46px; flex: none; border-radius: 50%;
+  border: 1px solid rgba(143,227,216,.45); background: rgba(12,7,22,.6); color: var(--cream); font: inherit; font-size: 1.3rem; line-height: 1;
+  cursor: pointer; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
+.explorer__step:hover { border-color: #8FE3D8; background: rgba(40,78,90,.55); }
+.explorer__step:focus-visible { outline: 2px solid rgba(143,227,216,.85); outline-offset: 2px; }
+.explorer__step:active { transform: translateY(1px); }
+.explorer__choose { flex: 1; max-width: 280px; }
+.explorer__links { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 2px; }
+.explorer__count { color: rgba(143,227,216,.85); font-size: .74rem; letter-spacing: .16em; font-variant-numeric: tabular-nums; }
+.explorer__note { margin: 3px 0 0; max-width: 320px; color: rgba(253,244,236,.58); font-size: .72rem; line-height: 1.35; text-align: center; }
+.explorer__dock .reveal__primary { min-height: 46px; padding: 10px 28px; }
+.explorer__dock .reveal__secondary { min-height: 32px; padding: 4px 12px; font-size: .84rem; }
+
+@media (max-height: 800px) {
+  .explorer__dock { margin-bottom: 4dvh; padding-block: 8px 6px; }
+  .explorer__note { display: none; }
+}
+@media (max-width: 640px) {
+  .explorer__dock { width: 94vw; margin-bottom: 3dvh; }
+  .explorer__step { width: 44px; height: 44px; }
+}
+
+/* Collectible hero card. */
+.hero-card { position: relative; overflow: hidden; border-image: linear-gradient(135deg, var(--accent), transparent 55%) 1; }
+.hero-card__portrait { position: relative; display: block; width: 92px; height: 92px; margin-bottom: 4px; }
+.hero-portrait { width: 100%; height: 100%; display: block; }
+.hero-card__sigil { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--accent); background: rgba(13,8,24,.92); border: 1px solid var(--accent); }
+.hero-card__sigil svg { width: 19px; height: 19px; }
+.tablet__header-trait svg { width: 16px; height: 16px; vertical-align: -3px; }
+
+@media (max-height: 800px) {
+  .routine__selector, .routine-reveal__panel { margin-bottom: 4dvh; }
+  .routine__choice { min-height: 36px; padding-block: 5px; }
+  .routine__hint { min-height: 2em; font-size: .84rem; }
+  .routine__controls { display: none; }
+}
+@media (max-width: 640px) {
+  .routine__selector { width: 94vw; margin-bottom: 3dvh; }
+  .routine__panel { padding: 10px 10px 8px; }
+  .routine__choice { min-height: 42px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .routine-diorama, .routine-reveal__light, .routine-reveal__sigil, .routine-reveal__copy, .routine-reveal__dock, .routine__selector { animation: none; transition: none; }
+  .diorama-door-panel, .diorama-ship, .diorama-robot { transition: none; }
+  .routine__choice:hover, .routine__choice:focus-visible, .routine__choice.is-focused { transform: none; }
+}
