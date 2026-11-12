@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { MARS_OBJECTS } from '../data/marsObjects'
+import { SPIRIT_SITE } from '../data/spiritSite'
 import {
   distanceToPath,
+  distanceToSurveyTrail,
   getTerrainHeight,
   getTerrainSlope,
   slopeSpeedFactor,
 } from './terrainHeight'
-import { PATH_WAYPOINTS, WORLD } from './worldConfig'
+import { PATH_WAYPOINTS, SURVEY_ROUTE, WORLD } from './worldConfig'
 
 function expectClose(actual: number, expected: number, tolerance: number) {
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance)
@@ -211,5 +213,53 @@ describe('distanceToPath', () => {
     const near = distanceToPath(waypoint.x + 1, waypoint.z)
     const far = distanceToPath(waypoint.x + 9, waypoint.z)
     expect(far).toBeGreaterThan(near)
+  })
+})
+
+describe('Planetary Exploration 2.0 route and clearings', () => {
+  it('keeps a flat clearing around the explorer site', () => {
+    const center = getTerrainHeight(
+      SPIRIT_SITE.position.x,
+      SPIRIT_SITE.position.z,
+    )
+    for (const [dx, dz] of [
+      [2, 0],
+      [-2, 0],
+      [0, 2],
+      [0, -2],
+    ] as const) {
+      expectClose(
+        getTerrainHeight(SPIRIT_SITE.position.x + dx, SPIRIT_SITE.position.z + dz),
+        center,
+        1e-9,
+      )
+    }
+    expect(
+      getTerrainSlope(SPIRIT_SITE.position.x, SPIRIT_SITE.position.z),
+    ).toBeLessThan(0.05)
+  })
+
+  it('offers a 100–180 m expedition from landing to the explorer', () => {
+    const distance = Math.hypot(
+      WORLD.spawn.x - SPIRIT_SITE.position.x,
+      WORLD.spawn.z - SPIRIT_SITE.position.z,
+    )
+    expect(distance).toBeGreaterThan(100)
+    expect(distance).toBeLessThan(180)
+  })
+
+  it('is zero along the hand-authored survey trail', () => {
+    for (const point of SURVEY_ROUTE) {
+      expectClose(distanceToSurveyTrail(point.x, point.z), 0, 1e-9)
+      expect(Math.hypot(point.x, point.z)).toBeLessThanOrEqual(
+        WORLD.playRadius,
+      )
+    }
+  })
+
+  it('keeps the survey trail traversable at every stop', () => {
+    for (const point of SURVEY_ROUTE) {
+      expect(getTerrainSlope(point.x, point.z)).toBeLessThan(0.7)
+    }
   })
 })

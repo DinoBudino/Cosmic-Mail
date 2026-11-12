@@ -3,15 +3,29 @@ import { useGLTF } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { mulberry32 } from './random'
-import { destinationPlanetKind, ZONES, type PlanetKind } from '../data/zones'
-import { DISCOVERY_QUESTIONS, getExplorer, getTrait, introMomentForLine, type IntroMoment } from '../data/personalization'
-import { explorerHologramSvg } from '../ui/onboarding/explorerHologramTexture'
+import {
+  DESTINATIONS,
+  destinationPlanetKind,
+  type Destination,
+  type PlanetKind,
+} from '../data/destinations'
+import {
+  introCameraForLine,
+  introEmotionForLine,
+  introHologramForLine,
+  introMomentForLine,
+  type IntroCameraShot,
+  type IntroEmotion,
+  type IntroMoment,
+} from '../data/onboardingNarrative'
+import { getPassportView, STORY_STATUS_LABEL, type PassportView } from '../data/passport'
 import { introHologramSvg } from '../ui/onboarding/introHologramTexture'
-import { routineDioramaSvg } from '../ui/onboarding/routineDioramaTexture'
+import { emitAudio } from './audio/audioEvents'
 import { WindowHologram } from './WindowHologram'
 import { HubPip, type HubPipExpression } from './HubPipModel'
 import { useGameStore } from '../store/gameStore'
-import { isNavigationUnlocked, useOnboardingStore } from '../store/onboardingStore'
+import { useJourneyStore } from '../store/journeyStore'
+import { useOnboardingStore } from '../store/onboardingStore'
 import {
   cruiseDistance,
   descentProgress,
@@ -40,6 +54,34 @@ const FRONTAL_POSITION = new THREE.Vector3(0, 0.35, 1.55)
 const FRONTAL_LOOK = new THREE.Vector3(0, -0.5, -2.4)
 const CABIN_POSITION = new THREE.Vector3(1.7, 0.3, 1.2)
 const ROUTE_POSITION = new THREE.Vector3(-0.5, -0.1, -0.35)
+
+/**
+ * Intro framing per narrative beat. Each shot keeps PIP and the Archive
+ * window in a readable relationship: welcome centres on PIP, the Archive
+ * beats favour the window, the fault turns to PIP's reaction, and the
+ * invitation comes back to the player. Moves are damped in CameraRig.
+ */
+const INTRO_CAMERA: Record<
+  IntroCameraShot,
+  { position: THREE.Vector3; look: THREE.Vector3 }
+> = {
+  welcome: {
+    position: FRONTAL_POSITION,
+    look: FRONTAL_LOOK,
+  },
+  archive: {
+    position: new THREE.Vector3(0.15, 0.24, 0.35),
+    look: new THREE.Vector3(0, 0.02, -4.4),
+  },
+  pip: {
+    position: new THREE.Vector3(0.55, 0.2, 0.3),
+    look: new THREE.Vector3(0.92, -0.08, -2.3),
+  },
+  invitation: {
+    position: new THREE.Vector3(-0.4, 0.22, 0.3),
+    look: new THREE.Vector3(-0.92, -0.06, -2.2),
+  },
+}
 const MENU_LOOK = new THREE.Vector3(0, 0, 0)
 // Launching: the same wide menu framing, then a slow push-in toward
 // the destination as the ship accelerates.
@@ -65,11 +107,13 @@ function CameraRig() {
   const phase = useOnboardingStore((state) => state.phase)
   const boardingStage = useOnboardingStore((state) => state.boardingStage)
   const routeOpen = useOnboardingStore((state) => state.routeOpen)
-  const tutorialDone = useOnboardingStore((state) => state.tutorialDone)
+  const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const setBoardingStage = useOnboardingStore((state) => state.setBoardingStage)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const lookTarget = useMemo(() => new THREE.Vector3(), [])
   const wasCabinRef = useRef(false)
+  const hubView =
+    phase === 'hub' || phase === 'launching' || phase === 'playing'
 
   // Approach flight first (dwell on the ship), then a clean cut into
   // the cabin: no settling move afterwards. The only camera travel
@@ -99,8 +143,8 @@ function CameraRig() {
       if (stage === 'ignition' || stage === 'countdown') {
         const time = state.clock.elapsedTime
         const settle = stage === 'ignition' ? progress : 1
-        const basePosition = tutorialDone ? CABIN_POSITION : FRONTAL_POSITION
-        const baseLook = tutorialDone ? CABIN_LOOK : FRONTAL_LOOK
+        const basePosition = hubView ? CABIN_POSITION : FRONTAL_POSITION
+        const baseLook = hubView ? CABIN_LOOK : FRONTAL_LOOK
         // Sit down: start a little high/back, settle into the seat.
         camera.position.set(
           basePosition.x,
@@ -152,10 +196,22 @@ function CameraRig() {
     }
     const e = smoothstep(routeBlend.value)
 
-    // Tutorial framing: totally straight-on until the tutorial is
-    // done, then the view glides to the diagonal hub framing.
-    const basePosition = tutorialDone ? CABIN_POSITION : FRONTAL_POSITION
-    const baseLook = tutorialDone ? CABIN_LOOK : FRONTAL_LOOK
+    // Hub framing: frontal during the intro/registration, diagonal once
+    // the carrier reaches the control center. Intro beats use a soft
+    // cinematic shot per scene; reduced motion keeps one stable frame.
+    const introShot =
+      phase === 'intro' && !hubView ? introCameraForLine(dialogueIndex, reducedMotion) : null
+    const introFraming = introShot ? INTRO_CAMERA[introShot] : null
+    const basePosition = hubView
+      ? CABIN_POSITION
+      : reducedMotion || !introFraming
+        ? FRONTAL_POSITION
+        : introFraming.position
+    const baseLook = hubView
+      ? CABIN_LOOK
+      : reducedMotion || !introFraming
+        ? FRONTAL_LOOK
+        : introFraming.look
 
     if (cabin && routeBlend.value > 0) {
       // In the route view (or travelling to/back from it): the camera
@@ -753,7 +809,9 @@ function BackdropPlanet() {
   const outerRef = useRef<THREE.Group>(null)
   const phase = useOnboardingStore((state) => state.phase)
   const boardingStage = useOnboardingStore((state) => state.boardingStage)
-  const destination = useOnboardingStore((state) => state.passport?.destination ?? null)
+  const destination = useJourneyStore(
+    (state) => state.save?.currentDestination ?? null,
+  )
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   // Earth (home) in the menu AND during the outside approach flight
   // to the ship. Only INSIDE the cabin does the window reflect the
@@ -956,7 +1014,7 @@ function ThrusterPlume() {
 
 /**
  * Name tag that floats ABOVE the ship during the cruise (a
- * billboarded sprite, always facing the camera) — the explorer's
+ * billboarded sprite, always facing the camera) — the carrier's
  * name as a simple identifier, not painted on the hull. That way
  * the ship never needs to turn mid-flight just to show it.
  */
@@ -998,14 +1056,16 @@ function MailShip() {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const phase = useOnboardingStore((state) => state.phase)
   const boardingStage = useOnboardingStore((state) => state.boardingStage)
-  const explorerName = useOnboardingStore((state) => state.passport?.explorerName ?? '')
+  const carrierName = useJourneyStore(
+    (state) => state.save?.playerName ?? '',
+  )
   const { scene } = useGLTF(SHIP_URL)
   // Inside the cabin the exterior ship is hidden: we are within it.
   // (During the approach stage it is the whole point, so it stays.
   // During launching we are back in the wide menu shot, so it stays
   // too — it is already flying there.)
   const cabin = phase !== 'menu' && phase !== 'launching' && boardingStage === 'cabin'
-  const nameTagTexture = useMemo(() => (phase === 'launching' ? makeNameTagTexture(explorerName) : null), [phase, explorerName])
+  const nameTagTexture = useMemo(() => (phase === 'launching' ? makeNameTagTexture(carrierName) : null), [phase, carrierName])
   useEffect(() => () => nameTagTexture?.dispose(), [nameTagTexture])
   const nameTagRef = useRef<THREE.Sprite>(null)
 
@@ -1118,8 +1178,6 @@ function MailShip() {
   )
 }
 
-type CabinExpression = 'welcome' | 'curious' | 'happy' | 'thinking' | 'surprised'
-
 /** Narrative pose for Cabin PIP: reusable acting targets (position,
  *  tilt, gaze yaw and motion energy), damped every frame so moves
  *  ease in/out instead of teleporting. The intro poses free the
@@ -1156,66 +1214,58 @@ const PIP_ANCHORS = {
   // hologram band, so PIP never covers the projection.
   leftPresenter: { x: -1.18, y: -0.35, z: -2.28, scale: 0.9 },
   rightPresenter: { x: 1.18, y: -0.35, z: -2.28, scale: 0.9 },
-  leftReflective: { x: -1.18, y: -0.38, z: -2.34, scale: 0.88 },
-  rightReflective: { x: 1.18, y: -0.32, z: -2.34, scale: 0.88 },
 } as const
 
 type PipAnchorName = keyof typeof PIP_ANCHORS
 
 const INTRO_ANCHORS: Record<IntroMoment, PipAnchorName> = {
-  welcome: 'centerFocus',
-  explorers: 'rightPresenter',
-  forgotten: 'leftReflective',
+  arrival: 'centerFocus',
+  archive: 'rightPresenter',
+  fault: 'rightPresenter',
+  hope: 'leftPresenter',
   invitation: 'leftPresenter',
-  reflection: 'rightReflective',
 }
 
 const INTRO_POSES: Record<IntroMoment, PipPose> = {
-  // Welcome: dead-centre, upright and directly facing the player.
-  // No roll/pitch/yaw and no lateral sway; only a soft float and a
-  // one-shot greeting hop keep him alive.
-  welcome: { ...PIP_ANCHORS.centerFocus, roll: 0, pitch: 0, yaw: 0, bob: 0.09, sway: 0, antenna: 0.07, lambda: 2 },
-  // Explorers: right presenter, gaze toward the destinations.
-  explorers: { ...PIP_ANCHORS.rightPresenter, roll: 0.05, pitch: 0.03, yaw: -0.2, bob: 0.07, sway: 0.035, antenna: 0.06, lambda: 1.8 },
-  // Forgotten: left reflective, low and quiet beside the rover.
-  forgotten: { ...PIP_ANCHORS.leftReflective, roll: 0.04, pitch: 0.12, yaw: 0.12, bob: 0.025, sway: 0.012, antenna: 0.02, lambda: 1.6 },
-  // Invitation: left presenter leaning toward the letter.
-  invitation: { ...PIP_ANCHORS.leftPresenter, roll: -0.04, pitch: 0.08, yaw: 0.1, bob: 0.08, sway: 0.04, antenna: 0.09, lambda: 1.8 },
-  // Reflection: right reflective, contemplating the constellation.
-  reflection: { ...PIP_ANCHORS.rightReflective, roll: 0.06, pitch: -0.04, yaw: -0.16, bob: 0.06, sway: 0.03, antenna: 0.07, lambda: 1.7 },
+  // Arrival: dead-centre, upright and directly facing the player.
+  arrival: { ...PIP_ANCHORS.centerFocus, roll: 0, pitch: 0, yaw: 0, bob: 0.09, sway: 0, antenna: 0.07, lambda: 2 },
+  // Archive: beside the window, presenting the records.
+  archive: { x: 1.06, y: -0.24, z: -2.22, scale: 0.96, roll: 0.05, pitch: 0.03, yaw: -0.28, bob: 0.07, sway: 0.035, antenna: 0.06, lambda: 1.8 },
+  // Fault: moves slightly toward the player so the reaction reads.
+  fault: { x: 0.92, y: -0.16, z: -2.08, scale: 1.04, roll: 0.02, pitch: 0.02, yaw: -0.08, bob: 0.05, sway: 0.022, antenna: 0.05, lambda: 1.7 },
+  // Hope: energy returns, leaning toward the recovered clue.
+  hope: { x: -1.02, y: -0.2, z: -2.1, scale: 1.0, roll: -0.04, pitch: 0.05, yaw: 0.12, bob: 0.09, sway: 0.04, antenna: 0.09, lambda: 1.8 },
+  // Invitation: a small approach toward the player, warm and direct.
+  invitation: { x: -0.9, y: -0.1, z: -1.96, scale: 1.06, roll: -0.02, pitch: 0.03, yaw: 0, bob: 0.08, sway: 0.03, antenna: 0.1, lambda: 1.8 },
 }
 
 function poseForIntro(moment: IntroMoment, lineIndex: number): PipPose {
-  const base: PipPose = { ...INTRO_POSES[moment], ...PIP_ANCHORS[INTRO_ANCHORS[moment]] }
-  // Gaze shifts with the words: Moon first, then the rest; envelope
-  // first, then the child's face on the question line.
-  if (moment === 'explorers') return { ...base, yaw: lineIndex <= 1 ? -0.34 : -0.1 }
-  if (moment === 'invitation') return { ...base, pitch: lineIndex >= 6 ? 0 : 0.08, yaw: 0 }
-  if (moment === 'reflection') return { ...base, yaw: lineIndex >= 8 ? 0 : -0.16 }
+  const base: PipPose = { ...PIP_ANCHORS[INTRO_ANCHORS[moment]], ...INTRO_POSES[moment] }
+  if (moment === 'archive') {
+    return { ...base, yaw: lineIndex <= 2 ? -0.3 : -0.12 }
+  }
+  if (moment === 'fault') {
+    return { ...base, yaw: lineIndex >= 9 ? 0 : -0.12 }
+  }
+  if (moment === 'hope') return { ...base, yaw: 0.12 }
+  if (moment === 'invitation') {
+    return { ...base, pitch: lineIndex >= 12 ? 0.03 : 0.06, yaw: 0 }
+  }
   return base
 }
 
-function expressionForPhase(phase: string, dialogueIndex = 0): CabinExpression {
+function expressionForPhase(
+  phase: string,
+  dialogueIndex = 0,
+): IntroEmotion {
   switch (phase) {
-    case 'reveal':
-      return 'surprised'
-    case 'intro': {
-      // Cinematic intro reactions, driven by the subtitle line index.
-      const moment = introMomentForLine(dialogueIndex)
-      // Welcome deliberately keeps the round eyes open and looks straight
-      // at the player, with the friendly open smile from the atlas.
-      if (moment === 'welcome') return 'welcome'
-      if (moment === 'invitation') return 'happy'
-      if (moment === 'forgotten') return 'thinking'
-      if (moment === 'reflection') return 'surprised'
-      return 'curious'
-    }
-    case 'explorer':
-      return dialogueIndex >= 0 ? 'happy' : 'curious'
-    case 'passport':
+    case 'intro':
+      return introEmotionForLine(dialogueIndex)
+    case 'registration':
+      return 'thoughtful'
+    case 'hub':
+    case 'launching':
       return 'happy'
-    case 'name':
-      return 'thinking'
     default:
       return 'curious'
   }
@@ -1233,28 +1283,19 @@ function CabinPip() {
   const boardingStage = useOnboardingStore((state) => state.boardingStage)
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const pipTalking = useOnboardingStore((state) => state.pipTalking)
-  const tutorialDone = useOnboardingStore((state) => state.tutorialDone)
+  const hubView = phase === 'hub' || phase === 'launching'
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const expression = expressionForPhase(phase, dialogueIndex)
-  const hubExpression: HubPipExpression = expression === 'thinking' ? 'thoughtful' : expression
+  const hubExpression: HubPipExpression = expression
   const isIntro = phase === 'intro'
   const moment: IntroMoment | null = isIntro ? introMomentForLine(dialogueIndex) : null
-  // Narrative acting target: intro poses per moment, otherwise the
-  // tutorial spot or the diagonal hub spot once the tutorial is done.
-  // During the Routine Check and its reveal, PIP steps aside as a
-  // presenter beside the window diorama — never over it.
+  // Intro poses per moment; registration stays frontal; the hub glides
+  // to the diagonal control-center spot. No questions/reveal/hero poses.
   const targetPose: PipPose = isIntro && moment
     ? poseForIntro(moment, dialogueIndex)
-    : phase === 'questions'
-      ? { ...PIP_ANCHORS.rightPresenter, roll: 0.05, pitch: 0.03, yaw: -0.18, bob: 0.06, sway: 0.03, antenna: 0.06, lambda: 1.8 }
-      : phase === 'reveal'
-        ? { ...PIP_ANCHORS.rightReflective, roll: 0.06, pitch: -0.04, yaw: -0.14, bob: 0.06, sway: 0.03, antenna: 0.07, lambda: 1.7 }
-        : phase === 'explorer'
-          // Admiring the hero beside the window, then facing the child.
-          ? { ...PIP_ANCHORS.leftPresenter, roll: -0.05, pitch: 0.04, yaw: 0.12, bob: 0.07, sway: 0.035, antenna: 0.08, lambda: 1.7 }
-          : tutorialDone
-            ? HUB_POSE
-            : TUTORIAL_POSE
+    : hubView
+      ? HUB_POSE
+      : TUTORIAL_POSE
   // Smoothed amplitudes: talking <-> resting blends over ~0.5s instead
   // of switching frequencies, which used to make PIP jump (reposition)
   // the instant he finished a line or the player clicked the bubble.
@@ -1278,6 +1319,23 @@ function CabinPip() {
     const time = state.clock.elapsedTime
     const damp = THREE.MathUtils.damp
     const talking = pipTalking && !reducedMotion
+    // Emotional body language: concern lowers the float and slows the sway;
+    // hope and welcome restore the usual energy. No teleporting: the same
+    // damped pose pipeline carries every change.
+    const energy =
+      expression === 'worried' || expression === 'sad' || expression === 'thoughtful'
+        ? 0.55
+        : expression === 'surprised'
+          ? 0.82
+          : expression === 'curious'
+            ? 0.9
+            : 1
+    const emotionalSink =
+      expression === 'sad' || expression === 'worried'
+        ? -0.07
+        : expression === 'thoughtful'
+          ? -0.035
+          : 0
     const pose = poseRef.current
     const moveLambda = reducedMotion ? 10 : targetPose.lambda
     pose.x = damp(pose.x, targetPose.x, moveLambda, delta)
@@ -1288,7 +1346,7 @@ function CabinPip() {
     pose.pitch = damp(pose.pitch, targetPose.pitch, 4, delta)
     pose.yaw = damp(pose.yaw, targetPose.yaw, 4, delta)
 
-    const isWelcome = phase === 'intro' && dialogueIndex === 0
+    const isWelcome = phase === 'intro' && moment === 'arrival'
     if (isWelcome && !welcomeSnappedRef.current) {
       Object.assign(pose, targetPose)
       bobAmpRef.current = targetPose.bob
@@ -1310,7 +1368,12 @@ function CabinPip() {
       welcomeGreetRef.current = time
     }
 
-    if (moment && prevMomentRef.current === 'invitation' && moment === 'reflection') {
+    const previousMoment = prevMomentRef.current
+    if (
+      moment &&
+      ((moment === 'hope' && previousMoment !== 'hope') ||
+        (moment === 'invitation' && previousMoment === 'hope'))
+    ) {
       hopStartRef.current = time
     }
     prevMomentRef.current = moment
@@ -1350,17 +1413,20 @@ function CabinPip() {
     group.position.z = pose.z
     group.scale.setScalar(pose.scale)
     if (!reducedMotion) {
-      const bobTarget = isWelcome ? targetPose.bob : talking ? 0.11 : targetPose.bob
-      const swayTarget = isWelcome ? 0 : talking ? 0.06 : targetPose.sway
+      const bobTarget =
+        (isWelcome ? targetPose.bob : talking ? 0.11 : targetPose.bob) * energy
+      const swayTarget =
+        (isWelcome ? 0 : talking ? 0.06 : targetPose.sway) * energy
       bobAmpRef.current = damp(bobAmpRef.current, bobTarget, 5, delta)
       swayAmpRef.current = damp(swayAmpRef.current, swayTarget, 5, delta)
       // Fixed frequencies: only the amplitudes blend, never the phase.
-      group.position.y = pose.y + Math.sin(time * 1.9) * bobAmpRef.current + hop
+      group.position.y =
+        pose.y + emotionalSink + Math.sin(time * 1.9) * bobAmpRef.current + hop
       // Additive sway ON TOP of the pose roll — an absolute
       // assignment here used to erase the roll every frame.
       group.rotation.z += Math.sin(time * 2.4) * swayAmpRef.current
     } else {
-      group.position.y = pose.y
+      group.position.y = pose.y + emotionalSink
     }
     // Facial expression, blink, talking mouth, antenna and scarf movement
     // now live inside HubPipModel; the cabin keeps only placement and pose.
@@ -1446,12 +1512,7 @@ function RadarSweep({ position }: { position: [number, number, number] }) {
 /* a hidden mirror for keyboard / screen-reader users (see Hub).       */
 /* ------------------------------------------------------------------ */
 
-function makePassportTexture(passport: {
-  explorerName: string
-  trait: string
-  explorerId: string
-  missionNumber: number
-}): THREE.CanvasTexture {
+function makePassportTexture(view: PassportView): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = 512
   canvas.height = 660
@@ -1477,7 +1538,7 @@ function makePassportTexture(passport: {
   ctx.fillText('✉ Cosmic Mail', 40, 66)
   ctx.font = '600 20px ui-monospace, monospace'
   ctx.textAlign = 'right'
-  ctx.fillText(`MISSION ${passport.missionNumber}`, 472, 62)
+  ctx.fillText(view.carrierId, 472, 62)
   ctx.textAlign = 'left'
   ctx.strokeStyle = 'rgba(253,244,236,0.35)'
   ctx.lineWidth = 2
@@ -1485,32 +1546,63 @@ function makePassportTexture(passport: {
   ctx.moveTo(40, 92)
   ctx.lineTo(472, 92)
   ctx.stroke()
-  // Single-column fields: no collisions on the small card.
+
   ctx.fillStyle = 'rgba(253,244,236,0.55)'
   ctx.font = '600 18px ui-monospace, monospace'
-  const fields: [string, string][] = [
-    ['EXPLORER', passport.explorerName],
-    ['POWER', passport.trait],
-    ['HERO', passport.explorerId],
-  ]
-  fields.forEach(([label, value], index) => {
-    const y = 140 + index * 78
-    ctx.fillText(label, 40, y)
+  ctx.fillText('CARRIER', 40, 138)
+  ctx.fillStyle = '#FDF4EC'
+  ctx.font = '700 28px system-ui, sans-serif'
+  ctx.fillText(fit(view.carrierName, 430), 40, 174)
+
+  ctx.fillStyle = 'rgba(253,244,236,0.55)'
+  ctx.font = '600 18px ui-monospace, monospace'
+  ctx.fillText('HISTORIES RESTORED', 40, 222)
+  ctx.fillStyle = '#FFD9A8'
+  ctx.font = '700 26px system-ui, sans-serif'
+  ctx.fillText(
+    `${view.transmittedCount}/${view.totalStories}`,
+    40,
+    256,
+  )
+
+  view.stories.forEach((story, index) => {
+    const y = 300 + index * 108
+    ctx.fillStyle = 'rgba(253,244,236,0.08)'
+    roundRectPath(ctx, 36, y - 28, 440, 92, 12)
+    ctx.fill()
+    ctx.strokeStyle = story.stampEarned
+      ? 'rgba(255,217,168,0.7)'
+      : 'rgba(253,244,236,0.22)'
+    ctx.lineWidth = 2
+    roundRectPath(ctx, 36, y - 28, 440, 92, 12)
+    ctx.stroke()
+
     ctx.fillStyle = '#FDF4EC'
-    ctx.font = '700 27px system-ui, sans-serif'
-    ctx.fillText(fit(value, 430), 40, y + 34)
-    ctx.fillStyle = 'rgba(253,244,236,0.55)'
-    ctx.font = '600 18px ui-monospace, monospace'
-  })
-  ctx.fillText('MISSION STAMPS', 40, 496)
-  ctx.strokeStyle = 'rgba(253,244,236,0.4)'
-  ctx.setLineDash([8, 6])
-  for (let row = 0; row < 2; row += 1) {
-    for (let col = 0; col < 6; col += 1) {
-      ctx.strokeRect(40 + col * 74, 514 + row * 62, 62, 52)
+    ctx.font = '700 24px system-ui, sans-serif'
+    ctx.fillText(`${story.destination.glyph} ${story.destination.name}`, 52, y)
+    ctx.fillStyle = 'rgba(253,244,236,0.62)'
+    ctx.font = '600 17px ui-monospace, monospace'
+    ctx.fillText(
+      story.machineName ?? 'EXPLORER NOT IDENTIFIED',
+      52,
+      y + 24,
+    )
+    ctx.fillStyle = story.stampEarned ? '#FFD9A8' : 'rgba(253,244,236,0.62)'
+    ctx.font = '600 16px ui-monospace, monospace'
+    ctx.fillText(
+      `${STORY_STATUS_LABEL[story.status].toUpperCase()} · ${story.scanned}/${story.total}`,
+      52,
+      y + 48,
+    )
+    if (story.stampEarned) {
+      ctx.fillStyle = '#FFD9A8'
+      ctx.textAlign = 'right'
+      ctx.font = '700 22px system-ui, sans-serif'
+      ctx.fillText('✦', 456, y + 8)
+      ctx.textAlign = 'left'
     }
-  }
-  ctx.setLineDash([])
+  })
+
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 4
@@ -1533,12 +1625,19 @@ const NAV_CARDS_H = 196
 const NAV_CARDS_TOP_FRAC = NAV_CARDS_Y / NAV_H
 const NAV_CARDS_BOTTOM_FRAC = (NAV_CARDS_Y + NAV_CARDS_H) / NAV_H
 
-type NavZone = {
-  id: string
-  name: string
-  glyph: string
-  enabled: boolean
-  objects: readonly string[]
+type NavDestination = Destination
+
+function fitCanvasText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string {
+  if (ctx.measureText(text).width <= maxWidth) return text
+  let value = text
+  while (value.length > 4 && ctx.measureText(`${value}…`).width > maxWidth) {
+    value = value.slice(0, -1)
+  }
+  return `${value}…`
 }
 
 function roundRectPath(
@@ -1687,25 +1786,8 @@ function zoneImage(zoneId: string): HTMLCanvasElement {
   return (deepSpaceImageCanvas ??= makeDeepSpaceCanvas())
 }
 
-function drawLock(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number): void {
-  ctx.strokeStyle = '#FFD9A8'
-  ctx.lineWidth = s * 0.16
-  ctx.beginPath()
-  ctx.arc(cx, cy - s * 0.18, s * 0.34, Math.PI, 0)
-  ctx.stroke()
-  ctx.fillStyle = '#FFD9A8'
-  roundRectPath(ctx, cx - s * 0.5, cy - s * 0.2, s, s * 0.75, s * 0.14)
-  ctx.fill()
-  ctx.fillStyle = '#1B1029'
-  ctx.beginPath()
-  ctx.arc(cx, cy + s * 0.12, s * 0.12, 0, Math.PI * 2)
-  ctx.fill()
-}
-
-/** The navigation screen at rest: idle radar rings, no destinations.
- *  While locked (PIP has not said "tap the radar screen" yet) there
- *  is no TAP FOR ROUTE prompt — the panel is inert decoration. */
-function drawRadarIdle(ctx: CanvasRenderingContext2D, unlocked: boolean): void {
+/** The navigation screen at rest: idle radar rings. */
+function drawRadarIdle(ctx: CanvasRenderingContext2D): void {
   const gradient = ctx.createLinearGradient(0, 0, NAV_W, NAV_H)
   gradient.addColorStop(0, '#14524A')
   gradient.addColorStop(1, '#0B2E29')
@@ -1718,7 +1800,6 @@ function drawRadarIdle(ctx: CanvasRenderingContext2D, unlocked: boolean): void {
   ctx.font = '700 34px ui-monospace, monospace'
   ctx.textAlign = 'left'
   ctx.fillText('NAVIGATION', 24, 52)
-  // Radar rings around the screen centre.
   ctx.strokeStyle = 'rgba(143,227,216,0.45)'
   ctx.lineWidth = 2
   for (const radius of [50, 100, 150]) {
@@ -1731,20 +1812,24 @@ function drawRadarIdle(ctx: CanvasRenderingContext2D, unlocked: boolean): void {
   ctx.textAlign = 'center'
   ctx.shadowColor = 'rgba(143,227,216,0.8)'
   ctx.shadowBlur = 12
-  if (unlocked) ctx.fillText('TAP FOR ROUTE', NAV_W / 2, NAV_H - 40)
+  ctx.fillText('TAP FOR ROUTE', NAV_W / 2, NAV_H - 40)
   ctx.shadowBlur = 0
   ctx.textAlign = 'left'
 }
 
-/** Route summary after tapping a destination: big image, the objects
- *  on the route, and the SELECCIONAR button that confirms it. */
-function drawSummary(ctx: CanvasRenderingContext2D, zone: NavZone): void {
-  // Big representative image.
+function drawSummary(
+  ctx: CanvasRenderingContext2D,
+  destination: NavDestination,
+  view: PassportView,
+): void {
+  const story = view.stories.find(
+    (entry) => entry.destination.id === destination.id,
+  )
   const imgX = 16
   const imgY = NAV_CARDS_Y
   const imgW = 460
   const imgH = NAV_CARDS_H
-  const image = zoneImage(zone.id)
+  const image = zoneImage(destination.id)
   ctx.save()
   roundRectPath(ctx, imgX, imgY, imgW, imgH, 14)
   ctx.clip()
@@ -1767,33 +1852,54 @@ function drawSummary(ctx: CanvasRenderingContext2D, zone: NavZone): void {
   ctx.lineWidth = 3
   roundRectPath(ctx, imgX, imgY, imgW, imgH, 14)
   ctx.stroke()
-  // Destination name + object summary.
+
   ctx.fillStyle = '#FDF4EC'
   ctx.font = '800 40px system-ui, sans-serif'
   ctx.textAlign = 'left'
-  ctx.fillText(zone.name, 500, 104)
+  ctx.fillText(destination.name, 500, 104)
   ctx.fillStyle = '#8FE3D8'
   ctx.font = '700 20px ui-monospace, monospace'
-  ctx.fillText('OBJECTS ON THIS ROUTE', 500, 140)
+  ctx.fillText('DESTINATION CLUE', 500, 140)
   ctx.fillStyle = '#FDF4EC'
   ctx.font = '600 24px system-ui, sans-serif'
-  zone.objects.forEach((object, index) => {
-    const y = 176 + index * 32
-    ctx.fillStyle = '#8FE3D8'
-    ctx.beginPath()
-    ctx.arc(508, y - 8, 4, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.fillStyle = '#FDF4EC'
-    ctx.fillText(object, 524, y)
-  })
-  // SELECT (confirm) and BACK (to the cards): same height.
-  ctx.fillStyle = '#FFD9A8'
+  ctx.fillText(fitCanvasText(ctx, destination.clue, 330), 500, 174)
+  ctx.fillStyle = 'rgba(253,244,236,0.92)'
+  ctx.font = '700 25px system-ui, sans-serif'
+  ctx.fillText(
+    fitCanvasText(
+      ctx,
+      story?.machineName ?? 'Signal awaiting identification',
+      330,
+    ),
+    500,
+    212,
+  )
+  ctx.fillStyle = '#8FE3D8'
+  ctx.font = '600 21px ui-monospace, monospace'
+  ctx.fillText(
+    `${story ? STORY_STATUS_LABEL[story.status] : 'Unidentified signal'} · ${
+      story?.scanned ?? 0
+    }/${story?.total ?? 3}`,
+    500,
+    244,
+  )
+  if (story?.stampEarned) {
+    ctx.fillStyle = '#FFD9A8'
+    ctx.font = '700 22px system-ui, sans-serif'
+    ctx.fillText(`✦ ${story.stampLabel}`, 500, 274)
+  }
+
+  ctx.fillStyle = destination.available ? '#FFD9A8' : 'rgba(253,244,236,0.35)'
   roundRectPath(ctx, 220, 312, 420, 56, 14)
   ctx.fill()
-  ctx.fillStyle = '#1B1029'
+  ctx.fillStyle = destination.available ? '#1B1029' : '#6B6070'
   ctx.font = '800 30px system-ui, sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText('SELECT', 430, 350)
+  ctx.fillText(
+    destination.available ? 'SELECT' : 'IN DEVELOPMENT',
+    430,
+    350,
+  )
   ctx.strokeStyle = 'rgba(143,227,216,0.7)'
   ctx.lineWidth = 2
   roundRectPath(ctx, 16, 312, 180, 56, 14)
@@ -1806,8 +1912,9 @@ function drawSummary(ctx: CanvasRenderingContext2D, zone: NavZone): void {
 
 function drawDestinations(
   ctx: CanvasRenderingContext2D,
-  zones: readonly NavZone[],
+  destinations: readonly NavDestination[],
   selectedId: string | null,
+  view: PassportView,
 ): void {
   const gradient = ctx.createLinearGradient(0, 0, NAV_W, NAV_H)
   gradient.addColorStop(0, 'rgba(67,120,140,0.92)')
@@ -1823,38 +1930,42 @@ function drawDestinations(
   ctx.fillText('NAVIGATION', 24, 52)
   ctx.textAlign = 'right'
   ctx.fillStyle = '#FDF4EC'
-  // Ambiguity avoided: nothing is locked until SELECT confirms it.
   ctx.fillText(selectedId ? 'ROUTE SUMMARY' : 'PICK A DESTINATION', NAV_W - 24, 52)
   ctx.textAlign = 'left'
 
-  const selected = zones.find((zone) => zone.id === selectedId)
+  const selected = destinations.find((entry) => entry.id === selectedId)
 
   if (selected) {
-    drawSummary(ctx, selected)
+    drawSummary(ctx, selected, view)
+    return
   }
 
-  if (!selected) zones.forEach((zone, index) => {
+  destinations.forEach((destination, index) => {
     const x = NAV_CARD_X0 + index * (NAV_CARD_W + NAV_CARD_GAP)
     const y = NAV_CARDS_Y
-    const isSelected = zone.id === selectedId
-    // Card body.
-    ctx.fillStyle = isSelected ? 'rgba(143,227,216,0.18)' : 'rgba(216,244,240,0.06)'
+    const story = view.stories.find(
+      (entry) => entry.destination.id === destination.id,
+    )
+    ctx.fillStyle = destination.available
+      ? 'rgba(216,244,240,0.06)'
+      : 'rgba(27,16,41,0.55)'
     roundRectPath(ctx, x, y, NAV_CARD_W, NAV_CARDS_H, 14)
     ctx.fill()
-    ctx.strokeStyle = isSelected ? '#8FE3D8' : 'rgba(253,244,236,0.3)'
-    ctx.lineWidth = isSelected ? 4 : 2
+    ctx.strokeStyle = destination.available
+      ? 'rgba(253,244,236,0.3)'
+      : 'rgba(184,166,217,0.35)'
+    ctx.lineWidth = 2
     roundRectPath(ctx, x, y, NAV_CARD_W, NAV_CARDS_H, 14)
     ctx.stroke()
-    // Representative image.
+
     const imgX = x + 10
     const imgY = y + 10
     const imgW = NAV_CARD_W - 20
-    const imgH = 118
-    const image = zoneImage(zone.id)
+    const imgH = 98
+    const image = zoneImage(destination.id)
     ctx.save()
     roundRectPath(ctx, imgX, imgY, imgW, imgH, 10)
     ctx.clip()
-    // Crop the source to the image aspect (Mars canvas is 1024x512).
     const srcAspect = imgW / imgH
     const srcW = Math.min(image.width, image.height * srcAspect)
     const srcH = Math.min(image.height, image.width / srcAspect)
@@ -1869,57 +1980,63 @@ function drawDestinations(
       imgW,
       imgH,
     )
-    if (!zone.enabled) {
-      // Locked destinations: image dimmed under a padlock.
-      ctx.fillStyle = 'rgba(5,3,9,0.58)'
+    if (!destination.available) {
+      ctx.fillStyle = 'rgba(5,3,9,0.55)'
       ctx.fillRect(imgX, imgY, imgW, imgH)
     }
     ctx.restore()
-    if (!zone.enabled) {
-      drawLock(ctx, imgX + imgW / 2, imgY + imgH / 2, 44)
-    }
-    // Name + status under the image (no glyph icons on the names).
+
     ctx.fillStyle = '#FDF4EC'
-    ctx.font = '700 28px system-ui, sans-serif'
+    ctx.font = '700 29px system-ui, sans-serif'
     ctx.textAlign = 'left'
-    ctx.fillText(zone.name, x + 12, imgY + imgH + 36)
-    ctx.font = '600 21px ui-monospace, monospace'
-    ctx.fillStyle = zone.enabled ? 'rgba(253,244,236,0.9)' : 'rgba(253,244,236,0.68)'
     ctx.fillText(
-      zone.enabled ? `${zone.objects.length} objects` : 'COMING SOON',
+      `${destination.glyph} ${destination.name}`,
       x + 12,
-      imgY + imgH + 64,
+      imgY + imgH + 35,
+    )
+    ctx.fillStyle = 'rgba(253,244,236,0.86)'
+    ctx.font = '600 18px system-ui, sans-serif'
+    ctx.fillText(
+      fitCanvasText(ctx, destination.clue, NAV_CARD_W - 24),
+      x + 12,
+      imgY + imgH + 60,
+    )
+    ctx.fillStyle = destination.available ? '#8FE3D8' : '#B8A6D9'
+    ctx.font = '700 17px ui-monospace, monospace'
+    ctx.fillText(
+      fitCanvasText(
+        ctx,
+        destination.available
+          ? story?.machineName ?? 'SIGNAL DETECTED'
+          : 'MISSION IN DEVELOPMENT',
+        NAV_CARD_W - 24,
+      ),
+      x + 12,
+      imgY + imgH + 84,
     )
   })
-
-  // No take-off text here: this screen only selects. Confirming with
-  // SELECT sends the pilot back to the cabin, where the big button's
-  // lid lifts.
 }
 
-/**
- * The whole navigation screen: idle radar first, and as the pilot
- * leans in (`alpha` follows the route blend) the cards fade in over
- * it — TAP FOR ROUTE stays until the content takes over.
- */
+/** Whole navigation screen: idle radar first, cards fade in as the pilot
+ *  leans in. */
 function drawNavScreen(
   ctx: CanvasRenderingContext2D,
   alpha: number,
-  zones: readonly NavZone[],
+  destinations: readonly NavDestination[],
   selectedId: string | null,
-  unlocked: boolean,
+  view: PassportView,
 ): void {
-  drawRadarIdle(ctx, unlocked)
+  drawRadarIdle(ctx)
   if (alpha <= 0.01) return
   ctx.save()
   ctx.globalAlpha = alpha
-  drawDestinations(ctx, zones, selectedId)
+  drawDestinations(ctx, destinations, selectedId, view)
   ctx.restore()
 }
 
 /** Passport card pinned on the cabin wall; click opens the detail view. */
 function PassportCard3D() {
-  const passport = useOnboardingStore((state) => state.passport)
+  const save = useJourneyStore((state) => state.save)
   const phase = useOnboardingStore((state) => state.phase)
   const detailOpen = useOnboardingStore((state) => state.passportDetailOpen)
   const setPassportDetailOpen = useOnboardingStore((state) => state.setPassportDetailOpen)
@@ -1957,14 +2074,9 @@ function PassportCard3D() {
   }
 
   const texture = useMemo(() => {
-    if (!passport) return null
-    return makePassportTexture({
-      explorerName: passport.explorerName,
-      trait: getTrait(passport.trait).name,
-      explorerId: getExplorer(passport.explorerId).name,
-      missionNumber: passport.missionNumber,
-    })
-  }, [passport])
+    if (!save) return null
+    return makePassportTexture(getPassportView(save))
+  }, [save])
 
   useEffect(() => () => texture?.dispose(), [texture])
 
@@ -1981,12 +2093,11 @@ function PassportCard3D() {
   //   foot z = -0.173 + 0.212 * sin(0.35) = -0.100
 
   // While the detail is open, the 3D card leaves the console (it is
-  // "in hand" now, not duplicated on the desk). During the ritual
-  // (new mission: intro → questions → name) the previous passport is
-  // NOT on the console: it belongs to the hub, and a new mission must
-  // not start with the old card already standing there.
-  const onConsole = phase === 'hub' || phase === 'launching' || phase === 'playing'
-  if (!passport || !texture || detailOpen || !onConsole) return null
+  // "in hand" now, not duplicated on the desk). It belongs to the hub
+  // and to the launch/playing cabin, never to the intro/registration.
+  const onConsole =
+    phase === 'hub' || phase === 'launching' || phase === 'playing'
+  if (!save || !texture || detailOpen || !onConsole) return null
   return (
     // Standing on its support tray in the right zone, leaning
     // back like a card propped on the dashboard.
@@ -2012,6 +2123,7 @@ function PassportCard3D() {
         onPointerOver={(event) => {
           if (!isOnCardFace(event.point)) return
           setHovered(true)
+          emitAudio('uiHover', { dedupeKey: 'passport-3d', dedupeMs: 180 })
           document.body.style.cursor = 'pointer'
         }}
         onPointerMove={(event) => {
@@ -2056,13 +2168,18 @@ function PassportCard3D() {
  */
 function NavScreenOnBoard() {
   const phase = useOnboardingStore((state) => state.phase)
-  const unlocked = useOnboardingStore((state) => isNavigationUnlocked(state))
-  const selectedZoneId = useOnboardingStore((state) => state.selectedZoneId)
+  const selectedDestinationId = useOnboardingStore(
+    (state) => state.selectedDestination,
+  )
   const routeOpen = useOnboardingStore((state) => state.routeOpen)
   const setRouteOpen = useOnboardingStore((state) => state.setRouteOpen)
-  const selectZone = useOnboardingStore((state) => state.selectZone)
+  const selectDestination = useOnboardingStore(
+    (state) => state.selectDestination,
+  )
   const clearSelection = useOnboardingStore((state) => state.clearSelection)
   const confirmRoute = useOnboardingStore((state) => state.confirmRoute)
+  const save = useJourneyStore((state) => state.save)
+  const view = getPassportView(save)
   const [hovered, setHovered] = useState(false)
 
   // One canvas + texture for the screen's whole life; the contents
@@ -2078,19 +2195,33 @@ function NavScreenOnBoard() {
   }, [])
   useEffect(() => () => screen.texture.dispose(), [screen])
 
-  const lastDrawnRef = useRef({ blend: -1, selected: undefined as string | null | undefined, unlocked: false })
+  const lastDrawnRef = useRef({
+    blend: -1,
+    selected: undefined as string | null | undefined,
+    viewKey: -1,
+  })
+  const viewKey = save?.updatedAt ?? 0
   useFrame(() => {
-    // The fade runs a little ahead of the camera travel, so the
-    // content is fully in (or fully gone) before the approach ends,
-    // instead of dissolving while already far away.
     const blend = smoothstep(Math.min(1, routeBlend.value * 1.6))
     const last = lastDrawnRef.current
-    if (blend === last.blend && selectedZoneId === last.selected && unlocked === last.unlocked) return
-    drawNavScreen(screen.ctx, blend, ZONES, selectedZoneId, unlocked)
+    if (
+      blend === last.blend &&
+      selectedDestinationId === last.selected &&
+      viewKey === last.viewKey
+    ) {
+      return
+    }
+    drawNavScreen(
+      screen.ctx,
+      blend,
+      DESTINATIONS,
+      selectedDestinationId,
+      view,
+    )
     screen.texture.needsUpdate = true
     last.blend = blend
-    last.selected = selectedZoneId
-    last.unlocked = unlocked
+    last.selected = selectedDestinationId
+    last.viewKey = viewKey
   })
 
   return (
@@ -2099,12 +2230,8 @@ function NavScreenOnBoard() {
       rotation={[-Math.PI / 2, 0, 0]}
       onPointerDown={(event) => {
         event.stopPropagation()
-        // The board controls only respond in the hub: during the
-        // discovery ritual the radar is inert decoration. And in the
-        // hub tutorial they stay inert until PIP says "tap the radar
-        // screen" — only then does tapping lean the camera to the
-        // side close-up (routeOpen) and show the destinations.
-        if (phase !== 'hub' || !unlocked) return
+        // The board controls only respond in the hub.
+        if (phase !== 'hub') return
         if (!routeOpen) {
           setRouteOpen(true)
           return
@@ -2112,30 +2239,43 @@ function NavScreenOnBoard() {
         const uv = event.uv
         if (!uv) return
         const yFromTop = 1 - uv.y
-        if (selectedZoneId) {
-          // Summary view: SELECT confirms and sends the pilot back
-          // to the cabin (where the take-off lid lifts); BACK goes
-          // back to the cards.
-          if (uv.x >= 220 / NAV_W && uv.x <= 640 / NAV_W && yFromTop >= 0.78 && yFromTop <= 0.92) {
-            confirmRoute()
-            setRouteOpen(false)
+        if (selectedDestinationId) {
+          if (
+            uv.x >= 220 / NAV_W &&
+            uv.x <= 640 / NAV_W &&
+            yFromTop >= 0.78 &&
+            yFromTop <= 0.92
+          ) {
+            const destination = DESTINATIONS.find(
+              (entry) => entry.id === selectedDestinationId,
+            )
+            if (destination?.available) confirmRoute()
             return
           }
-          if (uv.x >= 16 / NAV_W && uv.x <= 196 / NAV_W && yFromTop >= 0.78 && yFromTop <= 0.92) {
+          if (
+            uv.x >= 16 / NAV_W &&
+            uv.x <= 196 / NAV_W &&
+            yFromTop >= 0.78 &&
+            yFromTop <= 0.92
+          ) {
             clearSelection()
           }
           return
         }
-        if (yFromTop < NAV_CARDS_TOP_FRAC || yFromTop > NAV_CARDS_BOTTOM_FRAC) return
+        if (yFromTop < NAV_CARDS_TOP_FRAC || yFromTop > NAV_CARDS_BOTTOM_FRAC) {
+          return
+        }
         const index = Math.floor(
-          (uv.x - NAV_CARD_X0 / NAV_W) / ((NAV_CARD_W + NAV_CARD_GAP) / NAV_W),
+          (uv.x - NAV_CARD_X0 / NAV_W) /
+            ((NAV_CARD_W + NAV_CARD_GAP) / NAV_W),
         )
-        const zone = ZONES[index]
-        if (zone && zone.enabled) selectZone(zone.id)
+        const destination = DESTINATIONS[index]
+        if (destination?.available) selectDestination(destination.id)
       }}
       onPointerOver={() => {
         setHovered(true)
-        if (phase === 'hub' && unlocked) document.body.style.cursor = 'pointer'
+        emitAudio('uiHover', { dedupeKey: 'navigation-3d', dedupeMs: 180 })
+        if (phase === 'hub') document.body.style.cursor = 'pointer'
       }}
       onPointerOut={() => {
         setHovered(false)
@@ -2306,7 +2446,7 @@ function makeMailDecalTexture(): THREE.CanvasTexture {
   ctx.fillText('COSMIC MAIL', 76, 228)
   ctx.font = '600 20px ui-monospace, monospace'
   ctx.fillStyle = 'rgba(253,244,236,0.55)'
-  ctx.fillText('MARS POSTAL SERVICE', 76, 252 - 8)
+  ctx.fillText('EARTH COSMIC ARCHIVE', 76, 252 - 8)
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 4
@@ -2440,7 +2580,10 @@ function TakeOffButton() {
           if (routeConfirmed) takeOff()
         }}
         onPointerOver={() => {
-          if (routeConfirmed) document.body.style.cursor = 'pointer'
+          if (routeConfirmed) {
+            emitAudio('uiHover', { dedupeKey: 'red-button-3d', dedupeMs: 180 })
+            document.body.style.cursor = 'pointer'
+          }
         }}
         onPointerOut={() => {
           document.body.style.cursor = 'auto'
@@ -2572,8 +2715,8 @@ function StatusLight({ position }: { position: [number, number, number] }) {
 function StatusPanel() {
   const phase = useOnboardingStore((state) => state.phase)
   const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
-  const passport = useOnboardingStore((state) => state.passport)
-  const powerRef = useRef<THREE.MeshStandardMaterial>(null)
+  const save = useJourneyStore((state) => state.save)
+  const pulseLightRef = useRef<THREE.MeshStandardMaterial>(null)
 
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
@@ -2602,7 +2745,7 @@ function StatusPanel() {
   useEffect(() => () => texture.dispose(), [texture])
 
   useFrame((state) => {
-    const material = powerRef.current
+    const material = pulseLightRef.current
     if (!material) return
     material.emissiveIntensity = 1 + Math.sin(state.clock.elapsedTime * 2.2) * 0.4
   })
@@ -2615,7 +2758,7 @@ function StatusPanel() {
   }> = [
     { z: -0.15, color: '#8FE3D8', active: phase !== 'menu', pulse: true },
     { z: 0, color: '#FFD9A8', active: routeConfirmed },
-    { z: 0.15, color: '#F2B5E2', active: passport !== null },
+    { z: 0.15, color: '#F2B5E2', active: save !== null },
   ]
 
   return (
@@ -2639,7 +2782,7 @@ function StatusPanel() {
         >
           <cylinderGeometry args={[0.02, 0.02, 0.012, 14]} />
           <meshStandardMaterial
-            ref={light.pulse ? powerRef : undefined}
+            ref={light.pulse ? pulseLightRef : undefined}
             color={light.active ? light.color : '#3A3350'}
             emissive={light.color}
             emissiveIntensity={light.active ? 1.2 : 0.12}
@@ -2651,39 +2794,18 @@ function StatusPanel() {
   )
 }
 
-/** Window projections (cinematic intro, Routine Check dioramas and
- *  the historical hero card), rendered inside the cabin window as
- *  circular meshes behind PIP. */
+/** Window projections for the cinematic intro: welcome, unfinished
+ *  archive signals and the forming smart letter invitation. */
 function MemoryWindowHolograms() {
   const phase = useOnboardingStore((state) => state.phase)
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
-  const questionIndex = useOnboardingStore((state) => state.questionIndex)
-  const focus = useOnboardingStore((state) => state.routineFocus)
-  const explorerId = useOnboardingStore((state) => state.explorerId)
-  const previewId = useOnboardingStore((state) => state.explorerPreviewId)
 
   const introSvg =
-    phase === 'intro' ? introHologramSvg(introMomentForLine(dialogueIndex)) : null
-  const routineSvg =
-    phase === 'questions' ? routineDioramaSvg(DISCOVERY_QUESTIONS[questionIndex]?.id ?? '', focus) : null
-  const heroSvg = (() => {
-    if (phase !== 'explorer') return null
-    const id = previewId ?? explorerId
-    if (!id) return null
-    try {
-      return explorerHologramSvg(getExplorer(id))
-    } catch {
-      return null
-    }
-  })()
+    phase === 'intro'
+      ? introHologramSvg(introHologramForLine(dialogueIndex))
+      : null
 
-  return (
-    <>
-      {phase === 'intro' && <WindowHologram svg={introSvg} />}
-      {phase === 'questions' && <WindowHologram svg={routineSvg} />}
-      {phase === 'explorer' && <WindowHologram svg={heroSvg} />}
-    </>
-  )
+  return introSvg ? <WindowHologram svg={introSvg} /> : null
 }
 
 /**
@@ -2718,12 +2840,9 @@ function CabinInterior() {
     // Welcome moment) the glass darkens to ~85% so the hologram
     // stage reads inside the window. The planet stays behind the
     // dimming, the gold frame and PIP/console lighting are untouched.
-    // Leaving the intro (Skip/Back/Routine Check) fades it back out.
+    // Leaving the intro (Skip/Back) fades it back out.
     const inMemoryWindow =
-      (phase === 'intro' && introMomentForLine(dialogueIndex) !== 'welcome') ||
-      phase === 'questions' ||
-      phase === 'reveal' ||
-      phase === 'explorer'
+      phase === 'intro' && introMomentForLine(dialogueIndex) !== 'arrival'
     const darkTarget = inMemoryWindow ? 0.85 : 0
     const lambda = reducedMotion ? 8 : 1.8
     if (windowDarkRef.current) {
@@ -2948,7 +3067,7 @@ function CabinInterior() {
         />
       </mesh>
 
-      {/* Routine Check hologram: behind PIP, inside the round window. */}
+      {/* Intro archive hologram: behind PIP, inside the round window. */}
       <MemoryWindowHolograms />
 
       {/* Cosmic Mail identity decal on the front wall. */}

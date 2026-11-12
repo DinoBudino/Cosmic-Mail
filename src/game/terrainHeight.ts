@@ -1,8 +1,10 @@
 import { MARS_OBJECTS } from '../data/marsObjects'
-import { PATH_WAYPOINTS, WORLD } from './worldConfig'
+import { SPIRIT_SITE } from '../data/spiritSite'
+import { PATH_WAYPOINTS, SURVEY_ROUTE, WORLD } from './worldConfig'
 
-const SPAWN_FLAT_RADIUS = 6.5
+const SPAWN_FLAT_RADIUS = 8
 const SITE_FLAT_RADIUS = 7.2
+const SPIRIT_FLAT_RADIUS = 7.8
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
@@ -132,6 +134,23 @@ function reliefFor(x: number, z: number): ZoneRelief {
   }
 }
 
+/** Hand-placed shelves that give the Geological Passage a readable shape. */
+const GEOLOGIC_MOUNDS = [
+  { x: 15, z: 28, radius: 12, height: 3.4 },
+  { x: -3, z: 21, radius: 8, height: 2.6 },
+  { x: 9, z: 5, radius: 7.5, height: 1.9 },
+] as const
+
+function moundHeight(x: number, z: number): number {
+  let height = 0
+  for (const mound of GEOLOGIC_MOUNDS) {
+    const distance = Math.hypot(x - mound.x, z - mound.z)
+    const rolloff = 1 - smoothstep(0, mound.radius * 1.7, distance)
+    height += mound.height * rolloff * rolloff
+  }
+  return height
+}
+
 function rawHeight(x: number, z: number): number {
   const relief = reliefFor(x, z)
   const broad = fbm(x * 0.012, z * 0.012, 7, 2) * relief.broad
@@ -141,7 +160,15 @@ function rawHeight(x: number, z: number): number {
   const ridges = fbm(x * 0.075 + 13, z * 0.075 - 8, 31, 3) * relief.ridges
   const basins = -Math.max(0, fbm(x * 0.03 - 5, z * 0.03 + 9, 43, 2)) * relief.basins
   const detail = fbm(x * 0.12, z * 0.12, 19, 2) * relief.detail
-  return broad + dunes + ridges + basins + detail + relief.offset
+  return (
+    broad +
+    dunes +
+    ridges +
+    basins +
+    detail +
+    relief.offset +
+    moundHeight(x, z)
+  )
 }
 
 interface FlattenZone {
@@ -164,6 +191,12 @@ const FLATTEN_ZONES: readonly FlattenZone[] = [
     radius: SPAWN_FLAT_RADIUS,
     height: rawHeight(WORLD.spawn.x, WORLD.spawn.z),
   },
+  {
+    x: SPIRIT_SITE.position.x,
+    z: SPIRIT_SITE.position.z,
+    radius: SPIRIT_FLAT_RADIUS,
+    height: rawHeight(SPIRIT_SITE.position.x, SPIRIT_SITE.position.z),
+  },
 ]
 
 /**
@@ -181,8 +214,10 @@ export function getTerrainHeight(x: number, z: number): number {
   }
 
   const distanceFromCenter = Math.hypot(x, z)
-  // Rim scaled to the semi-open world (play radius 95).
-  height += smoothstep(85, 125, distanceFromCenter) * 12
+  // A long, low rise instead of a nearby circular wall: the playable area
+  // ends well before the decorative ridge becomes steep.
+  height += smoothstep(112, 168, distanceFromCenter) * 6
+  height += smoothstep(158, 230, distanceFromCenter) * 15
   return height
 }
 
@@ -230,6 +265,20 @@ export function distanceToPath(x: number, z: number): number {
   for (let index = 0; index < PATH_WAYPOINTS.length - 1; index += 1) {
     const from = PATH_WAYPOINTS[index]
     const to = PATH_WAYPOINTS[index + 1]
+    closest = Math.min(
+      closest,
+      distanceToSegment(x, z, from.x, from.z, to.x, to.z),
+    )
+  }
+  return closest
+}
+
+/** Distance to the hand-authored expedition trail (landing → explorer). */
+export function distanceToSurveyTrail(x: number, z: number): number {
+  let closest = Number.POSITIVE_INFINITY
+  for (let index = 0; index < SURVEY_ROUTE.length - 1; index += 1) {
+    const from = SURVEY_ROUTE[index]
+    const to = SURVEY_ROUTE[index + 1]
     closest = Math.min(
       closest,
       distanceToSegment(x, z, from.x, from.z, to.x, to.z),

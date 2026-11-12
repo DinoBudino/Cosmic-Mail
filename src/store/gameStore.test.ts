@@ -7,7 +7,32 @@ describe('site interaction state', () => {
   beforeEach(() => {
     clearInput()
     useOnboardingStore.setState({ phase: 'playing' })
-    useGameStore.setState({ settingsOpen: false, nearbySiteId: null, activeSiteId: null, challengePreview: false, travelTargetId: null })
+    useGameStore.setState({
+      settingsOpen: false,
+      nearbySiteId: null,
+      activeSiteId: null,
+      nearbySpirit: false,
+      scannerOpen: false,
+      scannerMissionId: null,
+      scannerSelectedComponentId: null,
+      scannerEquipped: false,
+      scannerScanProgress: 0,
+      scannerEnvironmentalId: null,
+      scannerTargetKind: null,
+      scannerPhysicalState: 'idle',
+      scannerAnalysis: 'idle',
+      scannerTriggerHeld: false,
+      historicalExplanationId: null,
+      radarUnlocked: true,
+      cinematicFocus: null,
+      scannerCamera: 'first-person',
+      assistedScanEnabled: false,
+      scannerCardComponentId: null,
+      scannerRecordsOpen: false,
+      archiveView: 'none',
+      archiveMissionId: null,
+      travelTargetId: null,
+    })
   })
 
   it('requires a nearby site and pauses only when its panel opens', () => {
@@ -45,25 +70,13 @@ describe('site interaction state', () => {
     expect(useGameStore.getState().settingsOpen).toBe(false)
   })
 
-  it('previews only the active available site without changing catalog state', () => {
-    const state = useGameStore.getState()
-    state.setNearbySite('opportunity')
-    state.openNearbySite()
-    state.startChallenge('insight')
-    expect(useGameStore.getState().challengePreview).toBe(false)
-    state.startChallenge('opportunity')
-    expect(useGameStore.getState().challengePreview).toBe(true)
-    state.closeSite()
-    expect(useGameStore.getState().challengePreview).toBe(false)
-  })
-
-  it('allows inspecting Viking 1 but not starting a challenge', () => {
+  it('allows inspecting a coming-soon landmark as information only', () => {
     const state = useGameStore.getState()
     state.setNearbySite('viking1')
     state.openNearbySite()
     expect(useGameStore.getState().activeSiteId).toBe('viking1')
-    state.startChallenge('viking1')
-    expect(useGameStore.getState().challengePreview).toBe(false)
+    state.closeSite()
+    expect(useGameStore.getState().activeSiteId).toBeNull()
   })
 
   it('starts and cancels travel without changing interaction eligibility', () => {
@@ -91,5 +104,291 @@ describe('site interaction state', () => {
     expect(useGameStore.getState().travelTargetId).toBeNull()
     state.startTravel('opportunity')
     expect(useGameStore.getState().travelTargetId).toBeNull()
+  })
+
+  it('opens and closes the Cosmic Scanner as a paused interaction', () => {
+    const state = useGameStore.getState()
+    state.setNearbySpirit(true)
+    state.openScanner('spirit')
+
+    expect(useGameStore.getState().scannerOpen).toBe(true)
+    expect(useGameStore.getState().scannerMissionId).toBe('spirit')
+    expect(useGameStore.getState().scannerSelectedComponentId).toBeNull()
+    expect(isWorldPaused()).toBe(true)
+
+    state.selectScannerComponent('spirit-pancam')
+    expect(useGameStore.getState().scannerSelectedComponentId).toBe(
+      'spirit-pancam',
+    )
+
+    state.closeScanner()
+    expect(useGameStore.getState().scannerOpen).toBe(false)
+    expect(useGameStore.getState().scannerMissionId).toBeNull()
+    expect(useGameStore.getState().scannerSelectedComponentId).toBeNull()
+    expect(isWorldPaused()).toBe(false)
+  })
+
+  it('keeps the Spirit prompt and the four legacy sites mutually exclusive', () => {
+    const state = useGameStore.getState()
+    state.setNearbySite('opportunity')
+    state.setNearbySpirit(true)
+    expect(useGameStore.getState().nearbySiteId).toBeNull()
+    expect(useGameStore.getState().nearbySpirit).toBe(true)
+
+    state.setNearbySite('insight')
+    expect(useGameStore.getState().nearbySpirit).toBe(false)
+    expect(useGameStore.getState().nearbySiteId).toBe('insight')
+  })
+
+  it('never opens the scanner over settings or a legacy site dialog', () => {
+    const state = useGameStore.getState()
+    state.openSettings()
+    state.openScanner('spirit')
+    expect(useGameStore.getState().scannerOpen).toBe(false)
+    state.closeSettings()
+
+    state.setNearbySite('opportunity')
+    state.openNearbySite()
+    state.openScanner('spirit')
+    expect(useGameStore.getState().scannerOpen).toBe(false)
+    state.closeSite()
+  })
+
+  it('blocks settings and travel while the scanner is open', () => {
+    const state = useGameStore.getState()
+    state.openScanner('spirit')
+    state.openSettings()
+    expect(useGameStore.getState().settingsOpen).toBe(false)
+    state.startTravel('opportunity')
+    expect(useGameStore.getState().travelTargetId).toBeNull()
+    state.closeScanner()
+  })
+
+  it('opens an Archive overlay from the scanner and pauses the world', () => {
+    const state = useGameStore.getState()
+    state.setNearbySpirit(true)
+    state.openScanner('spirit')
+    state.selectScannerComponent('spirit-pancam')
+    state.openArchive('smart-letter', 'spirit')
+
+    const opened = useGameStore.getState()
+    expect(opened.scannerOpen).toBe(false)
+    expect(opened.scannerMissionId).toBeNull()
+    expect(opened.scannerSelectedComponentId).toBeNull()
+    expect(opened.archiveView).toBe('smart-letter')
+    expect(opened.archiveMissionId).toBe('spirit')
+    expect(isWorldPaused()).toBe(true)
+
+    state.closeArchive()
+    expect(useGameStore.getState().archiveView).toBe('none')
+    expect(useGameStore.getState().archiveMissionId).toBeNull()
+    expect(isWorldPaused()).toBe(false)
+  })
+
+  it('blocks scanner, settings, travel and landmarks while an Archive overlay is open', () => {
+    const state = useGameStore.getState()
+    state.openArchive('smart-letter', 'spirit')
+
+    state.openScanner('spirit')
+    expect(useGameStore.getState().scannerOpen).toBe(false)
+
+    state.openSettings()
+    expect(useGameStore.getState().settingsOpen).toBe(false)
+
+    state.startTravel('opportunity')
+    expect(useGameStore.getState().travelTargetId).toBeNull()
+
+    state.setNearbySite('opportunity')
+    state.openNearbySite()
+    expect(useGameStore.getState().activeSiteId).toBeNull()
+
+    state.closeArchive()
+  })
+
+  it('opens the optional records browser without equipping the scanner', () => {
+    const state = useGameStore.getState()
+    state.openScannerRecords('spirit', 'spirit-pancam')
+
+    const records = useGameStore.getState()
+    expect(records.scannerRecordsOpen).toBe(true)
+    expect(records.scannerMissionId).toBe('spirit')
+    expect(records.scannerCardComponentId).toBe('spirit-pancam')
+    expect(records.scannerEquipped).toBe(false)
+    expect(isWorldPaused()).toBe(true)
+
+    state.closeScannerCard()
+    expect(useGameStore.getState().scannerRecordsOpen).toBe(false)
+    expect(useGameStore.getState().scannerCardComponentId).toBeNull()
+    expect(useGameStore.getState().scannerMissionId).toBeNull()
+    expect(isWorldPaused()).toBe(false)
+  })
+
+  it('keeps the records mission while the physical scanner stays equipped', () => {
+    const state = useGameStore.getState()
+    state.equipScanner('spirit')
+    state.openScannerRecords('spirit')
+    expect(useGameStore.getState().scannerRecordsOpen).toBe(true)
+    expect(useGameStore.getState().scannerCardComponentId).toBeNull()
+
+    state.closeScannerCard()
+    expect(useGameStore.getState().scannerRecordsOpen).toBe(false)
+    expect(useGameStore.getState().scannerMissionId).toBe('spirit')
+    expect(useGameStore.getState().scannerEquipped).toBe(true)
+  })
+
+  it('never stacks records over another modal', () => {
+    const state = useGameStore.getState()
+    state.openScanner('spirit')
+    state.openScannerRecords('spirit')
+    expect(useGameStore.getState().scannerRecordsOpen).toBe(false)
+    state.closeScanner()
+
+    state.equipScanner('spirit')
+    state.openArchive('smart-letter', 'spirit')
+    state.openScannerRecords('spirit')
+    expect(useGameStore.getState().scannerRecordsOpen).toBe(false)
+    expect(useGameStore.getState().archiveView).toBe('smart-letter')
+    state.closeArchive()
+  })
+
+  it('does not open an Archive overlay over settings or a landmark dialog', () => {
+    const state = useGameStore.getState()
+    state.openSettings()
+    state.openArchive('smart-letter', 'spirit')
+    expect(useGameStore.getState().archiveView).toBe('none')
+    state.closeSettings()
+
+    state.setNearbySite('opportunity')
+    state.openNearbySite()
+    state.openArchive('smart-letter', 'spirit')
+    expect(useGameStore.getState().archiveView).toBe('none')
+    state.closeSite()
+  })
+
+  it('clears held touch input when an Archive overlay opens and closes', () => {
+    const state = useGameStore.getState()
+    setTouchMove(1, 1)
+    state.openArchive('smart-letter', 'spirit')
+    expect(readMoveAxes({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 })
+
+    setTouchMove(1, 0)
+    state.closeArchive()
+    expect(readMoveAxes({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 })
+  })
+
+  it('equips and puts away the physical scanner without pausing the world', () => {
+    const state = useGameStore.getState()
+    state.startTravel('opportunity')
+    state.equipScanner('spirit')
+
+    const equipped = useGameStore.getState()
+    expect(equipped.scannerEquipped).toBe(true)
+    expect(equipped.scannerMissionId).toBe('spirit')
+    expect(equipped.scannerSelectedComponentId).toBeNull()
+    expect(equipped.scannerScanProgress).toBe(0)
+    expect(equipped.scannerTriggerHeld).toBe(false)
+    expect(equipped.travelTargetId).toBeNull()
+    expect(isWorldPaused()).toBe(false)
+
+    state.unequipScanner()
+    expect(useGameStore.getState().scannerEquipped).toBe(false)
+    expect(useGameStore.getState().scannerMissionId).toBeNull()
+  })
+
+  it('keeps assisted review and reading card paused', () => {
+    const state = useGameStore.getState()
+    state.equipScanner('spirit')
+    state.openScanner('spirit')
+    expect(useGameStore.getState().scannerOpen).toBe(true)
+    expect(isWorldPaused()).toBe(true)
+    state.closeScanner()
+    expect(useGameStore.getState().scannerOpen).toBe(false)
+    expect(useGameStore.getState().scannerEquipped).toBe(true)
+    expect(isWorldPaused()).toBe(false)
+
+    state.setScannerTarget('spirit-pancam')
+    state.setScannerTrigger(true)
+    state.setScannerScanProgress(0.6)
+    state.openScannerCard('spirit-pancam')
+    expect(useGameStore.getState().scannerCardComponentId).toBe(
+      'spirit-pancam',
+    )
+    expect(useGameStore.getState().scannerTriggerHeld).toBe(false)
+    expect(useGameStore.getState().scannerScanProgress).toBe(0)
+    expect(isWorldPaused()).toBe(true)
+
+    state.closeScannerCard()
+    expect(useGameStore.getState().scannerCardComponentId).toBeNull()
+    expect(isWorldPaused()).toBe(false)
+  })
+
+  it('keeps held movement input while equipping and putting away the scanner', () => {
+    const state = useGameStore.getState()
+    setTouchMove(1, 0)
+    state.equipScanner('spirit')
+    expect(readMoveAxes({ x: 0, y: 0 })).toEqual({ x: 1, y: 0 })
+    expect(isWorldPaused()).toBe(false)
+
+    state.unequipScanner()
+    expect(readMoveAxes({ x: 0, y: 0 })).toEqual({ x: 1, y: 0 })
+  })
+
+  it('only changes target and trigger while equipped and resets hold progress', () => {
+    const state = useGameStore.getState()
+    state.setScannerTarget('spirit-pancam')
+    state.setScannerTrigger(true)
+    expect(useGameStore.getState().scannerSelectedComponentId).toBeNull()
+    expect(useGameStore.getState().scannerTriggerHeld).toBe(false)
+
+    state.equipScanner('spirit')
+    state.setScannerTarget('spirit-pancam')
+    state.setScannerScanProgress(0.4)
+    expect(useGameStore.getState().scannerSelectedComponentId).toBe(
+      'spirit-pancam',
+    )
+    expect(useGameStore.getState().scannerScanProgress).toBe(0.4)
+
+    state.setScannerTarget('spirit-mini-tes')
+    expect(useGameStore.getState().scannerScanProgress).toBe(0)
+
+    state.setScannerTrigger(true)
+    state.setScannerScanProgress(0.8)
+    state.setScannerTrigger(false)
+    expect(useGameStore.getState().scannerTriggerHeld).toBe(false)
+    expect(useGameStore.getState().scannerScanProgress).toBe(0)
+
+    state.setScannerScanProgress(2)
+    expect(useGameStore.getState().scannerScanProgress).toBe(1)
+    state.setScannerScanProgress(-1)
+    expect(useGameStore.getState().scannerScanProgress).toBe(0)
+  })
+
+  it('closes scanner and reading card when opening an Archive overlay', () => {
+    const state = useGameStore.getState()
+    state.equipScanner('spirit')
+    state.openScanner('spirit')
+    state.openScannerCard('spirit-pancam')
+    state.openArchive('smart-letter', 'spirit')
+
+    const opened = useGameStore.getState()
+    expect(opened.archiveView).toBe('smart-letter')
+    expect(opened.scannerOpen).toBe(false)
+    expect(opened.scannerEquipped).toBe(false)
+    expect(opened.scannerCardComponentId).toBeNull()
+    expect(opened.scannerTriggerHeld).toBe(false)
+    expect(opened.scannerScanProgress).toBe(0)
+    expect(isWorldPaused()).toBe(true)
+    state.closeArchive()
+    expect(isWorldPaused()).toBe(false)
+  })
+})
+
+describe('scanner accessibility settings', () => {
+  it('keeps assisted component review explicitly opt-in', () => {
+    useGameStore.getState().setAssistedScanEnabled(false)
+    expect(useGameStore.getState().assistedScanEnabled).toBe(false)
+    useGameStore.getState().setAssistedScanEnabled(true)
+    expect(useGameStore.getState().assistedScanEnabled).toBe(true)
+    useGameStore.getState().setAssistedScanEnabled(false)
   })
 })

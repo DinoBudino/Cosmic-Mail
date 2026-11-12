@@ -1,6 +1,43 @@
 import { useEffect, useRef, useState } from 'react'
+import { AUDIO_ASSETS } from '../game/audio/audioManifest'
 import { PIP_VOICES, resolveVoiceId, speakPip } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
+
+const MUSIC_CREDITS = Object.values(AUDIO_ASSETS).filter(
+  (asset) => asset.category === 'music',
+)
+
+function VolumeControl({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string
+  label: string
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <div className="volume-row">
+      <label htmlFor={id} className="voice-label">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="range"
+        min={0}
+        max={100}
+        value={Math.round(value * 100)}
+        onChange={(event) => onChange(Number(event.target.value) / 100)}
+        className="music-volume volume-slider"
+      />
+      <span className="volume-value" aria-hidden="true">
+        {Math.round(value * 100)}%
+      </span>
+    </div>
+  )
+}
 
 export function SettingsMenu() {
   const settingsOpen = useGameStore((state) => state.settingsOpen)
@@ -11,12 +48,30 @@ export function SettingsMenu() {
   const setReducedMotion = useGameStore(
     (state) => state.setReducedMotion,
   )
+  const scannerCamera = useGameStore((state) => state.scannerCamera)
+  const setScannerCamera = useGameStore((state) => state.setScannerCamera)
+  const assistedScanEnabled = useGameStore(
+    (state) => state.assistedScanEnabled,
+  )
+  const setAssistedScanEnabled = useGameStore(
+    (state) => state.setAssistedScanEnabled,
+  )
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
   const setVoiceEnabled = useGameStore((state) => state.setVoiceEnabled)
   const voiceName = useGameStore((state) => state.voiceName)
   const setVoiceName = useGameStore((state) => state.setVoiceName)
+  const masterVolume = useGameStore((state) => state.masterVolume)
+  const setMasterVolume = useGameStore((state) => state.setMasterVolume)
   const musicVolume = useGameStore((state) => state.musicVolume)
   const setMusicVolume = useGameStore((state) => state.setMusicVolume)
+  const ambienceVolume = useGameStore((state) => state.ambienceVolume)
+  const setAmbienceVolume = useGameStore((state) => state.setAmbienceVolume)
+  const sfxVolume = useGameStore((state) => state.sfxVolume)
+  const setSfxVolume = useGameStore((state) => state.setSfxVolume)
+  const voiceVolume = useGameStore((state) => state.voiceVolume)
+  const setVoiceVolume = useGameStore((state) => state.setVoiceVolume)
+  const muted = useGameStore((state) => state.muted)
+  const setMuted = useGameStore((state) => state.setMuted)
 
   const effectiveVoice = resolveVoiceId(voiceName)
   const [activeTab, setActiveTab] = useState<'graphics' | 'sounds'>('graphics')
@@ -162,6 +217,33 @@ export function SettingsMenu() {
         </fieldset>
 
         <fieldset className="settings-group">
+          <legend>Scanner camera</legend>
+          <div className="segmented">
+            <button
+              type="button"
+              className={scannerCamera === 'first-person' ? 'is-active' : ''}
+              aria-pressed={scannerCamera === 'first-person'}
+              onClick={() => setScannerCamera('first-person')}
+            >
+              First person
+            </button>
+            <button
+              type="button"
+              className={scannerCamera === 'third-person' ? 'is-active' : ''}
+              aria-pressed={scannerCamera === 'third-person'}
+              onClick={() => setScannerCamera('third-person')}
+            >
+              Third person
+            </button>
+          </div>
+          <p className="settings-hint">
+            First person gives precise aiming. Click the world to capture the
+            mouse; if capture is unavailable, right-drag to look. Third person
+            keeps the astronaut visible while the scanner is held.
+          </p>
+        </fieldset>
+
+        <fieldset className="settings-group">
           <legend>Accessibility</legend>
           <label className="settings-toggle">
             <input
@@ -175,6 +257,23 @@ export function SettingsMenu() {
               <strong>Reduced motion</strong>
               <small>
                 Disables walking bob, guide pulses and floating dust.
+              </small>
+            </span>
+          </label>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={assistedScanEnabled}
+              onChange={(event) =>
+                setAssistedScanEnabled(event.target.checked)
+              }
+            />
+            <span>
+              <strong>Assisted component review</strong>
+              <small>
+                Accessibility option. Lets you review discovered components
+                from a list instead of aiming the physical scanner. It never
+                replaces the physical scan in normal play.
               </small>
             </span>
           </label>
@@ -225,24 +324,106 @@ export function SettingsMenu() {
         </fieldset>
 
         <fieldset className="settings-group">
-          <legend>Cabin music</legend>
-          <label htmlFor="music-volume" className="voice-label">
-            Ambience volume
+          <legend>Audio mix</legend>
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={muted}
+              onChange={(event) => setMuted(event.target.checked)}
+            />
+            <span>
+              <strong>Mute all audio</strong>
+              <small>
+                Keeps subtitles on. Your individual channel levels are
+                remembered.
+              </small>
+            </span>
           </label>
-          <input
-            id="music-volume"
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(musicVolume * 100)}
-            onChange={(event) => setMusicVolume(Number(event.target.value) / 100)}
-            className="music-volume"
-          />
+
+          <div className="volume-grid">
+            <VolumeControl
+              id="master-volume"
+              label="Master"
+              value={masterVolume}
+              onChange={setMasterVolume}
+            />
+            <VolumeControl
+              id="music-volume"
+              label="Music"
+              value={musicVolume}
+              onChange={setMusicVolume}
+            />
+            <VolumeControl
+              id="ambience-volume"
+              label="Ambience"
+              value={ambienceVolume}
+              onChange={setAmbienceVolume}
+            />
+            <VolumeControl
+              id="sfx-volume"
+              label="Effects"
+              value={sfxVolume}
+              onChange={setSfxVolume}
+            />
+            <VolumeControl
+              id="voice-volume"
+              label="PIP voice"
+              value={voiceVolume}
+              onChange={setVoiceVolume}
+            />
+          </div>
           <p className="settings-hint">
-            The quiet space ambience that plays during the boarding ritual.
-            Lower it any time — it stops when the adventure begins.
+            Music and ambience duck automatically while PIP speaks. The
+            scanner, footsteps and critical cues stay audible.
           </p>
         </fieldset>
+
+        <details className="settings-credits">
+          <summary>Music and sound credits</summary>
+          <p>
+            Music by Pixabay creators under the{' '}
+            <a
+              href="https://pixabay.com/service/license-summary/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Pixabay Content License
+            </a>
+            . Sound effects from{' '}
+            <a
+              href="https://kenney.nl/assets"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Kenney
+            </a>{' '}
+            (CC0). PIP chirps and ambience beds are original project audio.
+          </p>
+          <ul className="settings-credits__list">
+            {MUSIC_CREDITS.map((asset) => (
+              <li key={asset.id}>
+                <strong>{asset.source.title}</strong> · {asset.source.author}
+                {asset.source.contentIdRisk === 'registered' && (
+                  <span className="settings-credits__warning">
+                    {' '}
+                    · Content ID registered on Pixabay; verify before
+                    publishing video.
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="settings-hint">
+            <a
+              href="audio/ATTRIBUTION.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Full attribution file
+            </a>{' '}
+            · repository notes in AUDIO_CREDITS.md.
+          </p>
+        </details>
         </div>
 
         <button

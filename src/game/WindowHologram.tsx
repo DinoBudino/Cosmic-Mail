@@ -23,8 +23,7 @@ export function WindowHologram({
   const lastTextureIdRef = useRef<string>('')
   const reducedMotion = useGameStore((state) => state.reducedMotion)
 
-  // Gentle fade-in whenever the projection changes (moment, question,
-  // hero): the new hologram materializes instead of popping in.
+  // Gentle fade-in whenever the projection changes (moment): the new hologram materializes instead of popping in.
   useFrame((_, delta) => {
     const material = materialRef.current
     const current = textureRef.current

@@ -1,35 +1,45 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
-import { MemoryArchive } from './MemoryArchive'
+import { areAllMissionsComplete } from '../../store/journeyLogic'
+import { ArchiveFinale } from './ArchiveFinale'
+import { DestinationNavigation } from './DestinationNavigation'
 import { Passport } from './Passport'
-import { RouteSelect } from './RouteSelect'
 
 /**
- * Control center: the cabin hub the pilot returns to between missions.
- * The passport card and the navigation panel live IN the 3D cabin
- * (see MenuScene); the DOM copies below are their accessible mirrors
- * for keyboard / screen-reader users, revealed on focus.
+ * Cabin hub. The passport card and navigation screen live in the 3D
+ * cabin (MenuScene); the DOM mirrors below keep keyboard and screen
+ * reader access without duplicating the visual layer.
  */
 export function Hub() {
   const goBack = useOnboardingStore((state) => state.goBack)
   const routeOpen = useOnboardingStore((state) => state.routeOpen)
   const setRouteOpen = useOnboardingStore((state) => state.setRouteOpen)
-  const passportDetailOpen = useOnboardingStore((state) => state.passportDetailOpen)
-  const setPassportDetailOpen = useOnboardingStore((state) => state.setPassportDetailOpen)
+  const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
+  const takeOff = useOnboardingStore((state) => state.takeOff)
+  const passportDetailOpen = useOnboardingStore(
+    (state) => state.passportDetailOpen,
+  )
+  const setPassportDetailOpen = useOnboardingStore(
+    (state) => state.setPassportDetailOpen,
+  )
   const [closing, setClosing] = useState(false)
   const openedAtRef = useRef(0)
+  const save = useJourneyStore((state) => state.save)
+  const showFinalQuote = useJourneyStore((state) => state.showFinalQuote)
+  const finaleOpen = Boolean(
+    save && !save.finalQuoteShown && areAllMissionsComplete(save),
+  )
 
-  // Clicking outside the card dismisses it; it shrinks back toward the
-  // 3D card on the console before unmounting. The opening click must
-  // not leak into the dismiss handler, so closes are ignored briefly
-  // after opening.
   const requestClose = () => {
     if (closing) return
-    // The opening gesture (3D card tap) must never leak into a close:
-    // ignore dismissals for a beat after opening.
     if (performance.now() - openedAtRef.current < 600) return
     setClosing(true)
   }
+
+  const closeDetail = useCallback(() => {
+    if (!closing) setClosing(true)
+  }, [closing])
 
   const finishClose = () => {
     setClosing(false)
@@ -40,7 +50,6 @@ export function Hub() {
     if (passportDetailOpen) openedAtRef.current = performance.now()
   }, [passportDetailOpen])
 
-  // Escape closes the navigation close-up, back to the cabin view.
   useEffect(() => {
     if (!routeOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -50,8 +59,20 @@ export function Hub() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [routeOpen, setRouteOpen])
 
+  useEffect(() => {
+    if (!passportDetailOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeDetail()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [passportDetailOpen, closeDetail])
+
   return (
-    <section className="hub" aria-label="Control center">
+    <section className="hub" aria-label="Cosmic Mail control center">
       {routeOpen ? (
         <button
           type="button"
@@ -66,9 +87,32 @@ export function Hub() {
         </button>
       )}
 
-      <div className="mirror" aria-label="Navigation choices (keyboard)">
-        <RouteSelect />
-      </div>
+      {routeOpen && (
+        <div className="mirror" aria-label="Navigation choices (keyboard)">
+          <DestinationNavigation />
+        </div>
+      )}
+
+      {!routeOpen && (
+        <div className="mirror">
+          <button
+            type="button"
+            className="mirror-controls"
+            onClick={() => setRouteOpen(true)}
+          >
+            Open navigation (keyboard)
+          </button>
+          {routeConfirmed && (
+            <button
+              type="button"
+              className="mirror-controls"
+              onClick={takeOff}
+            >
+              Take off (keyboard)
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="mirror">
         <button
@@ -80,6 +124,8 @@ export function Hub() {
         </button>
       </div>
 
+      {finaleOpen && <ArchiveFinale onClose={() => showFinalQuote()} />}
+
       {passportDetailOpen && (
         <div
           className="passport-detail"
@@ -88,14 +134,19 @@ export function Hub() {
           }}
         >
           <div
-            className={`passport-detail__card${closing ? ' is-closing' : ''}`}
-            // Only the EXIT animation should unmount — the entrance
-            // zoom-in must not trigger finishClose (that closed the
-            // detail right after opening).
+            className={`passport-detail__card${
+              closing ? ' is-closing' : ''
+            }`}
             onAnimationEnd={closing ? finishClose : undefined}
           >
             <Passport pinned />
-            <MemoryArchive />
+            <button
+              type="button"
+              className="settings-resume passport-detail__close"
+              onClick={closeDetail}
+            >
+              Back to cabin
+            </button>
           </div>
         </div>
       )}

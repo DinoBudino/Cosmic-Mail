@@ -1,7 +1,8 @@
 import * as THREE from 'three'
-import { isWorldPaused } from '../store/gameStore'
+import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { isTypingTarget } from './input'
-import { CAMERA } from './worldConfig'
+import { setScannerPointer } from './scannerPointer'
+import { CAMERA, SCANNER } from './worldConfig'
 
 export interface OrbitState {
   yaw: number
@@ -32,12 +33,15 @@ export function resetOrbit(): void {
 }
 
 export function applyOrbitDelta(dx: number, dy: number): void {
+  const store = useGameStore.getState()
+  const firstPerson =
+    store.scannerEquipped && store.scannerCamera === 'first-person'
   orbit.yaw -= dx * CAMERA.orbitSensitivity
   orbit.yaw = Math.atan2(Math.sin(orbit.yaw), Math.cos(orbit.yaw))
   orbit.pitch = clamp(
     orbit.pitch + dy * CAMERA.orbitSensitivity,
-    CAMERA.minPitch,
-    CAMERA.maxPitch,
+    firstPerson ? SCANNER.firstPersonPitchMin : CAMERA.minPitch,
+    firstPerson ? SCANNER.firstPersonPitchMax : CAMERA.maxPitch,
   )
 }
 
@@ -46,6 +50,15 @@ export function zoomOrbit(delta: number): void {
     orbit.distance + delta,
     CAMERA.minDistance,
     CAMERA.maxDistance,
+  )
+}
+
+/** Keep the shared pitch valid when switching scanner camera modes. */
+export function clampOrbitPitch(firstPerson: boolean): void {
+  orbit.pitch = clamp(
+    orbit.pitch,
+    firstPerson ? SCANNER.firstPersonPitchMin : CAMERA.minPitch,
+    firstPerson ? SCANNER.firstPersonPitchMax : CAMERA.maxPitch,
   )
 }
 
@@ -70,6 +83,22 @@ export function computeCameraOffset(out: THREE.Vector3): THREE.Vector3 {
 }
 
 /**
+ * Comfortable third-person offset while the scanner is held. It keeps
+ * the normal orbit framing (player centred) and only moves slightly
+ * closer than the exploration camera, so walking and mouse aiming stay
+ * natural and the transition in/out is smooth.
+ */
+export function computeScannerCameraOffset(out: THREE.Vector3): THREE.Vector3 {
+  const horizontal = Math.cos(orbit.pitch) * SCANNER.cameraDistance
+  out.set(
+    Math.sin(orbit.yaw) * horizontal,
+    Math.sin(orbit.pitch) * SCANNER.cameraDistance,
+    Math.cos(orbit.yaw) * horizontal,
+  )
+  return out
+}
+
+/**
  * Attaches pointer, wheel, pinch and recenter input to the WebGL canvas.
  * Dragging rotates the orbit; scrolling or pinching changes distance.
  */
@@ -79,6 +108,7 @@ export function attachCameraControls(element: HTMLElement): () => void {
   let lastX = 0
   let lastY = 0
   let pinchDistance = 0
+  let aimPointerId: number | null = null
 
   const isPaused = isWorldPaused
 
@@ -94,11 +124,35 @@ export function attachCameraControls(element: HTMLElement): () => void {
     pointers.clear()
     dragging = false
     pinchDistance = 0
+    aimPointerId = null
   }
 
   const onPointerDown = (event: PointerEvent) => {
     if (isPaused()) return
-    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const store = useGameStore.getState()
+    const scannerAiming = store.scannerEquipped
+    const firstPerson =
+      scannerAiming && store.scannerCamera === 'first-person'
+    if (scannerAiming && !firstPerson && event.pointerType !== 'mouse') {
+      // Touch dragging aims the physical scanner reticle directly. It
+      // never starts a scan or an accidental camera orbit. In first
+      // person the reticle is centred and drag becomes look input.
+      if (aimPointerId !== null) return
+      aimPointerId = event.pointerId
+      element.setPointerCapture(event.pointerId)
+      setScannerPointer(event.clientX, event.clientY)
+      return
+    }
+    if (event.pointerType === 'mouse') {
+      if (firstPerson && event.button === 0) {
+        // Pointer Lock is the primary mouse-look path. The browser blocks
+        // it in some contexts, so drag-to-look remains the fallback.
+        void element.requestPointerLock?.()
+      }
+      // Left click is reserved for hold-to-scan while the device is
+      // equipped; right-drag orbits the aim camera.
+      if (scannerAiming ? event.button !== 2 : event.button !== 0) return
+    }
 
     element.setPointerCapture(event.pointerId)
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
@@ -114,6 +168,23 @@ export function attachCameraControls(element: HTMLElement): () => void {
   }
 
   const onPointerMove = (event: PointerEvent) => {
+    const store = useGameStore.getState()
+    const firstPerson =
+      store.scannerEquipped && store.scannerCamera === 'first-person'
+    if (
+      firstPerson &&
+      document.pointerLockElement === element &&
+      event.pointerType === 'mouse'
+    ) {
+      applyOrbitDelta(event.movementX, event.movementY)
+      return
+    }
+    if (aimPointerId === event.pointerId) {
+      if (isPaused() || !useGameStore.getState().scannerEquipped) return
+      setScannerPointer(event.clientX, event.clientY)
+      return
+    }
+
     if (!pointers.has(event.pointerId)) return
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
@@ -140,6 +211,14 @@ export function attachCameraControls(element: HTMLElement): () => void {
   }
 
   const endPointer = (event: PointerEvent) => {
+    if (aimPointerId === event.pointerId) {
+      aimPointerId = null
+      if (element.hasPointerCapture(event.pointerId)) {
+        element.releasePointerCapture(event.pointerId)
+      }
+      return
+    }
+
     pointers.delete(event.pointerId)
     if (element.hasPointerCapture(event.pointerId)) {
       element.releasePointerCapture(event.pointerId)
@@ -160,9 +239,14 @@ export function attachCameraControls(element: HTMLElement): () => void {
   }
 
   const onWheel = (event: WheelEvent) => {
-    if (isPaused()) return
+    if (isPaused() || useGameStore.getState().scannerEquipped) return
     event.preventDefault()
     zoomOrbit(event.deltaY * CAMERA.zoomSensitivity)
+  }
+
+  const onContextMenu = (event: Event) => {
+    if (!useGameStore.getState().scannerEquipped) return
+    event.preventDefault()
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -184,6 +268,7 @@ export function attachCameraControls(element: HTMLElement): () => void {
   element.addEventListener('pointercancel', endPointer)
   element.addEventListener('lostpointercapture', endPointer)
   element.addEventListener('wheel', onWheel, { passive: false })
+  element.addEventListener('contextmenu', onContextMenu)
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('blur', onBlur)
   document.addEventListener('visibilitychange', onVisibilityChange)
@@ -195,6 +280,7 @@ export function attachCameraControls(element: HTMLElement): () => void {
     element.removeEventListener('pointercancel', endPointer)
     element.removeEventListener('lostpointercapture', endPointer)
     element.removeEventListener('wheel', onWheel)
+    element.removeEventListener('contextmenu', onContextMenu)
     window.removeEventListener('keydown', onKeyDown)
     window.removeEventListener('blur', onBlur)
     document.removeEventListener('visibilitychange', onVisibilityChange)

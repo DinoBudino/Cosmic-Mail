@@ -1,26 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { useOnboardingStore } from '../../store/onboardingStore'
+import { emitAudio } from '../../game/audio/audioEvents'
 import { useGameStore } from '../../store/gameStore'
-import { playNavSound } from '../../game/music'
+import { useJourneyStore } from '../../store/journeyStore'
+import { useOnboardingStore } from '../../store/onboardingStore'
+
+interface MenuAction {
+  id: string
+  label: string
+  run: () => void
+}
 
 /**
- * Title screen: black space with the 3D scene behind, the game title at the
- * top and a bare list of options in the middle. No instructions, no panel —
- * the mystery is the tutorial.
- *
- * The options behave like a game menu, not web links: a single
- * selection indicator walks with rAF-free CSS transitions, arrow keys
- * move it, hover/focus adopt it, and confirming gives a brief warm
- * pulse + soft tick before the action runs.
+ * Title screen. Continue is offered only for a valid JourneySave; New
+ * Game asks for confirmation before the registration step replaces it.
  */
 export function MainMenu() {
-  const startMission = useOnboardingStore((state) => state.startMission)
-  const continueMission = useOnboardingStore((state) => state.continueMission)
-  const resetJourney = useOnboardingStore((state) => state.resetJourney)
-  const passport = useOnboardingStore((state) => state.passport)
+  const save = useJourneyStore((state) => state.save)
+  const loadStatus = useJourneyStore((state) => state.loadStatus)
   const openSettings = useGameStore((state) => state.openSettings)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
-  const musicVolume = useGameStore((state) => state.musicVolume)
 
   const [selected, setSelected] = useState(0)
   const [confirming, setConfirming] = useState<string | null>(null)
@@ -28,35 +26,50 @@ export function MainMenu() {
   const firstRenderRef = useRef(true)
   const timerRef = useRef<number | null>(null)
 
-  const actions: Array<{ id: string; label: string; run: () => void }> = passport
+  const startNewGame = () => {
+    if (
+      save &&
+      !window.confirm(
+        'Starting a new game will replace this carrier and all restored histories. The previous save is replaced only after you confirm. Continue?',
+      )
+    ) {
+      return
+    }
+    useOnboardingStore.getState().startNewJourney()
+  }
+
+  const continueGame = () => {
+    useOnboardingStore.getState().continueJourney()
+  }
+
+  const actions: MenuAction[] = save
     ? [
-        { id: 'continue', label: 'Continue mission', run: continueMission },
-        { id: 'start', label: 'Start a new mission', run: startMission },
+        { id: 'continue', label: 'Continue', run: continueGame },
+        { id: 'new', label: 'New Game', run: startNewGame },
         { id: 'settings', label: 'Settings', run: openSettings },
       ]
     : [
-        { id: 'start', label: 'Start a new mission', run: startMission },
+        { id: 'new', label: 'New Game', run: startNewGame },
         { id: 'settings', label: 'Settings', run: openSettings },
       ]
 
-  // Soft tick when the selection moves (never on mount).
   useEffect(() => {
     if (firstRenderRef.current) {
       firstRenderRef.current = false
       return
     }
-    playNavSound('move', musicVolume)
-  }, [selected, musicVolume])
+    emitAudio('uiHover', { dedupeKey: 'menu-selection', dedupeMs: 60 })
+  }, [selected])
 
-  useEffect(() => () => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-  }, [])
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    },
+    [],
+  )
 
-  // First option gets focus on mount for keyboard users.
   useEffect(() => {
     optionRefs.current[0]?.focus()
-    // Only on mount: the option list changes with passport state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const moveSelection = (index: number) => {
@@ -81,14 +94,13 @@ export function MainMenu() {
     }
   }
 
-  const confirm = (action: { id: string; run: () => void }) => {
+  const confirm = (action: MenuAction) => {
     if (confirming) return
-    playNavSound('confirm', musicVolume)
+    emitAudio('uiConfirm')
     if (reducedMotion) {
       action.run()
       return
     }
-    // Brief warm pulse, then the action runs.
     setConfirming(action.id)
     timerRef.current = window.setTimeout(() => {
       setConfirming(null)
@@ -102,13 +114,17 @@ export function MainMenu() {
         <h1 id="menu-title" className="menu__title">
           COSMIC MAIL
         </h1>
-        <p className="menu__tagline">Abandoned, but not forgotten</p>
+        <p className="menu__tagline">The memories that must find their way home</p>
         <span className="menu__divider" aria-hidden="true">
           ✦
         </span>
       </header>
 
-      <nav className="menu__nav" aria-label="Main menu" onKeyDown={onNavKeyDown}>
+      <nav
+        className="menu__nav"
+        aria-label="Main menu"
+        onKeyDown={onNavKeyDown}
+      >
         {actions.map((action, index) => (
           <button
             key={action.id}
@@ -116,9 +132,9 @@ export function MainMenu() {
               optionRefs.current[index] = element
             }}
             type="button"
-            className={`menu__option${selected === index ? ' is-selected' : ''}${
-              confirming === action.id ? ' is-confirming' : ''
-            }`}
+            className={`menu__option${
+              selected === index ? ' is-selected' : ''
+            }${confirming === action.id ? ' is-confirming' : ''}`}
             tabIndex={selected === index ? 0 : -1}
             aria-current={selected === index ? 'true' : undefined}
             onClick={() => confirm(action)}
@@ -130,10 +146,15 @@ export function MainMenu() {
         ))}
       </nav>
 
-      {passport && (
-        <button type="button" className="menu__footer" onClick={resetJourney}>
-          Forget this explorer
-        </button>
+      {save && (
+        <p className="menu__carrier">
+          Carrier {save.playerName} · Cosmic Mail
+        </p>
+      )}
+      {!save && loadStatus === 'corrupt' && (
+        <p className="menu__carrier" role="status">
+          The saved journey could not be read. New Game will start a fresh one.
+        </p>
       )}
     </section>
   )

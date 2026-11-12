@@ -6,7 +6,7 @@ import { SceneStatus } from '../ui/SceneStatus'
 import { CameraControls } from './CameraControls'
 import { clearInput } from './input'
 import { MarsWorld } from './MarsWorld'
-import { QUALITY_PRESETS } from './worldConfig'
+import { CAMERA, QUALITY_PRESETS } from './worldConfig'
 
 function ContextMonitor({ onLost }: { onLost: () => void }) {
   const gl = useThree((state) => state.gl)
@@ -33,7 +33,7 @@ export default function GameCanvas() {
     <Canvas
       shadows
       dpr={QUALITY_PRESETS[quality].dpr}
-      camera={{ position: [0, 10, 30], fov: 55, near: 0.1, far: 900 }}
+      camera={{ position: [0, 10, 30], fov: CAMERA.fov, near: 0.1, far: 900 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       fallback={<SceneStatus error />}
       onCreated={({ gl }) => {

@@ -3,13 +3,36 @@ import {
   useRef,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { SPIRIT_SITE } from '../data/spiritSite'
+import { isFlightUnlocked } from '../game/flight'
 import { setTouchBoot, setTouchMove, setTouchRun } from '../game/input'
 import { useGameStore } from '../store/gameStore'
+import { useJourneyStore } from '../store/journeyStore'
 
 export function TouchControls() {
   const settingsOpen = useGameStore((state) => state.settingsOpen)
   const activeSiteId = useGameStore((state) => state.activeSiteId)
-  const paused = settingsOpen || activeSiteId !== null
+  const scannerOpen = useGameStore((state) => state.scannerOpen)
+  const scannerCard = useGameStore(
+    (state) => state.scannerCardComponentId,
+  )
+  const scannerRecordsOpen = useGameStore(
+    (state) => state.scannerRecordsOpen,
+  )
+  const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
+  const progress = useJourneyStore(
+    (state) => state.save?.missions[SPIRIT_SITE.missionId] ?? null,
+  )
+  const flightLocked = progress != null && !isFlightUnlocked(progress)
+  // Equipping the scanner never hides or freezes the touch joystick; only
+  // modal panels that need reading block movement.
+  const paused =
+    settingsOpen ||
+    activeSiteId !== null ||
+    scannerOpen ||
+    scannerCard !== null ||
+    scannerRecordsOpen ||
+    archiveOpen
   const padRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)
   const activePointer = useRef<number | null>(null)
@@ -98,9 +121,14 @@ export function TouchControls() {
       <button
         type="button"
         className="touch-boost"
-        aria-label="Hold to use jet boots"
+        aria-label={
+          flightLocked
+            ? 'Jet boots locked during the ground survey'
+            : 'Hold to use jet boots'
+        }
+        disabled={flightLocked}
         onPointerDown={(event) => {
-          if (paused) return
+          if (paused || flightLocked) return
           event.currentTarget.setPointerCapture(event.pointerId)
           setTouchBoot(true)
         }}

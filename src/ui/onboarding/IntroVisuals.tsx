@@ -1,25 +1,30 @@
+import type { IntroHologramState } from '../../data/onboardingNarrative'
+
 /**
- * Procedural hologram visuals for the cinematic intro — generated in
- * code (SVG + CSS animation), no image files. Planets use the
- * approved Cosmic Mail palette (see ZONES accents): pale Moon,
- * rust Mars, lavender deep space. Deep space has no planet, only
- * stars and a probe on an orbit path.
+ * Procedural holograms for the cinematic intro. They are deliberately
+ * anonymous: three abstract archive files, their connections and a forming
+ * smart letter. No machine names, silhouettes or scientific identities.
+ *
+ * The projection is rasterised by WindowHologram, so each state is drawn
+ * as a complete, readable still frame instead of relying on CSS animation.
  */
 
-export type DestinationKind = 'moon' | 'mars' | 'deep'
-
-const STARS: ReadonlyArray<{ cx: number; cy: number; r: number; delay: string }> = [
-  { cx: 14, cy: 18, r: 1.4, delay: '0s' },
-  { cx: 30, cy: 10, r: 1, delay: '0.6s' },
-  { cx: 52, cy: 16, r: 1.5, delay: '1.1s' },
-  { cx: 78, cy: 12, r: 1.1, delay: '0.3s' },
-  { cx: 102, cy: 20, r: 1.6, delay: '1.6s' },
-  { cx: 20, cy: 44, r: 1.1, delay: '1.9s' },
-  { cx: 100, cy: 52, r: 1, delay: '0.9s' },
-  { cx: 12, cy: 82, r: 1.3, delay: '1.4s' },
-  { cx: 88, cy: 96, r: 1.2, delay: '0.2s' },
-  { cx: 40, cy: 104, r: 1, delay: '2.2s' },
+const STARS: ReadonlyArray<{ cx: number; cy: number; r: number }> = [
+  { cx: 38, cy: 34, r: 1.2 },
+  { cx: 82, cy: 22, r: 0.9 },
+  { cx: 138, cy: 30, r: 1.1 },
+  { cx: 206, cy: 24, r: 0.9 },
+  { cx: 268, cy: 40, r: 1.2 },
+  { cx: 24, cy: 96, r: 0.9 },
+  { cx: 296, cy: 108, r: 0.9 },
+  { cx: 52, cy: 270, r: 0.8 },
+  { cx: 272, cy: 262, r: 0.8 },
 ]
+
+const CARD_POSITIONS = [72, 160, 248] as const
+const CARD_Y = 178
+const CARD_W = 58
+const CARD_H = 76
 
 function StarField() {
   return (
@@ -27,217 +32,426 @@ function StarField() {
       {STARS.map((star, index) => (
         <circle
           key={index}
-          className="holo-star"
           cx={star.cx}
           cy={star.cy}
           r={star.r}
           fill="#FDF4EC"
-          style={{ animationDelay: star.delay }}
+          opacity={0.5 + (index % 3) * 0.12}
         />
       ))}
     </g>
   )
 }
 
-export function HoloDestination({ kind, label }: { kind: DestinationKind; label: string }) {
+function ArchiveHub({ faulted }: { faulted: boolean }) {
+  const accent = faulted ? '#F2B28C' : '#8FE3D8'
   return (
-    <svg className="holo-scene" viewBox="0 0 120 120" role="img" aria-label={label}>
-      <defs>
-        <radialGradient id={`holo-${kind}-body`} cx="35%" cy="30%" r="80%">
-          {kind === 'moon' && (
-            <>
-              <stop offset="0%" stopColor="#F5EFE4" />
-              <stop offset="55%" stopColor="#CFC7BA" />
-              <stop offset="100%" stopColor="#8D867A" />
-            </>
-          )}
-          {kind === 'mars' && (
-            <>
-              <stop offset="0%" stopColor="#FFDDB4" />
-              <stop offset="45%" stopColor="#F2B28C" />
-              <stop offset="100%" stopColor="#B85C38" />
-            </>
-          )}
-        </radialGradient>
-        <radialGradient id={`holo-${kind}-glow`} cx="50%" cy="50%" r="50%">
-          <stop offset="60%" stopColor="#8FE3D8" stopOpacity="0" />
-          <stop offset="100%" stopColor="#8FE3D8" stopOpacity="0.35" />
-        </radialGradient>
-      </defs>
+    <g>
+      <circle cx="160" cy="76" r="34" fill="url(#holo-hub-glow)" />
+      <circle
+        cx="160"
+        cy="76"
+        r="24"
+        fill="none"
+        stroke="#FFD9A8"
+        strokeOpacity="0.75"
+        strokeWidth="1.6"
+      />
+      <circle
+        cx="160"
+        cy="76"
+        r="15"
+        fill="rgba(143,227,216,0.12)"
+        stroke={accent}
+        strokeOpacity="0.85"
+        strokeWidth="1.4"
+        strokeDasharray={faulted ? '3 4' : undefined}
+      />
+      <circle cx="160" cy="76" r="4.5" fill={accent} />
+      <path
+        d="M160 96 v10"
+        stroke="#FFD9A8"
+        strokeOpacity="0.5"
+        strokeWidth="1.2"
+      />
+    </g>
+  )
+}
 
-      <circle cx="60" cy="60" r="52" fill={`url(#holo-${kind}-glow)`} />
-      <StarField />
+function Connection({
+  index,
+  state,
+}: {
+  index: number
+  state: IntroHologramState
+}) {
+  const x = CARD_POSITIONS[index]!
+  const path = `M160 102 C160 126 ${x} 118 ${x} 166`
+  const broken =
+    state === 'fragmented' ||
+    state === 'recovering' ||
+    (state === 'losing1' && index === 0) ||
+    (state === 'losing2' && index <= 1) ||
+    state === 'losing3'
+  const hopeful = state === 'hint' && index === 1
+  const quiet = state === 'hint' && !hopeful
 
-      {kind !== 'deep' && (
-        <g className="holo-float">
-          <circle cx="60" cy="62" r="34" fill={`url(#holo-${kind}-body)`} />
-          {kind === 'moon' && (
-            <g fill="rgba(60,52,44,0.28)">
-              <circle cx="48" cy="52" r="6" />
-              <circle cx="70" cy="66" r="8" />
-              <circle cx="56" cy="78" r="4" />
-              <circle cx="76" cy="48" r="3.5" />
-            </g>
-          )}
-          {kind === 'mars' && (
-            <g>
-              <ellipse cx="60" cy="34" rx="16" ry="6" fill="rgba(253,244,236,0.85)" />
-              <path d="M36 62 Q52 54 66 62 T94 60 Q88 78 64 82 T40 76 Z" fill="rgba(122,52,30,0.35)" />
-              <circle cx="78" cy="52" r="3" fill="rgba(122,52,30,0.3)" />
-              <circle cx="50" cy="74" r="2.4" fill="rgba(122,52,30,0.3)" />
-            </g>
-          )}
-          <ellipse className="holo-shine" cx="60" cy="62" rx="34" ry="12" fill="rgba(255,255,255,0.12)" />
-          <circle cx="60" cy="62" r="34" fill="none" stroke="#8FE3D8" strokeOpacity="0.55" strokeWidth="1.2" />
-        </g>
-      )}
+  if (quiet) {
+    return (
+      <path
+        d={path}
+        fill="none"
+        stroke="#B8A6D9"
+        strokeOpacity="0.28"
+        strokeWidth="1.1"
+        strokeDasharray="3 6"
+      />
+    )
+  }
 
-      {kind === 'deep' && (
+  if (broken && !hopeful) {
+    return (
+      <g opacity={state === 'recovering' ? 0.62 : 0.48}>
+        <path
+          d={path}
+          fill="none"
+          stroke="#F2B28C"
+          strokeWidth="1.5"
+          strokeDasharray="4 6"
+        />
+        <circle cx={x} cy="128" r="2.4" fill="#F2B28C" />
+        <circle cx={x} cy="136" r="1.4" fill="#F2B28C" opacity="0.7" />
+      </g>
+    )
+  }
+
+  return (
+    <path
+      d={path}
+      fill="none"
+      stroke={hopeful ? '#FFD9A8' : '#8FE3D8'}
+      strokeOpacity={hopeful ? 0.95 : 0.62}
+      strokeWidth={hopeful ? 2.2 : 1.5}
+      strokeDasharray={state === 'dossier' ? '5 5' : undefined}
+    />
+  )
+}
+
+function DossierCard({
+  index,
+  state,
+}: {
+  index: number
+  state: IntroHologramState
+}) {
+  const x = CARD_POSITIONS[index]!
+  const left = x - CARD_W / 2
+  const broken =
+    state === 'fragmented' ||
+    state === 'recovering' ||
+    (state === 'losing1' && index === 0) ||
+    (state === 'losing2' && index <= 1) ||
+    state === 'losing3'
+  const hopeful = state === 'hint' && index === 1
+  const dim = (broken && !hopeful) || (state === 'hint' && !hopeful)
+  const rotation = dim ? (index - 1) * 3.5 : 0
+  const border = hopeful ? '#FFD9A8' : dim ? '#B8A6D9' : '#F2DDB4'
+  const fill = hopeful
+    ? 'rgba(255,217,168,0.2)'
+    : 'rgba(253,244,236,0.1)'
+
+  return (
+    <g
+      transform={`rotate(${rotation} ${x} ${CARD_Y + CARD_H / 2})`}
+      opacity={dim ? 0.62 : 1}
+    >
+      {/* Folder tab + body */}
+      <path
+        d={`M${left} ${CARD_Y - 8} h20 l4 7 h${CARD_W - 24} v${CARD_H} h-${CARD_W} z`}
+        fill={fill}
+        stroke={border}
+        strokeOpacity={hopeful ? 0.95 : 0.7}
+        strokeWidth={hopeful ? 2 : 1.3}
+      />
+
+      {/* Abstract record lines; never equipment silhouettes. */}
+      <path
+        d={`M${left + 10} ${CARD_Y + 20} h30 M${left + 10} ${CARD_Y + 31} h22 M${left + 10} ${CARD_Y + 42} h27`}
+        stroke={hopeful ? '#FFD9A8' : '#FDF4EC'}
+        strokeOpacity={dim ? 0.4 : 0.72}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+
+      {/* Archive seal */}
+      <circle
+        cx={x + 14}
+        cy={CARD_Y + 56}
+        r="6"
+        fill="none"
+        stroke={hopeful ? '#FFD9A8' : '#8FE3D8'}
+        strokeOpacity={dim ? 0.45 : 0.8}
+        strokeWidth="1.2"
+      />
+      <circle
+        cx={x + 14}
+        cy={CARD_Y + 56}
+        r="2"
+        fill={hopeful ? '#FFD9A8' : '#8FE3D8'}
+        opacity={dim ? 0.5 : 0.9}
+      />
+
+      {hopeful && (
         <g>
-          <ellipse cx="60" cy="60" rx="44" ry="20" fill="none" stroke="#B8A6D9" strokeOpacity="0.7" strokeDasharray="3 5" />
-          <ellipse cx="60" cy="60" rx="28" ry="11" fill="none" stroke="#8FE3D8" strokeOpacity="0.45" strokeDasharray="2 4" />
-          <g className="holo-orbit">
-            <circle cx="104" cy="60" r="3.2" fill="#FDF4EC" />
-            <path d="M104 60 l-7 -3 l2 5 z" fill="#F4B4DF" />
-          </g>
-          <circle cx="60" cy="60" r="5" fill="#B8A6D9" />
-          <circle cx="60" cy="60" r="9" fill="none" stroke="#B8A6D9" strokeOpacity="0.5" />
-          <text x="60" y="104" textAnchor="middle" fontSize="7" fill="#B8A6D9" letterSpacing="2">
-            VOYAGER
-          </text>
+          <circle cx={x + 14} cy={CARD_Y + 56} r="12" fill="url(#holo-clue-glow)" />
+          <path
+            d={`M${x + 14} ${CARD_Y + 50} a5 5 0 1 1 0.1 0 M${x + 14} ${CARD_Y + 55} v9`}
+            stroke="#FFD9A8"
+            strokeWidth="1.6"
+            fill="none"
+            strokeLinecap="round"
+          />
         </g>
       )}
-    </svg>
+
+      {broken && !hopeful && (
+        <g>
+          <path
+            d={`M${left + 4} ${CARD_Y + 40} l14 -10 l8 7 l-12 12 z`}
+            fill="rgba(184,166,217,0.18)"
+            stroke="#B8A6D9"
+            strokeOpacity="0.5"
+            strokeWidth="0.9"
+          />
+          <path
+            d={`M${left + 20} ${CARD_Y + 6} l7 12 l-10 5`}
+            fill="none"
+            stroke="#F2B28C"
+            strokeOpacity="0.7"
+            strokeWidth="1.1"
+          />
+        </g>
+      )}
+    </g>
+  )
+}
+
+function FloatingShards() {
+  return (
+    <g opacity="0.5">
+      <path d="M96 112 l8 -5 l4 8 l-8 5 z" fill="#B8A6D9" />
+      <path d="M218 126 l7 4 l-3 8 l-7 -4 z" fill="#8FE3D8" />
+      <path d="M126 242 l6 -7 l6 5 l-4 8 z" fill="#F2B28C" />
+      <path d="M188 252 l8 3 l-2 7 l-8 -2 z" fill="#B8A6D9" />
+    </g>
+  )
+}
+
+function RecoveryAttempts() {
+  return (
+    <g opacity="0.9">
+      {[72, 160, 248].map((x) => (
+        <g key={x}>
+          <path
+            d={`M160 104 C160 126 ${x * 0.62 + 61} 126 ${x * 0.72 + 45} 142`}
+            fill="none"
+            stroke="#B8A6D9"
+            strokeWidth="1.4"
+            strokeDasharray="3 6"
+          />
+          <path
+            d={`M${x * 0.72 + 41} 139 l6 6 M${x * 0.72 + 47} 139 l-6 6`}
+            stroke="#F2B28C"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </g>
+      ))}
+      <circle cx="160" cy="76" r="31" fill="none" stroke="#B8A6D9" strokeOpacity="0.55" strokeWidth="1.2" strokeDasharray="2 6" />
+      <path d="M188 76 h8" stroke="#F2B28C" strokeWidth="1.6" strokeLinecap="round" />
+    </g>
+  )
+}
+
+function LocationClue() {
+  return (
+    <g opacity="0.85">
+      <path
+        d="M44 292 H276"
+        stroke="#8FE3D8"
+        strokeOpacity="0.32"
+        strokeWidth="1"
+        strokeDasharray="2 6"
+      />
+      <circle cx="160" cy="292" r="4" fill="#FFD9A8" />
+      <circle cx="160" cy="292" r="13" fill="none" stroke="#FFD9A8" strokeOpacity="0.5" strokeWidth="1" strokeDasharray="3 5" />
+      <circle cx="96" cy="292" r="2" fill="#B8A6D9" opacity="0.7" />
+      <circle cx="224" cy="292" r="2" fill="#B8A6D9" opacity="0.7" />
+    </g>
+  )
+}
+
+function DossierRoute() {
+  return (
+    <g opacity="0.65">
+      <path
+        d="M100 274 H220"
+        stroke="#FFD9A8"
+        strokeWidth="1.2"
+        strokeDasharray="4 7"
+      />
+      <path d="M214 270 l8 4 l-8 4 z" fill="#FFD9A8" />
+    </g>
   )
 }
 
 /**
- * Totally invented generic rover silhouette for the "forgotten"
- * moment — a narrative stand-in, not a specific NASA mission. Its
- * status light starts lit, dies, and a warm rim light remains.
+ * The central Archive board. Each state is a readable still: stable,
+ * losing connections one by one, fragmented, a failed recovery, a useful
+ * clue, or the three incomplete dossiers that set up the invitation.
  */
-export function RoverSilhouette() {
-  const wheels = [
-    { cx: 58, cy: 126 },
-    { cx: 110, cy: 134 },
-    { cx: 162, cy: 126 },
-  ]
+export function ArchiveBoard({ state }: { state: IntroHologramState }) {
+  const faulted =
+    state === 'losing1' ||
+    state === 'losing2' ||
+    state === 'losing3' ||
+    state === 'fragmented' ||
+    state === 'recovering'
+  const showShards =
+    state === 'fragmented' ||
+    state === 'recovering' ||
+    state === 'losing3'
+
   return (
-    <svg className="holo-scene holo-scene--rover" viewBox="0 0 220 160" role="img" aria-label="A quiet forgotten rover">
+    <svg
+      viewBox="0 0 320 320"
+      width="100%"
+      height="100%"
+      role="img"
+      aria-label={
+        faulted
+          ? 'Three anonymous archive files lose their connections and fragment.'
+          : state === 'hint'
+            ? 'One anonymous archive file shows a small location clue.'
+            : 'Three anonymous archive files connected to the Cosmic Archive.'
+      }
+    >
       <defs>
-        <linearGradient id="holo-rover-body" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6B5A80" />
-          <stop offset="100%" stopColor="#33284A" />
-        </linearGradient>
-        <radialGradient id="holo-rover-wheel" cx="35%" cy="30%" r="80%">
-          <stop offset="0%" stopColor="#4A3E60" />
-          <stop offset="100%" stopColor="#1E1730" />
+        <radialGradient id="holo-hub-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="30%" stopColor="#8FE3D8" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#8FE3D8" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="holo-clue-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="20%" stopColor="#FFD9A8" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#FFD9A8" stopOpacity="0" />
         </radialGradient>
       </defs>
 
-      {/* soft shadow + dusty ground */}
-      <ellipse cx="110" cy="146" rx="80" ry="9" fill="#000000" opacity="0.32" />
-      <path d="M12 140 H208" stroke="#8FE3D8" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="2 6" />
-      <path d="M18 140 l8-6 8 6z M192 140 l7-5 7 5z" fill="#241A33" stroke="#8FE3D8" strokeOpacity="0.25" />
+      <StarField />
+      <circle cx="160" cy="166" r="142" fill="none" stroke="#B8A6D9" strokeOpacity="0.22" strokeWidth="1" />
+      <circle cx="160" cy="166" r="112" fill="none" stroke="#8FE3D8" strokeOpacity="0.12" strokeWidth="1" strokeDasharray="2 7" />
 
-      {/* rocker-bogie suspension */}
-      <path d="M74 102 L58 126 M110 102 L110 134 M146 102 L162 126 M58 126 L84 118 L110 134 M110 134 L136 118 L162 126"
-        stroke="#CFC7BA" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.9" />
+      <ArchiveHub faulted={faulted} />
+      {state === 'recovering' && <RecoveryAttempts />}
 
-      {/* wheels with hubs and spokes */}
-      {wheels.map((wheel) => (
-        <g key={wheel.cx}>
-          <circle cx={wheel.cx} cy={wheel.cy} r="14" fill="url(#holo-rover-wheel)" stroke="#CFC7BA" strokeWidth="3" />
-          <path
-            d={`M${wheel.cx - 9} ${wheel.cy} H${wheel.cx + 9} M${wheel.cx} ${wheel.cy - 9} V${wheel.cy + 9} M${wheel.cx - 6.4} ${wheel.cy - 6.4} L${wheel.cx + 6.4} ${wheel.cy + 6.4} M${wheel.cx + 6.4} ${wheel.cy - 6.4} L${wheel.cx - 6.4} ${wheel.cy + 6.4}`}
-            stroke="#8FE3D8" strokeOpacity="0.45" strokeWidth="1.4"
-          />
-          <circle cx={wheel.cx} cy={wheel.cy} r="4" fill="#8FE3D8" opacity="0.85" />
-        </g>
+      {[0, 1, 2].map((index) => (
+        <Connection key={index} index={index} state={state} />
+      ))}
+      {[0, 1, 2].map((index) => (
+        <DossierCard key={index} index={index} state={state} />
       ))}
 
-      {/* hull + deck + solar panel */}
-      <rect x="58" y="74" width="104" height="30" rx="9" fill="url(#holo-rover-body)" stroke="#8FE3D8" strokeOpacity="0.55" strokeWidth="1.5" />
-      <rect x="72" y="60" width="76" height="16" rx="6" fill="#463A5C" stroke="#8FE3D8" strokeOpacity="0.4" />
-      <rect x="78" y="64" width="64" height="8" fill="none" stroke="#8FE3D8" strokeOpacity="0.35" />
-      <path d="M94 64 V72 M110 64 V72 M126 64 V72" stroke="#8FE3D8" strokeOpacity="0.35" />
-      <circle cx="66" cy="82" r="2.4" fill="#8FE3D8" opacity="0.7" />
-      <rect x="118" y="84" width="34" height="6" rx="3" fill="#241A33" opacity="0.8" />
-
-      {/* science arm with scoop (front-left) */}
-      <path d="M64 98 L40 114 L27 110" stroke="#CFC7BA" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M27 110 l-8 4 6 6 8-4z" fill="#463A5C" stroke="#8FE3D8" strokeOpacity="0.4" />
-
-      {/* mast + camera head + dish antenna */}
-      <path d="M138 60 L154 24" stroke="#CFC7BA" strokeWidth="4" strokeLinecap="round" />
-      <path d="M176 6 a11 11 0 0 1 10 12" fill="none" stroke="#CFC7BA" strokeWidth="2.4" strokeLinecap="round" />
-      <rect x="136" y="10" width="42" height="20" rx="5" fill="url(#holo-rover-body)" stroke="#8FE3D8" strokeOpacity="0.55" strokeWidth="1.5" />
-      <circle cx="148" cy="20" r="3.2" fill="#F4B4DF" />
-      <circle cx="160" cy="20" r="3.2" fill="#F4B4DF" />
-      {/* status light: lit, then dies (CSS animation) */}
-      <circle className="rover-light" cx="170" cy="20" r="2.8" fill="#FFD9A8" />
-
-      {/* warm rim light that stays */}
-      <path d="M58 78 q-5 10 0 24" stroke="#FFD9A8" strokeOpacity="0.8" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-      <path d="M138 16 q-4 8 0 12" stroke="#FFD9A8" strokeOpacity="0.6" strokeWidth="2" fill="none" strokeLinecap="round" />
+      {showShards && <FloatingShards />}
+      {state === 'hint' && <LocationClue />}
+      {state === 'dossier' && <DossierRoute />}
     </svg>
   )
 }
 
-/** The little holographic letter, floating over the console. */
+/** Three stable archive records (kept as a named export for reuse). */
+export function ArchiveSignals() {
+  return <ArchiveBoard state="stable" />
+}
+
+/** The little smart letter that forms during the invitation. */
 export function EnvelopeHologram({ facing }: { facing: boolean }) {
   return (
-    <svg className={`holo-scene holo-scene--envelope${facing ? ' is-facing' : ''}`} viewBox="0 0 140 110" role="img" aria-label="A glowing letter for a forgotten explorer">
+    <svg
+      className={`holo-scene holo-scene--envelope${facing ? ' is-facing' : ''}`}
+      viewBox="0 0 320 320"
+      width="100%"
+      height="100%"
+      role="img"
+      aria-label="An incomplete smart letter forming in the Cosmic Archive"
+    >
       <defs>
         <linearGradient id="holo-envelope" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#FFF3DC" />
           <stop offset="100%" stopColor="#F2DDB4" />
         </linearGradient>
+        <radialGradient id="holo-letter-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="30%" stopColor="#FFD9A8" stopOpacity="0.24" />
+          <stop offset="100%" stopColor="#FFD9A8" stopOpacity="0" />
+        </radialGradient>
       </defs>
-      <ellipse cx="70" cy="96" rx="36" ry="6" fill="#8FE3D8" opacity="0.18" />
-      <g className="holo-float">
-        <rect x="28" y="30" width="84" height="56" rx="8" fill="url(#holo-envelope)" stroke="#B8A6D9" strokeOpacity="0.8" strokeWidth="1.5" />
-        <path d="M30 34 L70 62 L110 34" fill="none" stroke="#8C6D3F" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="70" cy="66" r="4" fill="#B8A6D9" />
-        <path d="M70 66 l0 10 M66 72 h8" stroke="#B8A6D9" strokeWidth="1.6" strokeLinecap="round" />
+      <StarField />
+      <circle cx="160" cy="160" r="140" fill="none" stroke="#B8A6D9" strokeOpacity="0.22" strokeWidth="1" />
+      <circle cx="160" cy="160" r="74" fill="url(#holo-letter-glow)" />
+
+      <g>
+        <rect
+          x="94"
+          y="92"
+          width="132"
+          height="92"
+          rx="9"
+          fill="url(#holo-envelope)"
+          stroke="#B8A6D9"
+          strokeOpacity="0.85"
+          strokeWidth="1.6"
+        />
+        <path
+          d="M96 98 L160 146 L224 98"
+          fill="none"
+          stroke="#8C6D3F"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+        {/* Incomplete seal: the last connection is still forming. */}
+        <circle cx="160" cy="164" r="7" fill="none" stroke="#B8A6D9" strokeWidth="1.6" strokeDasharray="3 3" />
+        <circle cx="160" cy="164" r="2.6" fill="#FFD9A8" />
       </g>
-      <path d="M20 18 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" fill="#FFD9A8" className="holo-star" />
-      <path d="M118 22 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z" fill="#F4B4DF" className="holo-star" style={{ animationDelay: '1.2s' }} />
-    </svg>
-  )
-}
 
-const SPIRIT_STARS: ReadonlyArray<{ x: number; y: number; label: string }> = [
-  { x: 80, y: 30, label: 'Brave' },
-  { x: 118, y: 58, label: 'Observant' },
-  { x: 96, y: 96, label: 'Methodical' },
-  { x: 48, y: 96, label: 'Careful' },
-  { x: 28, y: 58, label: 'Reflective' },
-]
-
-/** The five-star spirit constellation (equal weight, no result yet). */
-export function SpiritConstellation() {
-  return (
-    <svg className="holo-scene holo-scene--constellation" viewBox="0 0 150 120" role="img" aria-label="A constellation of five explorer spirits">
-      <path
-        className="constellation-lines"
-        d="M80 30 L118 58 L96 96 L48 96 L28 58 Z"
-        fill="none"
-        stroke="#8FE3D8"
-        strokeOpacity="0.55"
-        strokeWidth="1"
-        strokeDasharray="3 4"
-      />
-      <path d="M80 30 L96 96 M118 58 L48 96 M28 58 L96 96" stroke="#B8A6D9" strokeOpacity="0.3" strokeWidth="0.8" />
-      {SPIRIT_STARS.map((star, index) => (
-        <g key={star.label}>
-          <circle className="holo-star" cx={star.x} cy={star.y} r="4.5" fill="#FFD9A8" style={{ animationDelay: `${index * 0.45}s` }} />
-          <circle cx={star.x} cy={star.y} r="8" fill="none" stroke="#FFD9A8" strokeOpacity="0.35" />
-          <text x={star.x} y={star.y - 12} textAnchor="middle" fontSize="7.5" fill="#FDF4EC" letterSpacing="0.5">
-            {star.label}
-          </text>
+      {/* The three anonymous files wait under the letter. */}
+      {[110, 160, 210].map((x) => (
+        <g key={x} opacity="0.85">
+          <path
+            d={`M${x - 14} 250 h28 v20 h-28 z`}
+            fill="rgba(253,244,236,0.12)"
+            stroke="#8FE3D8"
+            strokeOpacity="0.68"
+            strokeWidth="1"
+          />
+          <path
+            d={`M${x - 9} 257 h18 M${x - 9} 262 h12`}
+            stroke="#FDF4EC"
+            strokeOpacity="0.58"
+            strokeWidth="1"
+          />
+          <circle cx={x + 8} cy={265} r="1.8" fill="#FFD9A8" opacity="0.8" />
         </g>
       ))}
+
+      <path
+        d="M70 62 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z"
+        fill="#FFD9A8"
+        opacity="0.9"
+      />
+      <path
+        d="M252 70 l1.6 4.6 4.6 1.6 -4.6 1.6 -1.6 4.6 -1.6 -4.6 -4.6 -1.6 4.6 -1.6z"
+        fill="#F4B4DF"
+        opacity="0.85"
+      />
     </svg>
   )
 }

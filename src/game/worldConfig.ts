@@ -21,11 +21,11 @@ export const QUALITY_PRESETS: Record<Quality, QualityPreset> = {
     dpr: [1, 2],
     shadows: true,
     postprocessing: true,
-    rockCount: 120,
-    dustCount: 420,
+    rockCount: 150,
+    dustCount: 460,
     starCount: 1800,
-    fogNear: 42,
-    fogFar: 225,
+    fogNear: 54,
+    fogFar: 280,
     shadowMapSize: 2048,
   },
   low: {
@@ -33,28 +33,67 @@ export const QUALITY_PRESETS: Record<Quality, QualityPreset> = {
     dpr: [1, 1.25],
     shadows: false,
     postprocessing: false,
-    rockCount: 48,
-    dustCount: 160,
+    rockCount: 64,
+    dustCount: 170,
     starCount: 650,
-    fogNear: 40,
-    fogFar: 215,
+    fogNear: 50,
+    fogFar: 255,
     shadowMapSize: 1024,
   },
 }
 
 /**
- * Semi-open Mars (Fase 5): four regions in separate quadrants around a
- * southern spawn. Sites sit ~55–95 units away (roughly 12–20 s of walking at
- * 5.4 u/s along the curved trail), so no explorer is visible from landing:
- * dunes, mesas and fog reveal each region progressively. The world stays
- * small enough for children to cross and return to spawn.
+ * Planetary Exploration 2.0 — a compact but open-handed Mars expedition.
+ * The landing zone sits south of the map; the survey passage crosses a
+ * raised geological shelf, and the explorer site lies about 120 m away.
+ * The terrain continues as decorative hills far beyond the playable radius,
+ * so the horizon reads as landscape rather than a circular wall.
  */
 export const WORLD = {
-  terrainSize: 360,
-  terrainSegments: 216,
-  playRadius: 95,
-  spawn: { x: 0, z: 42 },
+  terrainSize: 480,
+  terrainSegments: 240,
+  playRadius: 120,
+  spawn: { x: 0, z: 75 },
 } as const
+
+/** Hand-authored survey trail from the landing zone to the explorer approach. */
+export const SURVEY_ROUTE: readonly WorldPosition[] = [
+  WORLD.spawn,
+  { x: -4, z: 60 },
+  { x: 7, z: 47 },
+  { x: -7, z: 34 },
+  { x: 3, z: 22 },
+  { x: 14, z: 16 },
+  { x: 9, z: 2 },
+  { x: 1, z: -13 },
+  { x: -4, z: -27 },
+  { x: 0, z: -36 },
+]
+
+/** Raised geological viewpoint that reveals the explorer site from afar. */
+export const SURVEY_VIEWPOINT = { x: 15, z: 28 } as const
+
+/** The three connected exploration areas, used by UI and PIP orientation. */
+export const EXPLORATION_ZONES = [
+  {
+    id: 'landing',
+    name: 'Landing Zone',
+    position: { x: WORLD.spawn.x, z: WORLD.spawn.z },
+    radius: 22,
+  },
+  {
+    id: 'passage',
+    name: 'Geological Passage',
+    position: { x: 2, z: 28 },
+    radius: 34,
+  },
+  {
+    id: 'explorer',
+    name: 'Explorer Site',
+    position: { x: 0, z: -45 },
+    radius: 18,
+  },
+] as const
 
 export const PLAYER = {
   moveSpeed: 5.4,
@@ -90,6 +129,40 @@ export const CAMERA = {
   minTerrainClearance: 1.8,
   collisionSamples: 6,
   objectClearance: 3.6,
+  fov: 55,
+} as const
+
+/** Physical Cosmic Scanner tuning: aim, raycast and hold-to-scan. */
+export const SCANNER = {
+  /** Maximum player-to-component distance for a valid scan. */
+  range: 14,
+  /** Camera ray length from the pointer/camera. */
+  rayFar: 28,
+  /** Continuous hold required to register a component. */
+  holdSeconds: 1.2,
+  /** Comfortable third-person distance while the scanner is held. */
+  cameraDistance: 8.4,
+  cameraDamping: 7,
+  /** Arm aim fallback point along the pointer ray. */
+  fallbackAimDistance: 10,
+  /** Anatomical clamp for the right-arm aim direction. */
+  minAimYaw: -0.35,
+  maxAimYaw: 1.35,
+  minAimY: -0.8,
+  maxAimY: 0.6,
+  /** Damping for the world aim point that drives the arm pose. */
+  armAimDamping: 14,
+  /** Environmental targets are reachable from a slightly shorter range. */
+  environmentalRange: 11,
+  /** A quick field reading; holding longer produces a detailed comparison. */
+  environmentalQuickSeconds: 1.4,
+  environmentalDetailSeconds: 3.4,
+  /** First-person eye height and camera transition speed. */
+  firstPersonEyeHeight: 1.62,
+  firstPersonDamping: 9,
+  /** First-person camera setting. */
+  firstPersonPitchMin: -0.72,
+  firstPersonPitchMax: 0.72,
 } as const
 
 export const PALETTE = {

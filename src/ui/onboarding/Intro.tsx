@@ -1,73 +1,112 @@
-import { useEffect } from 'react'
-import { INTRO_LINES, introMomentForLine } from '../../data/personalization'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ARCHIVE_LABELS,
+  INTRO_BEATS,
+  introAutoAdvanceForMode,
+  introBeatForLine,
+  introMomentForLine,
+  type IntroMoment,
+} from '../../data/onboardingNarrative'
+import { emitAudio } from '../../game/audio/audioEvents'
 import { speakPip, stopPipVoice } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 
-const MOMENT_LABELS: Record<string, string> = {
-  explorers: 'Moon, Mars and Deep Space float as holograms in the window.',
-  forgotten: 'A quiet rover hologram fades its status light. The words read: abandoned, but not forgotten.',
-  invitation: 'A holographic letter floats in the window, offered to the player.',
-  reflection: 'Five stars form a constellation of explorer spirits: brave, observant, methodical, careful and reflective.',
-}
+const SCENE_ORDER: readonly IntroMoment[] = [
+  'arrival',
+  'archive',
+  'fault',
+  'hope',
+  'invitation',
+]
 
-function momentLabel(moment: string): string {
-  return MOMENT_LABELS[moment] ?? ''
+const SCENE_LABEL: Record<IntroMoment, string> = {
+  arrival: 'Welcome aboard',
+  archive: 'Cosmic Archive',
+  fault: 'Archive fault',
+  hope: 'A clue',
+  invitation: 'The invitation',
 }
 
 /**
- * Cinematic introduction (five moments, one visual idea each) over
- * the existing 3D cabin: PIP stays visible up top, a single hologram
- * set floats mid-frame, and a bottom subtitle bar carries the
- * dialogue (independent of PIP's 3D position). No tablet, no cards:
- * the child discovers the premise instead of reading a summary.
- *
- * Subtitle lines are user-paced (Continue advances), because the new
- * lines have no recordings yet — PIP must never speak a stale line.
- * Moment 4 waits for the explicit "I'm ready!" choice; moment 5 ends
- * with the single "Discover my explorer spirit" button.
+ * Cinematic introduction over the existing cabin. It never reveals the
+ * names of the historical machines. Short reaction beats advance on their
+ * own after they are read; every beat can also be advanced manually, the
+ * last invitation waits for the player, and Replay/Skip stay available.
  */
 export function Intro() {
-  const continueFromIntro = useOnboardingStore((state) => state.continueFromIntro)
+  const finishIntro = useOnboardingStore((state) => state.finishIntro)
+  const goBack = useOnboardingStore((state) => state.goBack)
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const setDialogueIndex = useOnboardingStore((state) => state.setDialogueIndex)
-  const goBack = useOnboardingStore((state) => state.goBack)
   const setPipTalking = useOnboardingStore((state) => state.setPipTalking)
-  const reducedMotion = useGameStore((state) => state.reducedMotion)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
   const voiceName = useGameStore((state) => state.voiceName)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
 
-  const lastLine = INTRO_LINES.length - 1
-  const lineIndex = Math.min(dialogueIndex, lastLine)
-  const line = INTRO_LINES[lineIndex] ?? ''
-
-  // PIP speaks each subtitle line (recorded Kokoro takes). speakPip
-  // stops the previous line first, so advancing never overlaps;
-  // leaving the intro (Skip/Back/Discover) stops the voice. His
-  // mouth follows the line for roughly its spoken length.
-  useEffect(() => {
-    speakPip(line, voiceName, voiceEnabled)
-    setPipTalking(true)
-    const talkMs = 1200 + line.length * 42
-    const timer = window.setTimeout(() => setPipTalking(false), talkMs)
-    return () => {
-      window.clearTimeout(timer)
-      setPipTalking(false)
-    }
-  }, [line, voiceName, voiceEnabled, setPipTalking])
-
-  useEffect(() => () => stopPipVoice(), [])
+  const [replayNonce, setReplayNonce] = useState(0)
+  const lastLine = INTRO_BEATS.length - 1
+  const lineIndex = Math.min(Math.max(0, dialogueIndex), lastLine)
+  const beat = introBeatForLine(lineIndex)
   const moment = introMomentForLine(lineIndex)
-  // The merged delivery + question line is the invitation decision.
-  const isInvitationQuestion = lineIndex === 6
   const isFinalLine = lineIndex === lastLine
+  // Reduced motion also means user-paced reading: no automatic cuts.
+  const autoAdvanceMs = introAutoAdvanceForMode(lineIndex, reducedMotion)
+  const scenePosition = SCENE_ORDER.indexOf(moment) + 1
 
-  const advance = () => {
-    if (lineIndex < lastLine) setDialogueIndex(lineIndex + 1)
+  const advance = useCallback(() => {
+    if (lineIndex < lastLine) {
+      setDialogueIndex(lineIndex + 1)
+      return
+    }
+    stopPipVoice()
+    finishIntro()
+  }, [lineIndex, lastLine, setDialogueIndex, finishIntro])
+
+  const skip = () => {
+    emitAudio('introSkipped')
+    stopPipVoice()
+    setPipTalking(false)
+    finishIntro()
   }
 
+  useEffect(() => {
+    speakPip(beat.line, voiceName, voiceEnabled)
+    setPipTalking(true)
+    const talkMs = Math.min(7200, 1200 + beat.line.length * 42)
+    const mouthTimer = window.setTimeout(() => setPipTalking(false), talkMs)
+    const advanceTimer =
+      autoAdvanceMs === null
+        ? null
+        : window.setTimeout(() => {
+            if (lineIndex < lastLine) setDialogueIndex(lineIndex + 1)
+          }, autoAdvanceMs)
+
+    return () => {
+      window.clearTimeout(mouthTimer)
+      if (advanceTimer !== null) window.clearTimeout(advanceTimer)
+      setPipTalking(false)
+    }
+  }, [
+    beat.line,
+    lineIndex,
+    lastLine,
+    autoAdvanceMs,
+    replayNonce,
+    voiceName,
+    voiceEnabled,
+    setPipTalking,
+    setDialogueIndex,
+  ])
+
+  useEffect(() => () => stopPipVoice(), [])
+
   return (
-    <section className="cine" aria-labelledby="intro-title">
+    <section
+      className="cine"
+      aria-labelledby="intro-title"
+      data-scene={moment}
+    >
       <h1 id="intro-title" className="sr-only">
         Cosmic Mail — introduction
       </h1>
@@ -75,52 +114,78 @@ export function Intro() {
         ← Back
       </button>
 
-      {/* The hologram itself is projected in 3D inside the Cosmic
-          Memory Window (see MenuScene MemoryWindowHolograms), so PIP
-          passes in front of it and the round window clips it. Screen
-          readers get the scene described here instead. */}
-      {moment !== 'welcome' && <p className="sr-only">{momentLabel(moment)}</p>}
+      <p className="sr-only">{ARCHIVE_LABELS[moment]}</p>
 
-      {/* Subtitle bar: bottom, independent of PIP's 3D position. */}
-      <div className="cine__subtitle" role="group" aria-label="PIP is telling you a story">
+      <div
+        className="cine__progress"
+        role="progressbar"
+        aria-label={`Intro scene ${scenePosition} of ${SCENE_ORDER.length}: ${SCENE_LABEL[moment]}`}
+        aria-valuemin={1}
+        aria-valuemax={SCENE_ORDER.length}
+        aria-valuenow={scenePosition}
+      >
+        {SCENE_ORDER.map((scene) => (
+          <span
+            key={scene}
+            className={`cine__progress-dot${
+              scene === moment ? ' is-current' : ''
+            }${
+              SCENE_ORDER.indexOf(scene) < SCENE_ORDER.indexOf(moment)
+                ? ' is-past'
+                : ''
+            }`}
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+
+      <div
+        className="cine__subtitle"
+        role="group"
+        aria-label="PIP is telling you what happened to the Cosmic Archive"
+      >
         <div className="cine__subtitle-head">
           <span className="cine__subtitle-name">PIP</span>
+          <span className="cine__scene-label">{SCENE_LABEL[moment]}</span>
           <button
             type="button"
             className="cine__replay"
-            onClick={() => speakPip(line, voiceName, voiceEnabled)}
-            aria-label="Replay this moment"
+            onClick={() => setReplayNonce((nonce) => nonce + 1)}
+            aria-label="Replay this line"
           >
             ↻ Replay
           </button>
-          <button type="button" className="cine__skip" onClick={continueFromIntro}>
+          <button type="button" className="cine__skip" onClick={skip}>
             Skip intro ▸
           </button>
         </div>
+
         <p className="cine__subtitle-text" aria-live="polite">
-          {line}
+          {beat.line}
         </p>
 
         <div className="cine__actions">
-          {isInvitationQuestion ? (
-            <button type="button" className="menu__option cine__action" onClick={advance} autoFocus>
-              I'm ready!
-            </button>
-          ) : isFinalLine ? (
-            <button type="button" className="menu__option cine__action" onClick={continueFromIntro} autoFocus>
-              Discover my explorer spirit
-            </button>
-          ) : (
-            <button type="button" className="menu__option cine__action" onClick={advance}>
-              Continue ▸
-            </button>
-          )}
+          <button
+            type="button"
+            className="menu__option cine__action"
+            onClick={advance}
+            autoFocus
+          >
+            {isFinalLine ? 'Count me in!' : 'Continue ▸'}
+          </button>
         </div>
+
+        {autoAdvanceMs !== null && (
+          <span className="cine__auto-note" aria-hidden="true">
+            Continues automatically · press Continue to move on
+          </span>
+        )}
       </div>
 
-      {/* Reduced motion stays user-paced too: nothing auto-advances. */}
       <span className="sr-only" aria-live="polite">
-        {reducedMotion ? 'Reduced motion is on. Use Continue to move through the story at your own pace.' : ''}
+        {reducedMotion
+          ? 'Reduced motion is on. Camera moves are simplified; use Continue to move through the story at your own pace.'
+          : ''}
       </span>
     </section>
   )

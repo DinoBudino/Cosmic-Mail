@@ -2,23 +2,44 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MARS_OBJECTS, REGION_INFO } from '../data/marsObjects'
+import { SPIRIT_SITE } from '../data/spiritSite'
+import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
+import { emitAudio, emitFootstep } from './audio/audioEvents'
 import { AstronautModel } from './AstronautModel'
+import { resolveEnvironmentalCollision } from './environmentCollision'
+import { isFlightUnlocked } from './flight'
+import { resolveBoulderCollision } from './landscape'
+import {
+  inspectSpirit,
+  requestFlightRestrictedNotice,
+} from './missionNarrative'
+import { ScannerFirstPersonView } from './ScannerFirstPersonView'
 import { Companion } from './Companion'
 import {
   computeCameraOffset,
+  computeScannerCameraOffset,
   getMovementBasis,
+  getOrbit,
 } from './cameraRig'
-import { consumeInteract, isBootHeld, isRunHeld, readMoveAxes, type MoveAxes } from './input'
+import {
+  consumeInteract,
+  consumeScannerToggle,
+  isBootHeld,
+  isRunHeld,
+  readMoveAxes,
+  type MoveAxes,
+} from './input'
 import { findNearbyRegion, findNearbySite, getAutoMove, resolveSiteCollision } from './interaction'
 import { stepVertical, type VerticalState } from './marsGravity'
 import { playerPosition } from './playerPosition'
+import { findNearbySpirit, resolveSpiritCollision } from './spiritSite'
 import {
   getTerrainHeight,
   getTerrainSlope,
   slopeSpeedFactor,
 } from './terrainHeight'
-import { CAMERA, PLAYER, WORLD } from './worldConfig'
+import { CAMERA, PLAYER, SCANNER, WORLD } from './worldConfig'
 
 /**
  * Lifts the camera over terrain between the player and the desired position.
@@ -66,6 +87,25 @@ function resolveObjectClearance(desired: THREE.Vector3): void {
     desired.x = object.position.x + dx * push
     desired.z = object.position.z + dz * push
   }
+
+  // Spirit is rendered outside MARS_OBJECTS so the four original sites,
+  // their flatten zones and the painted route stay untouched.
+  const spiritTop =
+    getTerrainHeight(SPIRIT_SITE.position.x, SPIRIT_SITE.position.z) + 3.2
+  if (desired.y <= spiritTop) {
+    const dx = desired.x - SPIRIT_SITE.position.x
+    const dz = desired.z - SPIRIT_SITE.position.z
+    const distance = Math.hypot(dx, dz)
+    if (distance < SPIRIT_SITE.cameraClearance) {
+      if (distance < 1e-4) {
+        desired.x += SPIRIT_SITE.cameraClearance
+      } else {
+        const push = SPIRIT_SITE.cameraClearance / distance
+        desired.x = SPIRIT_SITE.position.x + dx * push
+        desired.z = SPIRIT_SITE.position.z + dz * push
+      }
+    }
+  }
 }
 
 export function Player() {
@@ -83,13 +123,25 @@ export function Player() {
   const turnRef = useRef(0)
   const verticalRef = useRef<VerticalState>({ y: 0, vy: 0, grounded: true })
   const prevBoot = useRef(false)
+  const wasGrounded = useRef(true)
+  const thrusterLoopActive = useRef(false)
+  const stepDistance = useRef(0)
+  const stepVariant = useRef(0)
   const cameraTarget = useRef(new THREE.Vector3())
   const cameraDesired = useRef(new THREE.Vector3())
   const cameraOffset = useRef(new THREE.Vector3())
   const lookGoal = useRef(new THREE.Vector3())
+  const firstPersonDesired = useRef(new THREE.Vector3())
+  const firstPersonLook = useRef(new THREE.Vector3())
+  const cinematicLook = useRef(new THREE.Vector3())
+  const astronautRef = useRef<THREE.Group>(null)
 
   const { camera } = useThree()
   const quality = useGameStore((state) => state.quality)
+  const scannerEquipped = useGameStore((state) => state.scannerEquipped)
+  const scannerCamera = useGameStore((state) => state.scannerCamera)
+  const firstPersonScanner =
+    scannerEquipped && scannerCamera === 'first-person'
 
   const spawn = useMemo(
     () =>
@@ -150,28 +202,66 @@ export function Player() {
       velocity.current.set(0, 0, 0)
       motionRef.current = 0
       flightRef.current.thrust = 0
+      stepDistance.current = 0
+      if (thrusterLoopActive.current) {
+        thrusterLoopActive.current = false
+        emitAudio('thrusterStopped')
+      }
       return
     }
 
-    const store = useGameStore.getState()
+    let store = useGameStore.getState()
+
+    if (consumeScannerToggle()) {
+      if (store.scannerEquipped) {
+        store.unequipScanner()
+      } else if (playerPosition.airborne < 0.25) {
+        store.equipScanner(SPIRIT_SITE.missionId)
+      }
+      store = useGameStore.getState()
+    }
+
     if (consumeInteract()) {
-      store.openNearbySite()
+      const spiritProgress =
+        useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]
+      if (store.nearbySpirit && !spiritProgress?.discovered) {
+        inspectSpirit()
+      } else if (!store.scannerEquipped) {
+        if (store.nearbySpirit) {
+          // E is contextual inspection/review, never a quick scan menu.
+          store.openScannerRecords(SPIRIT_SITE.missionId)
+        } else {
+          store.openNearbySite()
+        }
+      }
       if (isWorldPaused()) {
         velocity.current.set(0, 0, 0)
         motionRef.current = 0
         return
       }
+      store = useGameStore.getState()
     }
 
+    // Equipping the scanner never freezes locomotion: the astronaut walks,
+    // runs and boosts exactly as before while the device stays in hand.
     readMoveAxes(axes.current)
     getMovementBasis(forward.current, right.current)
 
-    // Jet boots: press edge jumps, hold sustains thrust. Disabled while an
-    // assisted trip is active so the route can't be left in mid-air.
+    // Jet boots: press edge jumps, hold sustains thrust. Only an assisted
+    // trip disables the boots; the scanner stays compatible with flight.
     const traveling = Boolean(store.travelTargetId)
-    const bootHeld = traveling ? false : isBootHeld()
+    const missionProgress =
+      useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]
+    // Ground survey rule: flight unlocks after the memory is recovered. It is
+    // a level-design decision, not a broken jetpack, and movement stays free.
+    const flightUnlocked = isFlightUnlocked(missionProgress)
+    const rawBoot = traveling ? false : isBootHeld()
+    const bootHeld = rawBoot && flightUnlocked
     const jumpPressed = bootHeld && !prevBoot.current
-    prevBoot.current = bootHeld
+    if (rawBoot && !flightUnlocked && !prevBoot.current) {
+      requestFlightRestrictedNotice()
+    }
+    prevBoot.current = rawBoot
 
     const runHeld = isRunHeld()
     const topSpeed = runHeld
@@ -224,6 +314,17 @@ export function Player() {
     }
 
     resolveSiteCollision(player.position)
+    resolveSpiritCollision(player.position)
+    const playerAir = Math.max(
+      0,
+      player.position.y - getTerrainHeight(player.position.x, player.position.z),
+    )
+    resolveBoulderCollision(
+      player.position,
+      playerAir,
+      quality === 'low' ? 64 : 150,
+    )
+    resolveEnvironmentalCollision(player.position, playerAir)
 
     // Mars gravity: long arcs on takeoff, soft capped falls on landing.
     const groundY = getTerrainHeight(player.position.x, player.position.z)
@@ -243,11 +344,29 @@ export function Player() {
     playerPosition.z = player.position.z
     playerPosition.airborne = heightAboveGround
 
+    // Jet-boot bed + landing. Only real flight edges trigger sound;
+    // holding the key never restarts the loop every frame.
+    const thrusting = bootHeld && !vertical.grounded
+    if (thrusting && !thrusterLoopActive.current) {
+      thrusterLoopActive.current = true
+      emitAudio('thrusterStarted')
+    } else if (!thrusting && thrusterLoopActive.current) {
+      thrusterLoopActive.current = false
+      emitAudio('thrusterStopped')
+    }
+    if (!wasGrounded.current && vertical.grounded) {
+      emitAudio('landing')
+    }
+    wasGrounded.current = vertical.grounded
+
     // Rings + PIP only count close to the ground, so a high boot flight
     // over a site never triggers inspection mid-air.
     if (heightAboveGround <= PLAYER.inspectMaxHeight) {
-      store.setNearbySite(findNearbySite(player.position))
+      const nearSpirit = findNearbySpirit(player.position)
+      store.setNearbySpirit(nearSpirit)
+      store.setNearbySite(nearSpirit ? null : findNearbySite(player.position))
     } else {
+      store.setNearbySpirit(false)
       store.setNearbySite(null)
     }
     const regionId = findNearbyRegion(player.position)
@@ -260,7 +379,16 @@ export function Player() {
       velocity.current.x,
       velocity.current.z,
     )
-    if (horizontalSpeed > 0.12) {
+    if (store.scannerEquipped) {
+      // The torso keeps facing the camera yaw while the scanner is out; the
+      // right arm aims independently at the pointer target.
+      const orbit = getOrbit()
+      let difference = orbit.yaw - yaw.current
+      difference = Math.atan2(Math.sin(difference), Math.cos(difference))
+      yaw.current += difference * (1 - Math.exp(-14 * dt))
+      player.rotation.y = yaw.current
+      turnRef.current = 0
+    } else if (horizontalSpeed > 0.12) {
       const targetYaw = Math.atan2(
         -velocity.current.x,
         -velocity.current.z,
@@ -274,33 +402,147 @@ export function Player() {
       turnRef.current = 0
     }
 
-    motionRef.current = Math.min(horizontalSpeed / (PLAYER.moveSpeed * PLAYER.runSpeedMultiplier), 1)
+    motionRef.current = Math.min(
+      horizontalSpeed / (PLAYER.moveSpeed * PLAYER.runSpeedMultiplier),
+      1,
+    )
 
-    lookGoal.current.set(
-      player.position.x,
-      player.position.y + CAMERA.lookHeight,
-      player.position.z,
-    )
-    computeCameraOffset(cameraOffset.current)
-    cameraDesired.current.copy(lookGoal.current).add(cameraOffset.current)
-    resolveObjectClearance(cameraDesired.current)
-    resolveCameraClearance(lookGoal.current, cameraDesired.current)
+    // Footsteps follow travelled distance, never frame count.
+    if (vertical.grounded && horizontalSpeed > 0.35) {
+      stepDistance.current += horizontalSpeed * dt
+      const stride = runHeld ? 1.08 : 0.82
+      if (stepDistance.current >= stride) {
+        stepDistance.current = 0
+        stepVariant.current += 1
+        const destination =
+          useJourneyStore.getState().save?.currentDestination ?? 'mars'
+        emitFootstep(
+          destination === 'moon' ? 'lunar' : 'rock',
+          stepVariant.current,
+        )
+      }
+    } else {
+      stepDistance.current = Math.max(0, stepDistance.current - dt * 0.8)
+    }
 
-    camera.position.lerp(
-      cameraDesired.current,
-      1 - Math.exp(-CAMERA.damping * dt),
-    )
-    cameraTarget.current.lerp(
-      lookGoal.current,
-      1 - Math.exp(-CAMERA.lookDamping * dt),
-    )
-    camera.lookAt(cameraTarget.current)
+    const cinematic = useGameStore.getState().cinematicFocus
+    const cinematicActive =
+      Boolean(cinematic) &&
+      !store.scannerEquipped &&
+      !store.reducedMotion &&
+      motionRef.current <= 0.2 &&
+      Date.now() < (cinematic?.until ?? 0)
+    if (
+      cinematic &&
+      (store.scannerEquipped ||
+        store.reducedMotion ||
+        motionRef.current > 0.2 ||
+        Date.now() >= cinematic.until)
+    ) {
+      useGameStore.getState().endCinematic()
+    }
+
+    if (store.scannerEquipped && store.scannerCamera === 'first-person') {
+      // First person: camera at the visor, forward from the orbit yaw/pitch.
+      const orbit = getOrbit()
+      const cosPitch = Math.cos(orbit.pitch)
+      const dirX = -Math.sin(orbit.yaw) * cosPitch
+      const dirY = -Math.sin(orbit.pitch)
+      const dirZ = -Math.cos(orbit.yaw) * cosPitch
+      firstPersonDesired.current.set(
+        player.position.x,
+        player.position.y + SCANNER.firstPersonEyeHeight,
+        player.position.z,
+      )
+      firstPersonLook.current.set(
+        firstPersonDesired.current.x + dirX * 10,
+        firstPersonDesired.current.y + dirY * 10,
+        firstPersonDesired.current.z + dirZ * 10,
+      )
+      camera.position.lerp(
+        firstPersonDesired.current,
+        1 - Math.exp(-SCANNER.firstPersonDamping * dt),
+      )
+      cameraTarget.current.lerp(
+        firstPersonLook.current,
+        1 - Math.exp(-14 * dt),
+      )
+      camera.lookAt(cameraTarget.current)
+    } else if (store.scannerEquipped) {
+      // Comfortable third-person framing: the astronaut stays centred and
+      // visible while the mouse controls only the reticle, not the camera.
+      lookGoal.current.set(
+        player.position.x,
+        player.position.y + CAMERA.lookHeight,
+        player.position.z,
+      )
+      computeScannerCameraOffset(cameraOffset.current)
+      cameraDesired.current.copy(lookGoal.current).add(cameraOffset.current)
+      resolveObjectClearance(cameraDesired.current)
+      resolveCameraClearance(lookGoal.current, cameraDesired.current)
+
+      camera.position.lerp(
+        cameraDesired.current,
+        1 - Math.exp(-SCANNER.cameraDamping * dt),
+      )
+      cameraTarget.current.lerp(
+        lookGoal.current,
+        1 - Math.exp(-CAMERA.lookDamping * dt),
+      )
+      camera.lookAt(cameraTarget.current)
+    } else {
+      lookGoal.current.set(
+        player.position.x,
+        player.position.y + CAMERA.lookHeight,
+        player.position.z,
+      )
+      computeCameraOffset(cameraOffset.current)
+      cameraDesired.current.copy(lookGoal.current).add(cameraOffset.current)
+      resolveObjectClearance(cameraDesired.current)
+      resolveCameraClearance(lookGoal.current, cameraDesired.current)
+
+      camera.position.lerp(
+        cameraDesired.current,
+        1 - Math.exp(-CAMERA.damping * dt),
+      )
+      cameraTarget.current.lerp(
+        lookGoal.current,
+        1 - Math.exp(-CAMERA.lookDamping * dt),
+      )
+      camera.lookAt(cameraTarget.current)
+    }
+
+    if (cinematic && cinematicActive) {
+      cinematicLook.current.set(
+        cinematic.target.x,
+        getTerrainHeight(cinematic.target.x, cinematic.target.z) + 1.5,
+        cinematic.target.z,
+      )
+      cameraTarget.current.lerp(
+        cinematicLook.current,
+        1 - Math.exp(-2.6 * dt),
+      )
+      camera.lookAt(cameraTarget.current)
+    }
+
+    if (astronautRef.current) {
+      const firstPersonActive =
+        store.scannerEquipped && store.scannerCamera === 'first-person'
+      const cameraDistance = camera.position.distanceTo(player.position)
+      astronautRef.current.visible =
+        !firstPersonActive &&
+        (!store.scannerEquipped || cameraDistance > 2.2)
+    }
   })
 
   return (
     <>
       <Companion playerRef={group} motionRef={motionRef} />
-      <group ref={group} position={spawn}>
+      <group
+        ref={group}
+        position={spawn}
+        userData={{ scannerIgnore: true }}
+      >
         {quality === 'low' && (
           <mesh
             rotation={[-Math.PI / 2, 0, 0]}
@@ -319,14 +561,17 @@ export function Player() {
           </mesh>
         )}
 
-        <Suspense fallback={null}>
-          <AstronautModel
-            motionRef={motionRef}
-            flightRef={flightRef}
-            turnRef={turnRef}
-          />
-        </Suspense>
+        <group ref={astronautRef} visible={!firstPersonScanner}>
+          <Suspense fallback={null}>
+            <AstronautModel
+              motionRef={motionRef}
+              flightRef={flightRef}
+              turnRef={turnRef}
+            />
+          </Suspense>
+        </group>
       </group>
+      {firstPersonScanner && <ScannerFirstPersonView />}
     </>
   )
 }

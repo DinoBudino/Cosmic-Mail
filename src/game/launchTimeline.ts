@@ -155,7 +155,7 @@ export type ShipPose = 'fly' | 'land'
 
 /**
  * Ship attitude per stage: `fly` = nose toward the destination (the
- * explorer's name floats above the ship as a tag, so the hull never
+ * carrier's name floats above the ship as a tag, so the hull never
  * needs to turn mid-flight), `land` = upright (nose up, window to
  * camera) for the vertical descent.
  */

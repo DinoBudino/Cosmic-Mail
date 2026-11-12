@@ -1,9 +1,29 @@
 import { useEffect, useState } from 'react'
-import { speakPip, stopPipVoice } from '../game/pipVoice'
+import {
+  onPipVoiceEnded,
+  speakPip,
+  stopPipVoice,
+} from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
+import { useNarrativeStore } from '../store/narrativeStore'
+import { isPipSpeechHidden } from './pipSpeechVisibility'
 
-const PIP_MESSAGE_LIFETIME_MS = 6000
+const LEGACY_MESSAGE_LIFETIME_MS = 6000
 const TYPE_INTERVAL_MS = 18
+
+/**
+ * Fallback lifetime for the rare case where the voice cannot report its end
+ * (muted voice, blocked audio, missing recording). With voice enabled the
+ * box advances on the real audio end instead.
+ */
+function narrativeDuration(text: string): number {
+  return Math.min(18000, Math.max(6000, 1800 + text.length * 70))
+}
+
+/** Faster pacing when voice output is disabled and only reading remains. */
+function readingDuration(text: string): number {
+  return Math.min(9000, Math.max(4200, 1400 + text.length * 52))
+}
 
 export function PipAvatar() {
   return (
@@ -48,39 +68,137 @@ function PipLine({ message }: { message: string }) {
 }
 
 /**
- * PIP's dialogue box (bottom-left, separate from mission/site info):
- * subtitles with a typewriter effect, spoken with Samantha (or the
- * selected system voice) when voice output is enabled.
+ * PIP's dialogue box. New mission lines come from the narrative queue;
+ * legacy region/site messages still use gameStore.pipMessage. The box is
+ * available while the scanner is equipped, but yields to reading modals.
  */
 export function PipSpeech() {
+  const current = useNarrativeStore((state) => state.current)
+  const queueLength = useNarrativeStore((state) => state.queue.length)
+  const completeNarrative = useNarrativeStore((state) => state.complete)
+
   const pipMessage = useGameStore((state) => state.pipMessage)
   const pipMessageKey = useGameStore((state) => state.pipMessageKey)
   const clearPipMessage = useGameStore((state) => state.clearPipMessage)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
   const voiceName = useGameStore((state) => state.voiceName)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const scannerEquipped = useGameStore((state) => state.scannerEquipped)
+  const scannerOpen = useGameStore((state) => state.scannerOpen)
+  const scannerCard = useGameStore((state) => state.scannerCardComponentId)
+  const scannerRecordsOpen = useGameStore(
+    (state) => state.scannerRecordsOpen,
+  )
+  const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
+  const settingsOpen = useGameStore((state) => state.settingsOpen)
+  const activeSiteId = useGameStore((state) => state.activeSiteId)
+
+  const hidden = isPipSpeechHidden({
+    scannerEquipped,
+    scannerOpen,
+    scannerCardComponentId: scannerCard,
+    scannerRecordsOpen,
+    archiveOpen,
+    settingsOpen,
+    activeSiteId,
+  })
+  const activeKey = current
+    ? `narrative-${current.nonce}`
+    : pipMessage
+      ? `legacy-${pipMessageKey}`
+      : null
+  const activeText = current?.text ?? pipMessage ?? null
+  const activeNarrative = Boolean(current)
+  const activeEmotion = current?.expression ?? null
 
   useEffect(() => {
-    if (!pipMessage) {
+    if (!activeText || hidden) {
       stopPipVoice()
       return
     }
-    speakPip(pipMessage, voiceName, voiceEnabled)
-  }, [pipMessage, pipMessageKey, voiceName, voiceEnabled])
+    speakPip(activeText, voiceName, voiceEnabled, activeEmotion)
+    return () => stopPipVoice()
+  }, [
+    activeKey,
+    activeText,
+    hidden,
+    voiceName,
+    voiceEnabled,
+    activeEmotion,
+  ])
 
   useEffect(() => {
-    if (!pipMessage) return
-    const timer = window.setTimeout(clearPipMessage, PIP_MESSAGE_LIFETIME_MS)
-    return () => window.clearTimeout(timer)
-  }, [pipMessage, pipMessageKey, clearPipMessage])
+    // Mission dialogue owns the box while it is active; do not surface a
+    // stale region message afterwards.
+    if (current && pipMessage) clearPipMessage()
+  }, [current, pipMessage, clearPipMessage])
 
-  if (!pipMessage) return null
+  useEffect(() => {
+    if (!activeText || hidden) return
+    let finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      if (activeNarrative) completeNarrative()
+      else clearPipMessage()
+    }
+    // With voice enabled, the next line waits for the real recording. The
+    // timer is only a fallback for muted/blocked/missing audio.
+    const unsubscribe = voiceEnabled
+      ? onPipVoiceEnded(finish)
+      : () => undefined
+    const lifetime = activeNarrative
+      ? voiceEnabled
+        ? narrativeDuration(activeText)
+        : readingDuration(activeText)
+      : LEGACY_MESSAGE_LIFETIME_MS
+    const timer = window.setTimeout(finish, lifetime)
+    return () => {
+      finished = true
+      window.clearTimeout(timer)
+      unsubscribe()
+    }
+  }, [
+    activeKey,
+    activeText,
+    activeNarrative,
+    hidden,
+    completeNarrative,
+    clearPipMessage,
+    voiceEnabled,
+  ])
+
+  if (!activeText || hidden) return null
+
+  const skip = () => {
+    if (activeNarrative) completeNarrative()
+    else clearPipMessage()
+  }
 
   return (
-    <aside className="pip-speech" aria-label="PIP is speaking">
+    <aside
+      className="pip-speech"
+      data-emotion={activeEmotion ?? 'neutral'}
+      aria-label="PIP is speaking"
+    >
       <PipAvatar />
-      <div>
-        <p className="pip-name">PIP</p>
-        <PipLine key={pipMessageKey} message={pipMessage} />
+      <div className="pip-speech__copy">
+        <div className="pip-speech__head">
+          <p className="pip-name">PIP</p>
+          <button
+            type="button"
+            className="pip-speech__skip"
+            onClick={skip}
+            aria-label="Dismiss PIP's message"
+          >
+            {activeNarrative && queueLength > 0
+              ? 'Next'
+              : reducedMotion
+                ? 'Close'
+                : 'Skip'}
+          </button>
+        </div>
+        <PipLine key={activeKey ?? 'pip'} message={activeText} />
       </div>
     </aside>
   )

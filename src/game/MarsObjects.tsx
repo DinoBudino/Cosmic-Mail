@@ -393,10 +393,8 @@ function Beacon({ object }: { object: MarsObject }) {
   const ringMaterial = useRef<THREE.MeshBasicMaterial>(null)
   const crystal = useRef<THREE.Mesh>(null)
   const available = object.state !== 'coming-soon'
-  const rescued = object.state === 'rescued'
-  // Rescued = bright accent + steady ring; available = warm peach pulse;
-  // coming-soon = dim mauve. Prepared for future challenges / letters.
-  const color = rescued ? PALETTE.accent : available ? PALETTE.beaconAvailable : PALETTE.beaconSoon
+  // Landmark = warm peach pulse; coming-soon memorial = dim mauve.
+  const color = available ? PALETTE.beaconAvailable : PALETTE.beaconSoon
   const radius = SITE_RADII[object.id]
   const small = object.id === 'ingenuity'
   const columnHeight = small ? 2.2 : 3.8

@@ -1,0 +1,446 @@
+[
+  {
+    "key": "intro-01",
+    "text": "Hi! I'm PIP! Welcome aboard Mailwing!",
+    "speed": 1.06,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-02",
+    "text": "We’re part of Cosmic Mail. We carry important stories across the stars!",
+    "speed": 1.06,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-03",
+    "text": "Every explorer has a file in the Cosmic Archive. See how their records connect?",
+    "speed": 1.02,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-04",
+    "text": "Wait... one of the records just lost its connection.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-05",
+    "text": "Another one... and now the third!",
+    "speed": 0.98,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-06",
+    "text": "Huh? That’s strange...",
+    "speed": 0.96,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-07",
+    "text": "The archive is trying to reconnect them, but the pieces don’t match.",
+    "speed": 0.94,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-08",
+    "text": "Wait... these records aren’t connecting anymore!",
+    "speed": 0.94,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-09",
+    "text": "I know these explorers... but some of my own records are missing.",
+    "speed": 0.92,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-10",
+    "text": "I can’t remember everything they discovered.",
+    "speed": 0.92,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-11",
+    "text": "But wait! I still have some old locations!",
+    "speed": 1.04,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-12",
+    "text": "Maybe we can find them and put their stories back together!",
+    "speed": 1.05,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-13",
+    "text": "Three incomplete files. Three silent signals.",
+    "speed": 1.02,
+    "category": "onboarding"
+  },
+  {
+    "key": "intro-14",
+    "text": "Will you help me bring their stories back?",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "registration",
+    "text": "Then let's make it official! Every Cosmic Mail Carrier needs a name.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "hub-assignment",
+    "text": "Your passport is ready. Let me show you around the cabin.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "hub-tour-1",
+    "text": "This is your Cosmic Passport. It keeps every history we bring back to Earth.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "hub-tour-2",
+    "text": "The navigation screen shows approximate signals. Mars is the closest one.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "hub-tour-3",
+    "text": "Pick the signal, confirm the route, then press the red button.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "hub-tour-4",
+    "text": "When you find the explorer, use the scanner. I'll help you recognize its parts.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "hub-return",
+    "text": "Welcome back, carrier. The archive is waiting for your next delivery.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "route-ready",
+    "text": "Route ready! Press the red button when you're set!",
+    "speed": 1.04,
+    "category": "onboarding"
+  },
+  {
+    "key": "launch-cabin",
+    "text": "Here we go. Let's bring this memory home.",
+    "speed": 1,
+    "category": "onboarding"
+  },
+  {
+    "key": "mars-arrival",
+    "text": "We're here! The signal is somewhere ahead. Let's take a look!",
+    "speed": 1.06,
+    "category": "mars"
+  },
+  {
+    "key": "mars-detected",
+    "text": "Look! Something's over there. Could that be our missing explorer?",
+    "speed": 1.03,
+    "category": "mars"
+  },
+  {
+    "key": "mars-approached",
+    "text": "It looks like an old rover, resting in the dust. Its tools might tell us what it studied.",
+    "speed": 0.99,
+    "category": "mars"
+  },
+  {
+    "key": "mars-identified",
+    "text": "My archive just reconnected a record. This is Spirit, a Mars Exploration Rover! It was sent to study rocks and soil for clues about ancient water.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-scanner-prompt-desktop",
+    "text": "Press Q to take out your Cosmic Scanner.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-scanner-prompt-touch",
+    "text": "Tap the scanner button to take out your Cosmic Scanner.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-scanner-equipped",
+    "text": "Aim at one of the rover's tools and hold the scan button. I'll explain what we find.",
+    "speed": 1.01,
+    "category": "mars"
+  },
+  {
+    "key": "mars-target-detected",
+    "text": "Something on the explorer is responding. Hold the scan to recognize this part.",
+    "speed": 0.99,
+    "category": "mars"
+  },
+  {
+    "key": "mars-scan-started",
+    "text": "Keep holding... the scanner is reading this part.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-scan-interrupted",
+    "text": "The reading stopped. Hold the scan button a little longer when you're ready.",
+    "speed": 0.96,
+    "category": "mars"
+  },
+  {
+    "key": "mars-pancam",
+    "text": "These are Spirit's panoramic cameras! They helped scientists see the landscape and choose where to explore.",
+    "speed": 1.02,
+    "category": "mars"
+  },
+  {
+    "key": "mars-rat",
+    "text": "This tool brushed and ground away the rock's outer surface. Scientists could then study the material underneath!",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-mini-tes",
+    "text": "This instrument studied infrared light to help scientists learn what Martian materials were made of!",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-pancam",
+    "text": "Look at the cameras near the top of Spirit!",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-rat",
+    "text": "There's an interesting tool near its robotic arm!",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-mini-tes",
+    "text": "One more instrument is waiting beside the cameras!",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-direct-pancam",
+    "text": "The Pancam is still missing. Aim at the cameras at the top of the mast and hold the scan button.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-direct-rat",
+    "text": "The RAT is still missing. Aim at the tool on the robotic arm and hold the scan button.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-direct-mini-tes",
+    "text": "Mini-TES is still missing. Aim at the instrument beside the cameras and hold the scan button.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-completed-1",
+    "text": "We've found all the clues! Let's scan the whole explorer!",
+    "speed": 1.07,
+    "category": "mars"
+  },
+  {
+    "key": "mars-completed-2",
+    "text": "The archive needs a full recognition scan of the complete explorer before its memory can be recovered.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-full-scan-ready",
+    "text": "All three parts are recognized. The Cosmic Archive can now study the complete explorer.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-full-scan-started",
+    "text": "Hold still... I'm linking the three fragments into one record.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-full-scan-1",
+    "text": "OBJETO COMPLETO — MEMORIA RECUPERADA.",
+    "speed": 0.98,
+    "category": "mars"
+  },
+  {
+    "key": "mars-full-scan-2",
+    "text": "The memory is safe! Now we can create a smart letter and bring this story back to Earth.",
+    "speed": 1.06,
+    "category": "mars"
+  },
+  {
+    "key": "mars-letter-prepared",
+    "text": "The smart letter is ready. It carries Spirit's identity, journey, discoveries and the end of its mission.",
+    "speed": 1.03,
+    "category": "mars"
+  },
+  {
+    "key": "mars-return-to-ship",
+    "text": "We did it! Now we can bring this explorer's story back to Earth. Return to Mailwing and transmit the letter.",
+    "speed": 1.06,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-orientation",
+    "text": "Our job is to recognize this explorer's parts, recover its memory and send its story to Earth. The Cosmic Radar points toward the signal.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-context",
+    "text": "The tools that helped it study the landscape are usually on the mast and the robotic arm. Aim there and hold the scan.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-generic-hint",
+    "text": "Use your Cosmic Scanner on the explorer's tools. Look closely at the mast and the robotic arm.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-revisit-in-progress",
+    "text": "We still have fragments missing. The explorer is waiting for another scan.",
+    "speed": 1.01,
+    "category": "mars"
+  },
+  {
+    "key": "mars-revisit-letter-ready",
+    "text": "The smart letter is ready in the cabin archive. Return to Mailwing to transmit it.",
+    "speed": 1.02,
+    "category": "mars"
+  },
+  {
+    "key": "mars-revisit-transmitted",
+    "text": "This history is restored. The archive on Earth has its copy.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-full-scan",
+    "text": "Every part is recognized. Open the full recognition scan when you are ready; it studies the complete explorer, not a single part.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-letter",
+    "text": "The memory is recovered. Prepare the smart letter and carry it back to Mailwing to transmit it to Earth.",
+    "speed": 1.02,
+    "category": "mars"
+  },
+  {
+    "key": "mars-hint-restored",
+    "text": "This history is restored. You can review it in the passport at any time.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-ambient-1",
+    "text": "The wind here is very thin. Every dust grain has been waiting a long time.",
+    "speed": 0.96,
+    "category": "mars"
+  },
+  {
+    "key": "mars-ambient-2",
+    "text": "Those rocks look ancient. I wonder what stories they could tell us.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-completion-story",
+    "text": "We did it! Spirit may be silent now, but what it discovered will never be forgotten.",
+    "speed": 1.04,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-tutorial-desktop",
+    "text": "The Cosmic Scanner can read the landscape too. Press Q and try it on a rock or a patch of soil.",
+    "speed": 1.02,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-tutorial-touch",
+    "text": "The Cosmic Scanner can read the landscape too. Tap the scanner button and try it on a rock or a patch of soil.",
+    "speed": 1.02,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-first-scan",
+    "text": "The Cosmic Scanner can read the landscape too. Aim at a rock, a soil patch or a formation and hold the scan.",
+    "speed": 1.02,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-volcanic-quick",
+    "text": "This dark rock looks volcanic. I am comparing its shape and tone with Martian basalt references.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-volcanic-detail",
+    "text": "Volcanic rocks like this can preserve the story of ancient lava. The scanner sees a match in texture, but only a laboratory can confirm the minerals.",
+    "speed": 0.98,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-soil-quick",
+    "text": "This looks like fine Martian dust over broken rock. The surface is loose and easy for the wind to move.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-soil-detail",
+    "text": "The scanner sees a mix of dust and grains. Regolith covers much of Mars, and its patterns can hide the rock underneath.",
+    "speed": 0.98,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-wind-quick",
+    "text": "These streaks look shaped by the wind. The scanner is reading the ripple pattern, not the weather.",
+    "speed": 1.01,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-wind-detail",
+    "text": "Wind moves sand and dust into ripples and long streaks. The scanner compares the pattern with reference dunes. It is an observation, not a measurement of today's wind.",
+    "speed": 0.97,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-outcrop-quick",
+    "text": "This layered outcrop may record ancient changes. The scanner sees stacked layers worth a closer look.",
+    "speed": 1,
+    "category": "mars"
+  },
+  {
+    "key": "mars-env-outcrop-detail",
+    "text": "Layered rocks can preserve evidence of past water or changing environments. The scanner compares the visible layers with reference geology; the full story needs more data.",
+    "speed": 0.97,
+    "category": "mars"
+  },
+  {
+    "key": "mars-flight-restricted",
+    "text": "Let's keep our boots on the ground for now. I need a clear ground survey before we fly over the site.",
+    "speed": 1,
+    "category": "mars"
+  }
+]

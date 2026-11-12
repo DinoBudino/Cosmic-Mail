@@ -39,7 +39,8 @@ interface HubPipModelProps {
   scale?: number
 }
 
-const PIP_URL = 'models/pip-retro-space-post.glb'
+export const PIP_ASSET_URL = 'models/pip-retro-space-post.glb'
+const PIP_URL = PIP_ASSET_URL
 
 const EYE_ROW: Record<HubPipExpression, number> = {
   // Welcome keeps the big round "curious" eyes so he clearly looks at the

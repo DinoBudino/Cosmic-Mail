@@ -1,13 +1,52 @@
 import { useAnimations, useGLTF } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { createPortal, useFrame } from '@react-three/fiber'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type RefObject,
+} from 'react'
 import * as THREE from 'three'
 import { MARS_OBJECTS } from '../data/marsObjects'
 import { useGameStore } from '../store/gameStore'
+import { getOrbit } from './cameraRig'
+import { clampAimDirection, scannerAim } from './scannerAim'
+import { CosmicScannerDevice } from './CosmicScannerDevice'
+import { SCANNER } from './worldConfig'
 
 const MODEL_URL = 'models/astronaut.glb?v=astronaut-mensajero-3'
 
 useGLTF.preload(MODEL_URL)
+
+/**
+ * Hand_R local axes:
+ * +Y is forward along the hand, +Z is up.
+ * The scanner model is authored with +Z forward and +Y up, so this basis
+ * maps scanner forward to hand +Y, scanner up to hand +Z, and flips the
+ * symmetric right/left axis to keep a proper rotation.
+ */
+const SCANNER_MOUNT_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
+  new THREE.Matrix4().makeBasis(
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(0, 1, 0),
+  ),
+)
+
+const AIM_FORWARD = new THREE.Vector3()
+const AIM_UP = new THREE.Vector3(0, 1, 0)
+const AIM_Z = new THREE.Vector3()
+const AIM_X = new THREE.Vector3()
+const AIM_MATRIX = new THREE.Matrix4()
+const AIM_WORLD_QUATERNION = new THREE.Quaternion()
+const AIM_PARENT_QUATERNION = new THREE.Quaternion()
+const AIM_LOCAL_QUATERNION = new THREE.Quaternion()
+const AIM_MODEL_QUATERNION = new THREE.Quaternion()
+const AIM_BODY_FORWARD = new THREE.Vector3()
+const AIM_SHOULDER = new THREE.Vector3()
+const AIM_TARGET = new THREE.Vector3()
+const IDENTITY_QUATERNION = new THREE.Quaternion()
 
 interface FlightState {
   thrust: number
@@ -69,10 +108,26 @@ export function AstronautModel({
   const idleSince = useRef(0)
   const lastWave = useRef(-100)
   const lastTurn = useRef(-100)
+  const equipWeight = useRef(0)
+  const scannerMount = useRef<THREE.Group>(null)
+  const aimSmooth = useRef(new THREE.Vector3())
+  const aimSeeded = useRef(false)
 
   const { scene, animations } = useGLTF(MODEL_URL)
   const { actions } = useAnimations(animations, modelRef)
   const actionsRef = useRef(actions)
+
+  const rig = useMemo(() => {
+    const upperArm = scene.getObjectByName('UpperArm_R')
+    const forearm = scene.getObjectByName('Forearm_R')
+    const handBone = scene.getObjectByName('Hand_R')
+    return {
+      hand: handBone ?? null,
+      upperArm: upperArm instanceof THREE.Bone ? upperArm : null,
+      forearm: forearm instanceof THREE.Bone ? forearm : null,
+      handBone: handBone instanceof THREE.Bone ? handBone : null,
+    }
+  }, [scene])
   useEffect(() => {
     actionsRef.current = actions
   }, [actions])
@@ -289,7 +344,12 @@ export function AstronautModel({
           if (finished || movingCancel) gesture.current = null
         }
 
-        if (!gesture.current && pendingCelebrate.current && motion < 0.08) {
+        if (
+          !gesture.current &&
+          !store.scannerEquipped &&
+          pendingCelebrate.current &&
+          motion < 0.08
+        ) {
           pendingCelebrate.current = false
           startGesture('Celebrate', now, true)
         }
@@ -299,6 +359,7 @@ export function AstronautModel({
           !reducedMotion &&
           !store.settingsOpen &&
           !store.activeSiteId &&
+          !store.scannerEquipped &&
           motion < 0.04 &&
           now - idleSince.current > 7 &&
           now - lastWave.current > 15
@@ -309,6 +370,7 @@ export function AstronautModel({
 
         if (
           !gesture.current &&
+          !store.scannerEquipped &&
           motion > 0.15 &&
           Math.abs(turn) > 0.1 &&
           now - lastTurn.current > 0.9
@@ -366,6 +428,114 @@ export function AstronautModel({
         Math.min(delta, 0.05),
       )
     }
+
+    // Physical Cosmic Scanner. The mixer has already updated the authored
+    // arm pose, so this layer blends the right arm into a stable aim pose
+    // without touching the other bones, boots or thruster sockets.
+    equipWeight.current = THREE.MathUtils.damp(
+      equipWeight.current,
+      store.scannerEquipped ? 1 : 0,
+      12,
+      Math.min(delta, 0.05),
+    )
+    const scannerWeight = equipWeight.current
+    if (scannerMount.current) {
+      const visible = scannerWeight > 0.01
+      scannerMount.current.visible = visible
+      if (visible) {
+        scannerMount.current.scale.setScalar(
+          Math.max(0.001, scannerWeight),
+        )
+      }
+    }
+
+    if (scannerWeight <= 0.001) aimSeeded.current = false
+
+    if (
+      scannerWeight > 0.001 &&
+      rig.upperArm &&
+      rig.forearm &&
+      rig.handBone
+    ) {
+      const orbit = getOrbit()
+      rig.upperArm.getWorldPosition(AIM_SHOULDER)
+
+      // The physical device follows the exact surface under the reticle.
+      // Fall back to the camera forward when the pointer has no hit.
+      if (scannerAim.valid) {
+        AIM_TARGET.set(scannerAim.x, scannerAim.y, scannerAim.z)
+      } else {
+        const aimRightX = Math.cos(orbit.yaw)
+        const aimRightZ = -Math.sin(orbit.yaw)
+        AIM_TARGET.set(
+          AIM_SHOULDER.x +
+            (-Math.sin(orbit.yaw) + aimRightX * 0.7) *
+              SCANNER.fallbackAimDistance,
+          AIM_SHOULDER.y - 0.2 * SCANNER.fallbackAimDistance,
+          AIM_SHOULDER.z +
+            (-Math.cos(orbit.yaw) + aimRightZ * 0.7) *
+              SCANNER.fallbackAimDistance,
+        )
+      }
+
+      // Damping the world aim point keeps the arm stable under fast mouse
+      // movement while still converging exactly on the target.
+      if (!aimSeeded.current) {
+        aimSmooth.current.copy(AIM_TARGET)
+        aimSeeded.current = true
+      } else {
+        aimSmooth.current.lerp(
+          AIM_TARGET,
+          1 - Math.exp(-SCANNER.armAimDamping * Math.min(delta, 0.05)),
+        )
+      }
+
+      AIM_FORWARD.subVectors(aimSmooth.current, AIM_SHOULDER)
+      if (AIM_FORWARD.lengthSq() < 1e-6) AIM_FORWARD.set(0, 0, -1)
+      AIM_FORWARD.normalize()
+
+      // Clamp the shoulder cone relative to the body, never the camera.
+      if (modelRef.current) {
+        modelRef.current.updateWorldMatrix(true, false)
+        AIM_MODEL_QUATERNION.setFromRotationMatrix(
+          modelRef.current.matrixWorld,
+        )
+        AIM_BODY_FORWARD.set(0, 0, -1).applyQuaternion(
+          AIM_MODEL_QUATERNION,
+        )
+        const bodyYaw = Math.atan2(
+          -AIM_BODY_FORWARD.x,
+          -AIM_BODY_FORWARD.z,
+        )
+        clampAimDirection(
+          AIM_FORWARD,
+          bodyYaw,
+          SCANNER.minAimYaw,
+          SCANNER.maxAimYaw,
+          SCANNER.minAimY,
+          SCANNER.maxAimY,
+        )
+      }
+
+      AIM_Z.copy(AIM_UP)
+        .addScaledVector(AIM_FORWARD, -AIM_FORWARD.dot(AIM_UP))
+        .normalize()
+      AIM_X.crossVectors(AIM_FORWARD, AIM_Z).normalize()
+      AIM_MATRIX.makeBasis(AIM_X, AIM_FORWARD, AIM_Z)
+      AIM_WORLD_QUATERNION.setFromRotationMatrix(AIM_MATRIX)
+
+      const parent = rig.upperArm.parent
+      if (parent) {
+        parent.updateWorldMatrix(true, false)
+        AIM_PARENT_QUATERNION.setFromRotationMatrix(parent.matrixWorld)
+        AIM_LOCAL_QUATERNION.copy(AIM_PARENT_QUATERNION)
+          .invert()
+          .multiply(AIM_WORLD_QUATERNION)
+        rig.upperArm.quaternion.slerp(AIM_LOCAL_QUATERNION, scannerWeight)
+        rig.forearm.quaternion.slerp(IDENTITY_QUATERNION, scannerWeight)
+        rig.handBone.quaternion.slerp(IDENTITY_QUATERNION, scannerWeight)
+      }
+    }
   })
 
   return (
@@ -375,6 +545,19 @@ export function AstronautModel({
           <primitive object={scene} />
         </group>
       </group>
+      {rig.hand
+        ? createPortal(
+            <group
+              ref={scannerMount}
+              position={[0, 0.11, 0.01]}
+              quaternion={SCANNER_MOUNT_QUATERNION}
+              visible={false}
+            >
+              <CosmicScannerDevice />
+            </group>,
+            rig.hand,
+          )
+        : null}
     </group>
   )
 }

@@ -1,11 +1,22 @@
 import { lazy, Suspense, useEffect } from 'react'
 import './App.css'
 import { attachInput, clearInput } from './game/input'
+import { getEscapeAction } from './game/escapePriority'
+import { MissionNarrativeController } from './game/MissionNarrativeController'
 import { isWorldPaused, useGameStore } from './store/gameStore'
 import { useOnboardingStore } from './store/onboardingStore'
-import { startMusic, stopMusic, unlockMusic, setMusicVolume as applyMusicVolume } from './game/music'
+import { AudioDirector } from './game/audio/AudioDirector'
 import { Onboarding } from './ui/onboarding/Onboarding'
+import { CosmicRadar } from './ui/CosmicRadar'
+import { CosmicScanner } from './ui/CosmicScanner'
+import { FullScanOverlay } from './ui/FullScanDialog'
+import { MemoryReconstructionOverlay } from './ui/MemoryReconstruction'
+import { SmartLetterOverlay } from './ui/SmartLetter'
+import { ScannerHud } from './ui/ScannerHud'
+import { ScannerReadingCard } from './ui/ScannerReadingCard'
 import { SiteInteraction } from './ui/SiteInteraction'
+import { SpiritInteraction } from './ui/SpiritInteraction'
+import { CinematicOverlay } from './ui/CinematicOverlay'
 import { Hud } from './ui/Hud'
 import { MissionPanel } from './ui/MissionPanel'
 import { PipSpeech } from './ui/PipSpeech'
@@ -18,37 +29,11 @@ const GameCanvas = lazy(() => import('./game/GameCanvas'))
 export default function App() {
   const settingsOpen = useGameStore((state) => state.settingsOpen)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
-  const musicVolume = useGameStore((state) => state.musicVolume)
+  const scannerEquipped = useGameStore((state) => state.scannerEquipped)
+  const scannerCamera = useGameStore((state) => state.scannerCamera)
   const onboardingActive = useOnboardingStore((state) => state.phase !== 'playing')
 
   useEffect(() => attachInput(isWorldPaused), [])
-
-  // Cabin ambience: plays through the whole initial phase (title screen
-  // to the name signing) and stops when the adventure starts.
-  useEffect(() => {
-    if (onboardingActive) startMusic(musicVolume)
-    else stopMusic()
-  }, [onboardingActive, musicVolume])
-
-  useEffect(() => {
-    applyMusicVolume(musicVolume)
-  }, [musicVolume])
-
-  useEffect(() => {
-    // Browsers block audio before the first gesture: retry on any
-    // interaction while the ritual is active.
-    const unlock = () => {
-      if (useOnboardingStore.getState().phase !== 'playing') {
-        unlockMusic(useGameStore.getState().musicVolume)
-      }
-    }
-    window.addEventListener('pointerdown', unlock)
-    window.addEventListener('keydown', unlock)
-    return () => {
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
-    }
-  }, [])
 
   useEffect(() => {
     const stopTravel = () => useGameStore.getState().cancelTravel()
@@ -68,9 +53,21 @@ export default function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      // Escape releases Pointer Lock first; the next press opens settings.
+      if (document.pointerLockElement) return
       const state = useGameStore.getState()
-      if (state.settingsOpen || state.activeSiteId) return
+      const action = getEscapeAction(state)
+      if (action === 'ignore') return
+
       event.preventDefault()
+      if (action === 'close-records') {
+        state.closeScannerCard()
+        return
+      }
+      if (action === 'unequip-scanner') {
+        state.unequipScanner()
+        return
+      }
       state.openSettings()
     }
 
@@ -78,31 +75,49 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  if (onboardingActive) {
-    return (
-      <main className="game" data-reduced-motion={reducedMotion}>
-        <Onboarding />
-        <SettingsMenu />
-      </main>
-    )
-  }
-
   return (
-    <main className="game" data-reduced-motion={reducedMotion}>
-      <div className="world-layer" inert={settingsOpen}>
-      <SceneBoundary>
-        <Suspense fallback={<SceneStatus />}>
-          <GameCanvas />
-        </Suspense>
-      </SceneBoundary>
+    <>
+      <AudioDirector />
+      {onboardingActive ? (
+        <main className="game" data-reduced-motion={reducedMotion}>
+          <Onboarding />
+          <SettingsMenu />
+          <SmartLetterOverlay />
+          <MemoryReconstructionOverlay />
+        </main>
+      ) : (
+        <main
+          className="game"
+          data-reduced-motion={reducedMotion}
+          data-scanner={scannerEquipped ? 'equipped' : 'idle'}
+          data-scanner-camera={scannerCamera}
+        >
+          <div className="world-layer" inert={settingsOpen}>
+            <SceneBoundary>
+              <Suspense fallback={<SceneStatus />}>
+                <GameCanvas />
+              </Suspense>
+            </SceneBoundary>
 
-      <Hud />
-      <MissionPanel />
-      <PipSpeech />
-      <TouchControls />
-      </div>
-      <SettingsMenu />
-      <SiteInteraction />
-    </main>
+            <Hud />
+            <MissionPanel />
+            <CosmicRadar />
+            <ScannerHud />
+            <PipSpeech />
+            <CinematicOverlay />
+            <TouchControls />
+            <MissionNarrativeController />
+          </div>
+          <SettingsMenu />
+          <SiteInteraction />
+          <SpiritInteraction />
+          <CosmicScanner />
+          <ScannerReadingCard />
+          <FullScanOverlay />
+          <SmartLetterOverlay />
+          <MemoryReconstructionOverlay />
+        </main>
+      )}
+    </>
   )
 }

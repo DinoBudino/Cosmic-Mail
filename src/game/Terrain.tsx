@@ -15,10 +15,18 @@ import {
 import { playerPosition } from './playerPosition'
 import {
   distanceToPath,
+  distanceToSurveyTrail,
   getRegionWeight,
   getTerrainHeight,
 } from './terrainHeight'
-import { PALETTE, QUALITY_PRESETS, SUN_DIRECTION, WORLD, type Quality } from './worldConfig'
+import {
+  PALETTE,
+  QUALITY_PRESETS,
+  SUN_DIRECTION,
+  SURVEY_VIEWPOINT,
+  WORLD,
+  type Quality,
+} from './worldConfig'
 
 interface TerrainProps {
   quality: Quality
@@ -180,7 +188,7 @@ function makeTerrainTexture(): THREE.CanvasTexture | null {
   const texture = new THREE.CanvasTexture(canvas)
   texture.wrapS = THREE.RepeatWrapping
   texture.wrapT = THREE.RepeatWrapping
-  texture.repeat.set(42, 42)
+  texture.repeat.set(56, 56)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 4
   texture.needsUpdate = true
@@ -188,8 +196,10 @@ function makeTerrainTexture(): THREE.CanvasTexture | null {
 }
 
 function extendHorizon(value: number): number {
-  return Math.abs(value) <= 95
-    ? value : Math.sign(value) * (95 + (Math.abs(value) - 95) * 3.5)
+  return Math.abs(value) <= WORLD.playRadius
+    ? value
+    : Math.sign(value) *
+      (WORLD.playRadius + (Math.abs(value) - WORLD.playRadius) * 3.5)
 }
 
 function buildTerrainGeometry(): THREE.PlaneGeometry {
@@ -252,7 +262,10 @@ function buildTerrainGeometry(): THREE.PlaneGeometry {
       if (weight > 0) color.lerp(tint.color, weight * tint.strength)
     }
 
-    const pathDistance = distanceToPath(x, z)
+    const pathDistance = Math.min(
+      distanceToPath(x, z),
+      distanceToSurveyTrail(x, z),
+    )
     if (pathDistance < 4.2) {
       const pathBlend =
         1 - THREE.MathUtils.smoothstep(pathDistance, 0.8, 4.2)
@@ -550,6 +563,10 @@ function RegionDiscovery() {
   }, [])
 
   const spawnGround = getTerrainHeight(WORLD.spawn.x, WORLD.spawn.z)
+  const viewpointGround = getTerrainHeight(
+    SURVEY_VIEWPOINT.x,
+    SURVEY_VIEWPOINT.z,
+  )
 
   return (
     <group>
@@ -558,6 +575,41 @@ function RegionDiscovery() {
         <ringGeometry args={[2.2, 2.85, 40]} />
         <meshStandardMaterial color={PALETTE.path} roughness={1} depthWrite={false} />
       </mesh>
+
+      {/* Geological Passage viewpoint: a small field-survey cairn, not a
+          historical artifact. It gives the player a clear high point. */}
+      <group
+        position={[SURVEY_VIEWPOINT.x, viewpointGround, SURVEY_VIEWPOINT.z]}
+      >
+        {[0, 0.9, 1.8, 2.7].map((angle, index) => (
+          <mesh
+            key={index}
+            position={[
+              Math.cos(angle) * 0.9,
+              0.26 + index * 0.12,
+              Math.sin(angle) * 0.9,
+            ]}
+            rotation={[0.12, angle, 0.18]}
+            scale={[0.55 - index * 0.06, 0.42, 0.48]}
+            castShadow
+          >
+            <dodecahedronGeometry args={[1, 0]} />
+            <meshStandardMaterial
+              color={PALETTE.rockLight}
+              roughness={0.95}
+              flatShading
+            />
+          </mesh>
+        ))}
+        <mesh position={[0, 0.78, 0]}>
+          <cylinderGeometry args={[0.035, 0.05, 1.1, 6]} />
+          <meshStandardMaterial color={PALETTE.rockDark} roughness={0.8} />
+        </mesh>
+        <mesh position={[0, 1.36, 0]}>
+          <sphereGeometry args={[0.08, 10, 8]} />
+          <meshBasicMaterial color={PALETTE.accent} toneMapped={false} />
+        </mesh>
+      </group>
       {[-2.85, 2.85].map((dx, i) => (
         <group key={i} position={[WORLD.spawn.x + dx, spawnGround, WORLD.spawn.z + (i === 0 ? -1.2 : 1.2)]}>
           <mesh position={[0, 0.45, 0]} castShadow>

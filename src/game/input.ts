@@ -22,12 +22,14 @@ const MOVEMENT_KEYS = new Set([
 const INTERACT_KEY = 'e'
 const BOOT_KEY = ' '
 const RUN_KEY = 'shift'
+const SCANNER_KEY = 'q'
 
 const pressed = new Set<string>()
 const touchAxes: MoveAxes = { x: 0, y: 0 }
 let touchBoot = false
 let touchRun = false
 let interactQueued = false
+let scannerToggleQueued = false
 
 /** Normalizes a 2D movement vector so diagonals are not faster. */
 export function normalizeMoveVector(x: number, z: number): MoveVector {
@@ -74,10 +76,17 @@ export function isRunHeld(): boolean {
   return pressed.has(RUN_KEY) || touchRun
 }
 
-/** True once per E press. Consumed by the future interaction system. */
+/** True once per E press. Consumed by the contextual interaction system. */
 export function consumeInteract(): boolean {
   if (!interactQueued) return false
   interactQueued = false
+  return true
+}
+
+/** True once per Q press. Toggles the physical Cosmic Scanner. */
+export function consumeScannerToggle(): boolean {
+  if (!scannerToggleQueued) return false
+  scannerToggleQueued = false
   return true
 }
 
@@ -132,6 +141,7 @@ export function clearInput(): void {
   touchBoot = false
   touchRun = false
   interactQueued = false
+  scannerToggleQueued = false
 }
 
 /** Attaches keyboard listeners once. Returns a cleanup function. */
@@ -143,6 +153,12 @@ export function attachInput(isPaused: () => boolean = () => false): () => void {
 
     if (key === INTERACT_KEY) {
       if (!event.repeat) interactQueued = true
+      return
+    }
+
+    if (key === SCANNER_KEY) {
+      if (!event.repeat) scannerToggleQueued = true
+      event.preventDefault()
       return
     }
 

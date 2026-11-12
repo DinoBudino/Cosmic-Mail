@@ -127,6 +127,7 @@ export function Atmosphere({ quality }: AtmosphereProps) {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const skyRef = useRef<THREE.Group>(null)
   const dustGroupRef = useRef<THREE.Group>(null)
+  const sunLightRef = useRef<THREE.DirectionalLight>(null)
 
   const skyUniforms = useMemo(() => ({
     uZenith: { value: new THREE.Color(PALETTE.skyZenith) },
@@ -209,6 +210,13 @@ export function Atmosphere({ quality }: AtmosphereProps) {
     if (skyRef.current) skyRef.current.position.copy(camera.position)
 
     const elapsed = clock.elapsedTime
+    // A very slow, low-amplitude sunlight breath: enough to make the plain
+    // feel alive, far too subtle to read as a storm or a lighting effect.
+    if (sunLightRef.current) {
+      sunLightRef.current.intensity = reducedMotion
+        ? 2.55
+        : 2.55 + Math.sin(elapsed * 0.16) * 0.045
+    }
     const dustGroup = dustGroupRef.current
     if (!dustGroup) return
     for (let index = 0; index < dustLayers.length; index += 1) {
@@ -319,6 +327,7 @@ export function Atmosphere({ quality }: AtmosphereProps) {
       <ambientLight intensity={0.32} color={PALETTE.ambient} />
       <hemisphereLight args={[PALETTE.hemiSky, PALETTE.hemiGround, 0.85]} />
       <directionalLight
+        ref={sunLightRef}
         position={lightPosition}
         intensity={2.55}
         color={PALETTE.sun}

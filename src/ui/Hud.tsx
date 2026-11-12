@@ -1,4 +1,7 @@
+import { SPIRIT_SITE } from '../data/spiritSite'
+import { isFlightUnlocked } from '../game/flight'
 import { useGameStore } from '../store/gameStore'
+import { useJourneyStore } from '../store/journeyStore'
 
 function GearIcon() {
   return (
@@ -23,62 +26,44 @@ function GearIcon() {
 export function Hud() {
   const openSettings = useGameStore((state) => state.openSettings)
   const quality = useGameStore((state) => state.quality)
+  const scannerEquipped = useGameStore((state) => state.scannerEquipped)
+  const cinematicFocus = useGameStore((state) => state.cinematicFocus)
+  const progress = useJourneyStore(
+    (state) => state.save?.missions[SPIRIT_SITE.missionId] ?? null,
+  )
+  const flightLocked = progress != null && !isFlightUnlocked(progress)
 
   return (
     <>
-      <header className="hud-card" aria-label="Game title">
-        <p className="hud-eyebrow">Mars Delivery Zone</p>
-        <h1 className="hud-title">Letters to the Forgotten Explorers</h1>
-      </header>
-
-      <div className="hud-controls">
-        <span className="hud-control">
-          <span className="hud-key">WASD</span>
-          <span className="hud-label">move</span>
-        </span>
-        <span className="hud-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="hud-control">
-          <span className="hud-key">Drag</span>
-          <span className="hud-label">look</span>
-        </span>
-        <span className="hud-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="hud-control">
-          <span className="hud-key">Scroll</span>
-          <span className="hud-label">zoom</span>
-        </span>
-        <span className="hud-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="hud-control">
-          <span className="hud-key">Space</span>
-          <span className="hud-label">jet boots</span>
-        </span>
-        <span className="hud-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="hud-control">
-          <span className="hud-key">Shift</span>
-          <span className="hud-label">run</span>
-        </span>
-        <span className="hud-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="hud-control">
-          <span className="hud-key">C</span>
-          <span className="hud-label">recenter</span>
-        </span>
-        <span className="hud-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="hud-control">
-          <span className="hud-key">Esc</span>
-          <span className="hud-label">settings</span>
-        </span>
-      </div>
+      {!scannerEquipped && cinematicFocus === null && (
+        <details className="hud-controls">
+          <summary>Controls</summary>
+          <div className="hud-controls__row">
+            <span className="hud-control">
+              <span className="hud-key">WASD</span>
+              <span className="hud-label">move</span>
+            </span>
+            <span className="hud-control">
+              <span className="hud-key">Drag</span>
+              <span className="hud-label">look</span>
+            </span>
+            <span className="hud-control">
+              <span className="hud-key">Space</span>
+              <span className="hud-label">
+                {flightLocked ? 'boots locked' : 'jet boots'}
+              </span>
+            </span>
+            <span className="hud-control">
+              <span className="hud-key">Q</span>
+              <span className="hud-label">scanner</span>
+            </span>
+            <span className="hud-control">
+              <span className="hud-key">E</span>
+              <span className="hud-label">interact</span>
+            </span>
+          </div>
+        </details>
+      )}
 
       <button
         type="button"

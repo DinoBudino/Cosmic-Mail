@@ -1,91 +1,33 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  DISCOVERY_QUESTIONS,
-  INTRO_LINES,
-  getExplorer,
-  getHeroForTrait,
-} from '../../data/personalization'
+  REGISTRATION_LINE,
+  hubDialogueLines,
+} from '../../data/onboardingNarrative'
 import { speakPip, stopPipVoice } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { PipAvatar } from '../PipSpeech'
 
-/** PIP's dialogue lines for the current ritual step (written only, no voice). */
+/** PIP's dialogue lines for the current cabin step (written only, no voice). */
 function useDialogueLines(): string[] {
   const phase = useOnboardingStore((state) => state.phase)
-  const questionIndex = useOnboardingStore((state) => state.questionIndex)
-  const traitId = useOnboardingStore((state) => state.trait)
-  const explorerId = useOnboardingStore((state) => state.explorerId)
-  const explorerPreviewId = useOnboardingStore((state) => state.explorerPreviewId)
-  const tutorialDone = useOnboardingStore((state) => state.tutorialDone)
   const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
-
-  switch (phase) {
-    case 'intro':
-      return [...INTRO_LINES]
-    case 'questions': {
-      // PIP asks the question himself: lead-in line, then the
-      // question. Q1 goes straight to the question — the intro
-      // already greeted the child ("Welcome aboard" would repeat).
-      const question = DISCOVERY_QUESTIONS[questionIndex]
-      if (!question) return []
-      return questionIndex === 0 ? [question.question] : [question.pipIntro, question.question]
-    }
-    case 'reveal':
-      return ['The stars have spoken...']
-    case 'explorer': {
-      if (!traitId) return ['Which explorer feels like you?']
-      // Follow the hero CURRENTLY SHOWN in the window: the carousel
-      // preview when browsing, otherwise the assigned hero. The
-      // recorded line for each hero already exists (cabin-explorer-*),
-      // so the voice always matches the visible character.
-      const shownId = explorerPreviewId ?? explorerId
-      let hero = getHeroForTrait(traitId)
-      if (shownId) {
-        try {
-          hero = getExplorer(shownId)
-        } catch {
-          // Unknown preview id: keep the assigned hero.
-        }
-      }
-      // History first, then the fictional power it inspires. Each
-      // hero has its own recordings for both lines, so the voice
-      // always matches the character visible in the window.
-      return [hero.meetLine, hero.powerLine]
-    }
-    case 'name':
-      // Warm, short invitation: the card itself carries the rest.
-      return ['One last thing, carrier! Every letter needs a name. What should I call you?']
-    case 'hub':
-      // Route confirmed: PIP's one-line all-set cue pointing at the
-      // big red button (“Press the red button”) — the tutorial itself
-      // only ends when that first take-off happens.
-      if (routeConfirmed) {
-        return ['All set, carrier! Press the red button to take off!']
-      }
-      // First visit only: PIP tours the passport and the navigation
-      // screen. Returning carriers get no bubble at all — the hub opens
-      // on the initial cabin view and the close-up only happens when
-      // the pilot taps the navigation panel.
-      if (!tutorialDone) {
-        return [
-          // Soft arrival beat, so the hub does not start mid-topic.
-          'Look, carrier — your Cosmic Mail passport is ready!',
-          'It holds your name, your power, your hero and your stamps.',
-          'And this green screen is navigation. Moon and Deep Space are still sleeping — Mars is ready.',
-          'When you land, find the silent machines and deliver their letters. When you are ready, tap the radar screen and choose.',
-        ]
-      }
-      return []
-    default:
-      return []
+  const hubVisited = useOnboardingStore((state) => state.hubVisited)
+  const hubTourDone = useOnboardingStore((state) => state.hubTourDone)
+  if (phase === 'registration') return [REGISTRATION_LINE]
+  if (phase === 'hub') {
+    return hubDialogueLines({
+      routeConfirmed,
+      hubVisited,
+      hubTourDone,
+    })
   }
+  return []
 }
 
 /**
  * Typewriter line for PIP. While it runs, PIP "speaks" (his mouth moves
- * in the 3D scene). A skip nonce completes the line instantly, like a
- * visual novel.
+ * in the 3D scene). A skip nonce completes the line instantly.
  */
 function PipLine({
   line,
@@ -100,11 +42,9 @@ function PipLine({
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
   const voiceName = useGameStore((state) => state.voiceName)
   const setPipTalking = useOnboardingStore((state) => state.setPipTalking)
-  // Remounted per line (via key in the parent), so state starts clean.
   const [typed, setTyped] = useState(reducedMotion ? line : '')
   const intervalRef = useRef<number | null>(null)
   const doneRef = useRef(false)
-
   const typedRef = useRef('')
 
   useEffect(() => {
@@ -115,13 +55,8 @@ function PipLine({
     doneRef.current = false
     typedRef.current = ''
     setPipTalking(true)
-    // PIP says the line out loud while the subtitle types (recorded
-    // voice when available, browser TTS otherwise). The mouth gestures
-    // stay synced to the typewriter, subtitles always stay on.
     speakPip(line, voiceName, voiceEnabled)
     intervalRef.current = window.setInterval(() => {
-      // Completion is tracked in a ref, never inside a state updater
-      // (updaters may run during render — side effects there are a bug).
       const next = line.slice(0, typedRef.current.length + 1)
       typedRef.current = next
       setTyped(next)
@@ -142,7 +77,6 @@ function PipLine({
     }
   }, [line, reducedMotion, voiceEnabled, voiceName, setPipTalking, onDone])
 
-  // Skip: a click while typing completes the line immediately.
   useEffect(() => {
     if (skipNonce === 0 || reducedMotion) return
     if (intervalRef.current !== null) {
@@ -166,21 +100,19 @@ function PipLine({
 }
 
 /**
- * The cockpit wrapper shared by every ritual step: soft veil over the 3D
- * cabin, and PIP floating by with a clickable dialogue bubble. Clicking
- * the bubble completes the typewriter or advances to the next line —
- * answers appear only once PIP has finished asking.
+ * Cockpit wrapper shared by registration and hub. The cinematic intro
+ * owns its own subtitle bar; the cabin bubble is used after it.
  */
 export function Cabin({ children }: { children: ReactNode }) {
   const lines = useDialogueLines()
   const phase = useOnboardingStore((state) => state.phase)
-  const isHub = phase === 'hub'
-  const signing = useOnboardingStore((state) => state.signing)
-  const setSigning = useOnboardingStore((state) => state.setSigning)
-  const passportDetailOpen = useOnboardingStore((state) => state.passportDetailOpen)
   const routeOpen = useOnboardingStore((state) => state.routeOpen)
+  const passportDetailOpen = useOnboardingStore(
+    (state) => state.passportDetailOpen,
+  )
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const setDialogueIndex = useOnboardingStore((state) => state.setDialogueIndex)
+  const markHubVisited = useOnboardingStore((state) => state.markHubVisited)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
   const setVoiceEnabled = useGameStore((state) => state.setVoiceEnabled)
   const [typingDone, setTypingDone] = useState(false)
@@ -189,18 +121,13 @@ export function Cabin({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [liftPx, setLiftPx] = useState(0)
 
-  // If the step panel (tablet, label, passport) would collide with the
-  // bubble, the bubble rises smoothly to clear it — never abruptly.
   useEffect(() => {
     const bubble = bubbleRef.current
     const content = contentRef.current
     if (!bubble || !content) return
     const adjust = () => {
-      // Measure against the actual panel (tablet / label / passport),
-      // whose rendered top is what the bubble must clear. The bubble's
-      // current lift is compensated so re-measuring stays stable.
       const panel = content.querySelector<HTMLElement>(
-        '.tablet, .shipping-label, .onboarding__panel, .routine__selector, .routine-reveal__panel',
+        '.tablet, .shipping-label, .onboarding__panel',
       )
       if (!panel) {
         setLiftPx(0)
@@ -209,8 +136,6 @@ export function Cabin({ children }: { children: ReactNode }) {
       const bubbleBottom = bubble.getBoundingClientRect().bottom
       const overlap = bubbleBottom - (panel.getBoundingClientRect().top - 14)
       setLiftPx((current) => {
-        // Capped so the bubble never climbs back onto PIP's face: if
-        // the panel is very tall, the panel compacts instead.
         const desired = Math.min(120, Math.max(0, current + overlap))
         return Math.abs(desired - current) < 1 ? current : desired
       })
@@ -224,16 +149,12 @@ export function Cabin({ children }: { children: ReactNode }) {
       observer.disconnect()
       window.removeEventListener('resize', adjust)
     }
-  }, [children, isHub])
+  }, [children, phase])
 
   const line = lines[Math.min(dialogueIndex, Math.max(0, lines.length - 1))] ?? ''
   const isLastLine = dialogueIndex >= lines.length - 1
   const handleDone = useCallback(() => setTypingDone(true), [])
 
-  // A new line (next question included) starts untyped. Adjusting state
-  // during render is the React-endorsed pattern for derived resets.
-  // The skip nonce resets too: a stale skip would make the next line
-  // auto-complete (and mute PIP) the instant it mounts.
   const [seenLine, setSeenLine] = useState(line)
   if (seenLine !== line) {
     setSeenLine(line)
@@ -251,57 +172,64 @@ export function Cabin({ children }: { children: ReactNode }) {
       setDialogueIndex(dialogueIndex + 1)
       return
     }
-    // Name phase: after PIP's warning, clicking opens the signing
-    // window and the bubble itself disappears. (The hub tutorial
-    // ends at the first take-off, not at the end of these lines.)
-    if (phase === 'name') setSigning(true)
+    if (phase === 'hub') markHubVisited()
   }
+
+  const bubbleHidden =
+    phase === 'intro' ||
+    (phase === 'hub' && (passportDetailOpen || routeOpen))
 
   return (
     <div className="cabin">
       <div className="boarding__veil" aria-hidden="true" />
 
-      {!signing && lines.length > 0 && phase !== 'intro' && (
-      <div
-        className={`pip-bubble-wrap${phase === 'questions' || phase === 'reveal' ? ' pip-bubble-wrap--mid' : ''}${phase === 'explorer' ? ' pip-bubble-wrap--hero' : ''}${phase === 'hub' && (passportDetailOpen || routeOpen) ? ' is-hidden' : ''}`}
-        ref={bubbleRef}
-        style={{ transform: liftPx > 0 ? `translateY(${-liftPx}px)` : undefined }}
-      >
-        <button
-          type="button"
-          className="pip-bubble"
-          onClick={handleBubbleClick}
-          aria-label={typingDone && !isLastLine ? 'Continue' : 'PIP is speaking'}
-        >
-          <PipAvatar />
-          <span className="pip-bubble__body">
-            <span className="pip-bubble__name">PIP</span>
-            <PipLine
-              key={`${line}-${dialogueIndex}`}
-              line={line}
-              skipNonce={skipNonce}
-              onDone={handleDone}
-            />
-            {typingDone && !isLastLine && (
-              <span className="pip-bubble__next" aria-hidden="true">
-                ▸
-              </span>
-            )}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="pip-bubble__voice"
-          aria-pressed={voiceEnabled}
-          aria-label={voiceEnabled ? 'Turn PIP voice off' : 'Turn PIP voice on'}
-          onClick={() => {
-            if (voiceEnabled) stopPipVoice()
-            setVoiceEnabled(!voiceEnabled)
+      {!bubbleHidden && lines.length > 0 && (
+        <div
+          className={`pip-bubble-wrap pip-bubble-wrap--${phase}`}
+          ref={bubbleRef}
+          style={{
+            transform: liftPx > 0 ? `translateY(${-liftPx}px)` : undefined,
           }}
         >
-          <span aria-hidden="true">{voiceEnabled ? '🔊' : '🔇'}</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            className="pip-bubble"
+            onClick={handleBubbleClick}
+            aria-label={
+              typingDone && !isLastLine ? 'Continue' : 'PIP is speaking'
+            }
+          >
+            <PipAvatar />
+            <span className="pip-bubble__body">
+              <span className="pip-bubble__name">PIP</span>
+              <PipLine
+                key={`${line}-${dialogueIndex}`}
+                line={line}
+                skipNonce={skipNonce}
+                onDone={handleDone}
+              />
+              {typingDone && !isLastLine && (
+                <span className="pip-bubble__next" aria-hidden="true">
+                  ▸
+                </span>
+              )}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="pip-bubble__voice"
+            aria-pressed={voiceEnabled}
+            aria-label={
+              voiceEnabled ? 'Turn PIP voice off' : 'Turn PIP voice on'
+            }
+            onClick={() => {
+              if (voiceEnabled) stopPipVoice()
+              setVoiceEnabled(!voiceEnabled)
+            }}
+          >
+            <span aria-hidden="true">{voiceEnabled ? '🔊' : '🔇'}</span>
+          </button>
+        </div>
       )}
 
       <div ref={contentRef} className="cabin__content">

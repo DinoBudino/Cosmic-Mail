@@ -1,8 +1,14 @@
 import * as THREE from 'three'
 import { MARS_OBJECTS } from '../data/marsObjects'
+import { SPIRIT_SITE } from '../data/spiritSite'
 import { mulberry32 } from './random'
-import { distanceToPath, getTerrainHeight, getTerrainSlope } from './terrainHeight'
-import { PALETTE, PATH_WAYPOINTS, WORLD } from './worldConfig'
+import {
+  distanceToPath,
+  distanceToSurveyTrail,
+  getTerrainHeight,
+  getTerrainSlope,
+} from './terrainHeight'
+import { PALETTE, PATH_WAYPOINTS, PLAYER, WORLD } from './worldConfig'
 
 /** Broad erosion shelves, not pointed peaks. All geometry lives above y=0. */
 export function buildMesaGeometry(seed: number): THREE.BufferGeometry {
@@ -105,9 +111,9 @@ export const ROCK_FORMATIONS: readonly RockFormation[] = [
   // Mid-distance framing wall on the approach to the Opportunity valley:
   // close enough to read as its backdrop from the spawn, still clear of the
   // playable camera envelope.
-  { x: -132, z: 40, width: 14, depth: 16, height: 15, rotation: -0.2, variant: 1, color: PALETTE.mesaNear },
+  { x: -168, z: 48, width: 14, depth: 16, height: 15, rotation: -0.2, variant: 1, color: PALETTE.mesaNear },
   // Valley of Echoes backdrop: layered mesa north of Opportunity.
-  { x: -98, z: -118, width: 20, depth: 14, height: 14, rotation: 0.15, variant: 0, color: PALETTE.mesaNear },
+  { x: -118, z: -146, width: 20, depth: 14, height: 14, rotation: 0.15, variant: 0, color: PALETTE.mesaNear },
   // Lower-contrast distant silhouettes, with deliberate gaps instead of a ring.
   { x: -210, z: -138, width: 24, depth: 20, height: 25, rotation: 0.2, variant: 1, color: PALETTE.mesaFar },
   { x: -105, z: -240, width: 31, depth: 22, height: 28, rotation: -0.5, variant: 0, color: PALETTE.mesaFar },
@@ -143,7 +149,22 @@ export function createRocks(count: number): RockInstance[] {
   const random = mulberry32(0x5eed1)
   const rocks: RockInstance[] = []
   const maxAttempts = count * 40
-  const clusters = [[-52, 20], [-45, -40], [45, -30], [45, 25], [-14, -55], [24, 52]] as const
+  const clusters = [
+    [-52, 20],
+    [-45, -40],
+    [45, -30],
+    [45, 25],
+    [-14, -55],
+    [24, 52],
+    // Planetary Exploration 2.0: landing shelf, geological passage and the
+    // explorer approach each get their own character.
+    [-14, 66],
+    [13, 48],
+    [-13, 30],
+    [18, 12],
+    [9, -18],
+    [-12, -34],
+  ] as const
   let attempts = 0
 
   while (rocks.length < count && attempts < maxAttempts) {
@@ -156,8 +177,18 @@ export function createRocks(count: number): RockInstance[] {
     const z = clustered ? cluster[1] + Math.sin(angle) * random() * 10 : Math.sin(angle) * radius
     if (Math.hypot(x, z) > WORLD.playRadius + 7) continue
 
-    if (Math.hypot(x - WORLD.spawn.x, z - WORLD.spawn.z) < 3.5) continue
+    if (Math.hypot(x - WORLD.spawn.x, z - WORLD.spawn.z) < 4.5) continue
     if (distanceToPath(x, z) < 2.6) continue
+    if (distanceToSurveyTrail(x, z) < 2.2) continue
+    if (
+      Math.hypot(
+        x - SPIRIT_SITE.position.x,
+        z - SPIRIT_SITE.position.z,
+      ) <
+      SPIRIT_SITE.ringRadius + 3
+    ) {
+      continue
+    }
 
     let nearSite = false
     for (const object of MARS_OBJECTS) {
@@ -259,6 +290,37 @@ export function createRocks(count: number): RockInstance[] {
     })
   }
 
+  // Geological Passage: two large outcrop boulders break the direct line in
+  // a natural way, inviting the player to choose a left or right route while
+  // keeping the painted survey trail clear.
+  const passageBoulders = [
+    { x: 0.5, z: 21, scale: 1.9, variant: 0 },
+    { x: -2.5, z: 12, scale: 1.55, variant: 1 },
+    { x: 19, z: 30, scale: 1.15, variant: 2 },
+  ] as const
+  for (const boulder of passageBoulders) {
+    const x = boulder.x
+    const z = boulder.z
+    if (distanceToSurveyTrail(x, z) < 2.2) continue
+    const stretchY = 0.72
+    rocks.push({
+      x,
+      y: getTerrainHeight(x, z) + boulder.scale * stretchY * 0.4,
+      z,
+      scale: boulder.scale,
+      stretchX: 1.25,
+      stretchY,
+      stretchZ: 1.05,
+      variant: boulder.variant,
+      rotation: boulder.z * 0.17,
+      tilt: 0.12,
+      color: new THREE.Color(PALETTE.rockDark).lerp(
+        new THREE.Color(PALETTE.rockLight),
+        0.35,
+      ),
+    })
+  }
+
   // Ingenuity flight-area markers: small stones ringing the clear apron at
   // the edge of its rock-free radius, so the zone has a readable boundary.
   const ingenuity = MARS_OBJECTS.find((object) => object.id === 'ingenuity')!
@@ -295,15 +357,17 @@ export interface BoulderObstacle {
   topY: number
 }
 
-let boulderCache: { count: number; list: BoulderObstacle[] } | null = null
+const boulderCaches = new Map<number, BoulderObstacle[]>()
 
 /**
  * Deterministic boulders (scale ≥ 0.8, including trail waymarks) shared with
- * PIP so the companion can climb over or around the only rocks tall enough
- * to reach its flight height. Same seeded generation as the rendered rocks.
+ * PIP and the player so both collide with the same rocks that are rendered.
+ * The cache is keyed by count: High and Low quality each keep a stable list
+ * without rebuilding every frame when the two systems alternate calls.
  */
-export function getBoulderObstacles(count = 120): BoulderObstacle[] {
-  if (boulderCache && boulderCache.count === count) return boulderCache.list
+export function getBoulderObstacles(count = 150): BoulderObstacle[] {
+  const cached = boulderCaches.get(count)
+  if (cached) return cached
   const list = createRocks(count)
     .filter((rock) => rock.scale >= 0.8)
     .map((rock) => ({
@@ -312,6 +376,33 @@ export function getBoulderObstacles(count = 120): BoulderObstacle[] {
       radius: rock.scale * Math.max(rock.stretchX, rock.stretchZ) * 0.85,
       topY: rock.y + rock.scale * rock.stretchY * 0.5,
     }))
-  boulderCache = { count, list }
+  boulderCaches.set(count, list)
   return list
+}
+
+/**
+ * Player movement collision for the few boulders tall enough to matter.
+ * The player can still walk around them or fly over them once flight is
+ * unlocked. Mutates x/z to avoid per-frame allocations.
+ */
+export function resolveBoulderCollision(
+  position: { x: number; z: number },
+  airborne = 0,
+  count = 150,
+): void {
+  const groundY = getTerrainHeight(position.x, position.z)
+  for (const boulder of getBoulderObstacles(count)) {
+    if (groundY + airborne >= boulder.topY) continue
+    const dx = position.x - boulder.x
+    const dz = position.z - boulder.z
+    const distance = Math.hypot(dx, dz)
+    const minimum = boulder.radius + PLAYER.radius
+    if (distance >= minimum) continue
+    if (distance < 1e-4) {
+      position.x = boulder.x + minimum
+      continue
+    }
+    position.x = boulder.x + (dx / distance) * minimum
+    position.z = boulder.z + (dz / distance) * minimum
+  }
 }
