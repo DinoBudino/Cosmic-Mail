@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { findMission } from '../data/missions'
+import { lensMatchesComponent } from '../data/scannerLenses'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { emitAudio } from '../game/audio/audioEvents'
 import { playerPosition } from '../game/playerPosition'
@@ -12,6 +13,7 @@ import {
   scannedComponentCount,
 } from './missionStage'
 import { PipAvatar } from './PipSpeech'
+import { ScannerLensPicker } from './ScannerLensPicker'
 
 function SpiritSchematic() {
   return (
@@ -188,12 +190,17 @@ export function CosmicScanner() {
     const alreadyRecorded = Boolean(
       useJourneyStore.getState().save?.missions[mission.id]?.scannedComponentIds.includes(componentId),
     )
+    const component = mission.components.find((c) => c.id === componentId)
+    const lens = useGameStore.getState().scannerLens
     if (
       !alreadyRecorded &&
-      useGameStore.getState().historicalExplanationId
+      component &&
+      !lensMatchesComponent(component, lens)
     ) {
+      // Assisted review still teaches: the right lens is part of recognizing.
+      selectComponent(componentId)
       setStatus(
-        'PIP is still explaining the recovered fragment. Listen, walk or skip the line before recording another part.',
+        'This lens finds nothing on that part. Think about what the instrument does, pick another lens above and try again.',
       )
       return
     }
@@ -286,6 +293,8 @@ export function CosmicScanner() {
           ))}
           <span className="cosmic-scanner__count">{scannedCount}/3</span>
         </div>
+
+        {discovered && <ScannerLensPicker />}
 
         <div className="scanner-stage">
           <div className="scanner-stage__scanline" aria-hidden="true" />

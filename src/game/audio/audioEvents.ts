@@ -81,6 +81,7 @@ export type AudioEvent =
   | 'stampEarned'
   | 'historyRestored'
   | 'transmissionCompleted'
+  | 'passportStamped'
   | 'missionStampEarned'
   | 'thrusterStarted'
   | 'thrusterStopped'
@@ -248,13 +249,16 @@ export const EVENT_PLANS: Record<AudioEvent, AudioEventPlan> = {
   transmissionReceived: { sfx: ['transmission.received'] },
   stampEarned: { sfx: ['transmission.stamp'] },
   historyRestored: { sfx: ['transmission.historyRestored'] },
+  // Fires when the capsule is sent (the data commit): the signal is
+  // received on Earth. The stamp and "history restored" cues belong to the
+  // carrier's own stamping action, see `passportStamped`.
   transmissionCompleted: {
-    delayedSfx: [
-      { assetId: 'transmission.received', delayMs: 1100 },
-      { assetId: 'transmission.stamp', delayMs: 1700 },
-      { assetId: 'transmission.historyRestored', delayMs: 2000 },
-    ],
+    delayedSfx: [{ assetId: 'transmission.received', delayMs: 1100 }],
     music: 'transmission',
+  },
+  passportStamped: {
+    sfx: ['transmission.stamp'],
+    delayedSfx: [{ assetId: 'transmission.historyRestored', delayMs: 350 }],
   },
   missionStampEarned: { sfx: ['transmission.stamp'] },
 

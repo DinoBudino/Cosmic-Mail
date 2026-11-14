@@ -1,4 +1,17 @@
 import { create } from 'zustand'
+import {
+  createPolicyMemory,
+  decideCue,
+  fitLine,
+  rememberCue,
+  tierForPriority,
+  type PipTier,
+  type PolicyMemory,
+} from '../data/pipDialogPolicy'
+import {
+  INITIAL_PROTOCOL_FLAGS,
+  type ProtocolFlags,
+} from '../data/arrivalProtocol'
 import type {
   ArchiveNarrativeCue,
   NarrativeCue,
@@ -6,6 +19,8 @@ import type {
 
 export interface StoredNarrativeLine extends NarrativeCue {
   nonce: number
+  /** Resolved dialogue tier (explicit or derived from priority). */
+  tier: PipTier
 }
 
 export interface NarrativeArchiveLine extends ArchiveNarrativeCue {
@@ -42,7 +57,20 @@ interface NarrativeState {
   reaction: NarrativeReaction | null
   attention: NarrativeAttention | null
   archiveLine: NarrativeArchiveLine | null
-  enqueue: (cue: NarrativeCue) => boolean
+  /** Ephemeral arrival-protocol facts; progress itself stays in journeyStore. */
+  protocol: ProtocolFlags
+  markProtocol: (flag: keyof ProtocolFlags) => void
+  /**
+   * Single entry point for every PIP line. Applies the central dialogue
+   * policy (tiers, one voice at a time, frequency, anti-repetition, limits).
+   */
+  enqueue: (cue: NarrativeCue, now?: number) => boolean
+  /** Cancels the playing line if the player already moved past it. */
+  dropStaleCurrent: () => void
+  policy: PolicyMemory
+  /** P3 ambient lines are dropped unless free exploration is on (M7). */
+  ambientAllowed: boolean
+  setAmbientAllowed: (allowed: boolean) => void
   markSpoken: (id: string) => void
   complete: () => void
   clearDialogue: () => void
@@ -67,14 +95,6 @@ function nextNonce(): number {
   return nonceCounter
 }
 
-const PRIORITY_RANK: Record<NarrativeCue['priority'], number> = {
-  ambient: 0,
-  hint: 1,
-  mission: 2,
-  discovery: 3,
-  archive: 4,
-}
-
 let attentionTimer: ReturnType<typeof setTimeout> | null = null
 
 function clearAttentionTimer(): void {
@@ -91,33 +111,72 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
   reaction: null,
   attention: null,
   archiveLine: null,
+  protocol: INITIAL_PROTOCOL_FLAGS,
+  policy: createPolicyMemory(),
+  ambientAllowed: false,
 
-  enqueue: (cue) => {
+  setAmbientAllowed: (ambientAllowed) => {
+    if (get().ambientAllowed !== ambientAllowed) set({ ambientAllowed })
+  },
+
+  markProtocol: (flag) => {
+    if (get().protocol[flag]) return
+    set((state) => ({ protocol: { ...state.protocol, [flag]: true } }))
+  },
+
+  enqueue: (cue, now = Date.now()) => {
     const state = get()
     const once = cue.once ?? true
     if (state.current?.id === cue.id) return false
     if (state.queue.some((line) => line.id === cue.id)) return false
     if (once && state.spoken[cue.id]) return false
 
-    const line: StoredNarrativeLine = { ...cue, nonce: nextNonce() }
+    const text = fitLine(cue.text)
+    const tier = cue.tier ?? tierForPriority(cue.priority)
+    const policyCue = { text, tier, solicited: cue.solicited ?? false }
+    const decision = decideCue(
+      state.policy,
+      state.current ? { tier: state.current.tier } : null,
+      state.queue.length,
+      policyCue,
+      now,
+      state.ambientAllowed,
+    )
+    if (decision.action === 'drop') return false
+
+    const line: StoredNarrativeLine = {
+      ...cue,
+      text,
+      tier,
+      nonce: nextNonce(),
+    }
     const spoken = once
       ? { ...state.spoken, [cue.id]: true as const }
       : state.spoken
+    const policy = rememberCue(state.policy, policyCue, now)
 
-    if (state.current) {
-      // Higher-priority cues may move ahead of queued ambient/mission lines,
-      // but a line already playing is never cut off mid-sentence.
-      const queue = [...state.queue]
-      const rank = PRIORITY_RANK[line.priority]
-      const index = queue.findIndex(
-        (queued) => PRIORITY_RANK[queued.priority] < rank,
-      )
-      queue.splice(index === -1 ? queue.length : index, 0, line)
-      set({ queue, spoken })
+    if (decision.action === 'play') {
+      set({ current: line, spoken, policy })
+    } else if (decision.action === 'preempt') {
+      // A more important line cuts in. The interrupted one comes back only
+      // if it was a story beat or scan feedback; optional lines are lost.
+      const interrupted = state.current
+      const queue =
+        interrupted && interrupted.tier <= 1
+          ? [interrupted, ...state.queue]
+          : state.queue
+      set({ current: line, queue, spoken, policy })
     } else {
-      set({ current: line, spoken })
+      const queue = [...state.queue]
+      const index = queue.findIndex((queued) => queued.tier > tier)
+      queue.splice(index === -1 ? queue.length : index, 0, line)
+      set({ queue, spoken, policy })
     }
     return true
+  },
+
+  dropStaleCurrent: () => {
+    if (get().current?.cancelWhen?.()) get().complete()
   },
 
   markSpoken: (id) => {
@@ -126,7 +185,12 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
   },
 
   complete: () => {
-    const [next, ...rest] = get().queue
+    // Skip queued lines the player has already moved past.
+    let pending = get().queue
+    while (pending.length > 0 && pending[0]!.cancelWhen?.()) {
+      pending = pending.slice(1)
+    }
+    const [next, ...rest] = pending
     set({ current: next ?? null, queue: rest })
   },
 
@@ -184,6 +248,9 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
       reaction: null,
       attention: null,
       archiveLine: null,
+      protocol: INITIAL_PROTOCOL_FLAGS,
+      policy: createPolicyMemory(),
+      ambientAllowed: false,
     })
   },
 }))

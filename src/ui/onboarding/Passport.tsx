@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import {
-  TRANSMISSION_DESTINATION,
-  TRANSMISSION_SUCCESS_LINE,
-} from '../../data/onboardingNarrative'
+import { TRANSMISSION_DESTINATION } from '../../data/onboardingNarrative'
+import { getFieldNotesView } from '../../data/fieldNotes'
 import { STORY_STATUS_LABEL, getPassportView } from '../../data/passport'
 import type { MissionId } from '../../data/missions'
 import type { JourneySave } from '../../store/journeySchema'
@@ -29,13 +27,13 @@ export function Passport({
   const prepareSmartLetter = useJourneyStore(
     (state) => state.prepareSmartLetter,
   )
-  const transmit = useJourneyStore((state) => state.transmit)
   const openArchive = useGameStore((state) => state.openArchive)
   const goBack = useOnboardingStore((state) => state.goBack)
   const [message, setMessage] = useState<string | null>(null)
   if (!save) return null
 
   const view = getPassportView(save)
+  const fieldNotes = getFieldNotesView(save)
 
   const handlePrepare = (missionId: MissionId) => {
     const result = prepareSmartLetter(missionId)
@@ -46,30 +44,6 @@ export function Passport({
       ok
         ? null
         : 'The memory must be recovered before the smart letter can be prepared.',
-    )
-  }
-
-  const handleTransmit = (missionId: MissionId) => {
-    emitAudio('transmissionStarted')
-    const result = transmit(missionId)
-    if (!result) {
-      emitAudio('uiError')
-      setMessage('No active journey save. The transmission was not recorded.')
-      return
-    }
-    if (result.status === 'transmitted') {
-      setMessage(TRANSMISSION_SUCCESS_LINE)
-      return
-    }
-    if (result.status === 'already-transmitted') {
-      setMessage('This history is already restored in the Archive.')
-      return
-    }
-    emitAudio('uiError')
-    setMessage(
-      result.status === 'letter-missing'
-        ? 'Prepare the smart letter before transmitting it.'
-        : 'This mission is not available.',
     )
   }
 
@@ -200,9 +174,9 @@ export function Passport({
                   <button
                     type="button"
                     className="passport__action passport__action--primary"
-                    onClick={() => handleTransmit(story.missionId)}
+                    onClick={() => openArchive('smart-letter', story.missionId)}
                   >
-                    Transmit to Earth
+                    Deliver to Earth
                   </button>
                 )}
               </div>
@@ -237,6 +211,56 @@ export function Passport({
             )
           })}
         </div>
+
+        <section
+          className="passport__notes"
+          aria-labelledby="passport-notes-title"
+        >
+          <p id="passport-notes-title" className="passport__slot-label">
+            Mars field notes · {fieldNotes.unlockedCount}/{fieldNotes.totalCount}
+          </p>
+          <p className="passport__notes-intro">
+            Optional context from the landscape and the memorials. These notes
+            are not part of any smart letter.
+          </p>
+          <ul className="passport__notes-list">
+            {fieldNotes.entries.map(({ note, unlocked, detail }) => (
+              <li
+                key={note.id}
+                className={`passport__note${unlocked ? ' is-unlocked' : ''}`}
+              >
+                <h3>{unlocked ? note.title : 'Not yet observed'}</h3>
+                {unlocked ? (
+                  <>
+                    <p>{note.body}</p>
+                    <p className="passport__note-meta">
+                      {detail ? `${detail} · ` : ''}
+                      {note.sources.map((source, index) => (
+                        <a
+                          key={source.url}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {source.label}
+                          {index < note.sources.length - 1 ? ', ' : ''} ↗
+                        </a>
+                      ))}
+                    </p>
+                  </>
+                ) : (
+                  <p className="passport__note-meta">
+                    {note.kind === 'memorial'
+                      ? 'Visit this Mars memorial to add its note.'
+                      : `Scan a feature of this kind with the Cosmic Scanner.${
+                          detail ? ` ${detail}.` : ''
+                        }`}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
 
         {message && (
           <p className="passport__message" role="status">

@@ -28,6 +28,7 @@ import {
   markReconstructionWatched as applyReconstructionWatched,
   prepareSmartLetter as applyPrepareSmartLetter,
   recordEnvironmentalScan as applyEnvironmentalScan,
+  recordMemorialVisit as applyMemorialVisit,
   resetMissionProgress,
   scanComponent as applyScan,
   setCurrentDestination,
@@ -55,6 +56,7 @@ export interface JourneyState {
     siteId: string,
     detailed: boolean,
   ) => EnvironmentalScanResult | null
+  recordMemorialVisit: (memorialId: string) => boolean
   discoverMission: (missionId: MissionId) => boolean
   completeFullScan: (missionId: MissionId) => FullScanResult | null
   prepareSmartLetter: (missionId: MissionId) => SmartLetterResult | null
@@ -144,6 +146,14 @@ export function createJourneyStore(storage: StorageLike | null) {
           commit(result.save)
         }
         return result
+      },
+
+      recordMemorialVisit: (memorialId) => {
+        const save = get().save
+        if (!save) return false
+        const result = applyMemorialVisit(save, memorialId)
+        if (result.status === 'recorded') commit(result.save)
+        return result.status === 'recorded'
       },
 
       discoverMission: (missionId) => {

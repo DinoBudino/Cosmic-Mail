@@ -2339,6 +2339,39 @@
   opacity: 0.4;
 }
 
+.scanner-hud__lenses {
+  display: flex;
+  gap: 4px;
+}
+
+.scanner-hud__lens {
+  flex: 1;
+  min-height: 32px;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(253, 244, 236, 0.06);
+  color: var(--cream);
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.scanner-hud__lens.is-active {
+  border-color: rgba(255, 217, 168, 0.7);
+  background: rgba(255, 217, 168, 0.18);
+  color: #ffd9a8;
+}
+
+.scanner-hud__lens:hover:not(.is-active) {
+  background: rgba(253, 244, 236, 0.12);
+}
+
+.scanner-hud__lens:focus-visible {
+  outline: 2px solid #ffd9a8;
+  outline-offset: 2px;
+}
+
 .scanner-hud__archive {
   border-color: rgba(255, 217, 168, 0.48);
   color: #ffd9a8;
@@ -2787,23 +2820,6 @@
   filter: brightness(1.05);
 }
 
-.full-scan__meter {
-  height: 14px;
-  margin-top: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(42, 26, 51, 0.2);
-  border-radius: 999px;
-  background: rgba(42, 26, 51, 0.08);
-}
-
-.full-scan__meter-fill {
-  display: block;
-  height: 100%;
-  transform-origin: left center;
-  background: linear-gradient(90deg, #8fe3d8, #ffd9a8);
-  transition: transform 80ms linear;
-}
-
 .full-scan__result {
   margin-top: 14px;
   padding: 14px;
@@ -3122,6 +3138,727 @@
   border-color: rgba(255, 160, 140, 0.85);
 }
 
-.scanner-reticle[data-state="narrative-locked"] .scanner-reticle__bracket {
-  border-color: rgba(255, 217, 168, 0.9);
+/* ---------------------------------------------- Full scan reconstruction */
+.recon {
+  margin: 14px 0;
+}
+
+.recon h3 {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+}
+
+.recon__help {
+  margin: 0 0 8px;
+  font-size: 0.86rem;
+  color: rgba(42, 26, 51, 0.78);
+}
+
+.recon__traces {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.recon-trace {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 6px;
+  border: 1px solid rgba(42, 26, 51, 0.45);
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      to top,
+      rgba(201, 122, 99, 0.4) calc(var(--trace-progress, 0) * 100%),
+      transparent 0
+    ),
+    rgba(255, 255, 255, 0.55);
+  color: #2a1a33;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.recon-trace.is-revealed {
+  border-color: #8a5a2b;
+  background: rgba(201, 122, 99, 0.18);
+  color: #6b3f1d;
+  cursor: default;
+}
+
+.recon-trace:focus-visible,
+.recon-card:focus-visible,
+.recon-slot:focus-visible {
+  outline: 2px solid #6b3f1d;
+  outline-offset: 2px;
+}
+
+.recon-trace:disabled,
+.recon-card:disabled,
+.recon-slot:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.recon-trace__mark {
+  font-size: 1.1rem;
+}
+
+.recon__tray,
+.recon__timeline {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.recon__tray {
+  min-height: 12px;
+}
+
+.recon__timeline {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.recon__axis {
+  margin: 6px 0 4px;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(42, 26, 51, 0.78);
+}
+
+.recon-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(42, 26, 51, 0.45);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #2a1a33;
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.recon-card.is-selected {
+  border-color: #8a5a2b;
+  background: rgba(201, 122, 99, 0.22);
+}
+
+.recon-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 6px;
+  border: 1px dashed rgba(42, 26, 51, 0.45);
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(42, 26, 51, 0.78);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.recon-slot.is-open {
+  border-color: #8a5a2b;
+  color: #2a1a33;
+}
+
+.recon-slot.is-filled {
+  border-style: solid;
+  border-color: #8a5a2b;
+  background: rgba(201, 122, 99, 0.18);
+  color: #6b3f1d;
+}
+
+.recon-slot__step {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}
+
+.recon__live {
+  min-height: 1.2em;
+  margin: 0;
+  font-size: 0.86rem;
+  color: #6b3f1d;
+}
+
+@media (max-width: 520px) {
+  .recon__traces,
+  .recon__timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recon-trace {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------ Postal delivery (Mailwing) */
+.postal {
+  margin: 16px 0 8px;
+  padding: 12px;
+  border: 1px solid rgba(42, 26, 51, 0.2);
+  border-radius: 10px;
+  background: rgba(201, 122, 99, 0.08);
+}
+
+.postal h3 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.postal__tracker {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.postal__tracker-step {
+  flex: 1;
+  padding: 4px 6px;
+  border-bottom: 2px solid rgba(42, 26, 51, 0.2);
+  opacity: 0.55;
+}
+
+.postal__tracker-step.is-active {
+  border-bottom-color: #8a4a3a;
+  opacity: 1;
+}
+
+.postal__tracker-step.is-done {
+  border-bottom-color: #8a4a3a;
+  opacity: 0.85;
+}
+
+.postal__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.postal__stage {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.postal__scene {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  width: 100%;
+  min-height: 150px;
+  overflow: hidden;
+}
+
+.postal__earth {
+  position: absolute;
+  top: 4px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.postal__letter {
+  align-self: end;
+  font-size: 2.4rem;
+  transition: transform 300ms, opacity 300ms;
+}
+
+.postal__letter.is-sealed {
+  transform: translateY(-4px);
+  filter: drop-shadow(0 0 4px rgba(201, 122, 99, 0.6));
+}
+
+.postal__letter.is-gone {
+  opacity: 0;
+}
+
+.postal__slot {
+  align-self: end;
+  width: 70%;
+  padding: 6px 0;
+  border: 2px dashed rgba(42, 26, 51, 0.4);
+  border-radius: 6px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.postal__capsule {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  width: 22px;
+  height: 36px;
+  margin-left: -11px;
+  border: 2px solid #8a4a3a;
+  border-radius: 11px;
+  background: rgba(255, 217, 168, 0.8);
+  opacity: 0;
+}
+
+.postal__capsule.is-visible {
+  opacity: 1;
+}
+
+.postal__capsule.is-departing {
+  opacity: 1;
+  animation: postal-depart 1800ms ease-in both;
+}
+
+@keyframes postal-depart {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-150px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.postal__seal {
+  background-image: linear-gradient(
+    to right,
+    rgba(255, 217, 168, 0.55) calc(var(--seal-progress, 0) * 100%),
+    transparent 0
+  );
+  touch-action: none;
+  user-select: none;
+}
+
+.postal__status {
+  margin: 0;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.postal__status--done {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.postal__passport {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 10px 16px;
+  border: 1px solid rgba(42, 26, 51, 0.25);
+  border-radius: 6px;
+}
+
+.postal__passport-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .postal__letter {
+    transition: none;
+  }
+  .postal__capsule.is-departing {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* -------------------------------------------------- Arrival protocol */
+.objective-bar {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 9px 12px 9px 16px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 217, 168, 0.55);
+  border-radius: 999px;
+  background: rgba(31, 20, 44, 0.86);
+  color: #fdf4ec;
+  box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+}
+
+.objective-bar__text {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.objective-bar__ask {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 217, 168, 0.6);
+  border-radius: 999px;
+  background: transparent;
+  color: #ffd9a8;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.objective-bar__ask:hover,
+.objective-bar__ask:focus-visible {
+  background: rgba(255, 217, 168, 0.16);
+  outline: none;
+}
+
+.objective-bar__ask:focus-visible {
+  outline: 2px solid #ffd9a8;
+  outline-offset: 2px;
+}
+
+.cosmic-radar.is-guided {
+  animation: radar-arrive 0.7s ease-out both;
+  box-shadow: 0 0 0 2px rgba(255, 217, 168, 0.55);
+}
+
+.scanner-hud__lens.is-guided {
+  box-shadow: 0 0 0 2px #ffd9a8;
+  animation: lens-nudge 1.4s ease-in-out infinite;
+}
+
+@keyframes radar-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lens-nudge {
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 217, 168, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-radar.is-guided,
+  .scanner-hud__lens.is-guided {
+    animation: none;
+  }
+}
+
+.scanner-hud__lenses.is-intro {
+  border-radius: 12px;
+  animation: lens-nudge 1.4s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(255, 217, 168, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner-hud__lenses.is-intro {
+    animation: none;
+  }
+}
+
+/* Full scan: steps, meters and locked state (ink on letter paper) */
+.recon__steps {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.recon__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 6px;
+  border: 1px solid rgba(42, 26, 51, 0.4);
+  border-radius: 999px;
+  color: rgba(42, 26, 51, 0.7);
+  font-size: 0.84rem;
+}
+
+.recon__step.is-active {
+  border-color: #8a5a2b;
+  background: rgba(201, 122, 99, 0.2);
+  color: #2a1a33;
+  font-weight: 700;
+}
+
+.recon__step.is-done {
+  border-color: #3e7a4d;
+  color: #2d5a39;
+}
+
+.recon__step-num {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(42, 26, 51, 0.12);
+  font-size: 0.78rem;
+}
+
+.recon.is-current {
+  padding: 8px 10px;
+  border: 1px solid rgba(138, 90, 43, 0.55);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.recon.is-locked {
+  opacity: 0.72;
+}
+
+.recon.is-locked .recon__help::before {
+  content: '🔒 ';
+}
+
+.recon__meter {
+  height: 8px;
+  margin: 2px 0 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(42, 26, 51, 0.15);
+}
+
+.recon__meter > span {
+  display: block;
+  height: 100%;
+  background: #c97a63;
+  transition: width 0.25s ease;
+}
+
+.recon__status {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: rgba(42, 26, 51, 0.78);
+}
+
+.recon-card[draggable='true'] {
+  cursor: grab;
+}
+
+.full-scan__core {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 6px;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recon__meter > span {
+    transition: none;
+  }
+}
+
+.pip-speech {
+  cursor: pointer;
+}
+
+/* ------------------------------------------------ HUD legibility floor */
+/* Gameplay HUD text never drops below 0.8rem (12.8px); primary lines are
+   larger. This block is last on purpose and guarded by hudLegibility.test. */
+.pip-speech__skip,
+.pip-name,
+.hud-controls,
+.hud-controls > summary,
+.hud-key,
+.hud-quality,
+.cosmic-radar__distance,
+.cosmic-radar__note,
+.cosmic-radar__action,
+.cosmic-radar__near-line,
+.cosmic-radar__quiet-line,
+.scanner-hud__archive,
+.scanner-hud__assist,
+.scanner-hud__action,
+.scanner-hud__count,
+.scanner-hud__count--field,
+.scanner-hud__hint,
+.scanner-hud__lens,
+.scanner-hud__put-away,
+.scanner-reticle__label,
+.spirit-interaction__label,
+.spirit-interaction__action,
+.spirit-interaction__hint,
+.touch-hint,
+.touch-boost,
+.touch-scanner,
+.mission-site small,
+.settings-eyebrow {
+  font-size: 0.8rem;
+}
+
+.scanner-hud__status,
+.pip-text,
+.objective-bar__action,
+.objective-bar__ask {
+  font-size: 0.92rem;
+}
+
+.pip-text {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.objective-bar__text {
+  font-size: 1.02rem;
+}
+
+/* Reticle label and status: always readable over any terrain. */
+.scanner-reticle__label,
+.scanner-reticle__status {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(31, 20, 44, 0.78);
+  color: #fdf4ec;
+  text-shadow: none;
+}
+
+.scanner-reticle__status {
+  position: absolute;
+  left: 0;
+  top: 84px;
+  z-index: 1;
+  margin: 0;
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.scanner-reticle__status[data-status='scanning'] {
+  color: #ffd9a8;
+}
+
+.scanner-reticle__status[data-status='wrong-lens'],
+.scanner-reticle__status[data-status='out-of-range'],
+.scanner-reticle__status[data-status='blocked'] {
+  color: #ffb4a0;
+}
+
+.scanner-reticle__status[data-status='recorded'] {
+  color: #9bd6a8;
+}
+
+/* Objective bar: primary action */
+.objective-bar__action {
+  flex: none;
+  min-height: 34px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffd9a8;
+  color: #2a1a33;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.objective-bar__action:focus-visible {
+  outline: 2px solid #fdf4ec;
+  outline-offset: 2px;
+}
+
+/* Mission briefing: one line, expandable */
+.mission-panel__details > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mission-panel__details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mission-panel__details > summary::after {
+  content: '▾';
+  margin-left: auto;
+}
+
+.mission-panel__details[open] > summary::after {
+  content: '▴';
+}
+
+.mission-panel__state {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Touch: scanner equip button sits with the boost button */
+.touch-scanner {
+  pointer-events: auto;
+  min-width: 76px;
+  min-height: 52px;
+  border: 1px solid rgba(155, 214, 168, 0.55);
+  border-radius: 999px;
+  background: rgba(155, 214, 168, 0.16);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  touch-action: manipulation;
+}
+
+.touch-scanner:active {
+  background: rgba(155, 214, 168, 0.34);
+}
+
+/* PIP subtitles stay in their own zone and never reach the reticle. */
+@media (min-width: 721px) {
+  .pip-speech {
+    max-width: min(380px, 34vw);
+  }
+}
+
+/* Keep the objective bar clear of the settings and mission chips. */
+@media (max-width: 900px) {
+  .objective-bar {
+    top: calc(56px + env(safe-area-inset-top, 0px));
+    max-width: calc(100vw - 24px);
+  }
 }

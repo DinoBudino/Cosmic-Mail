@@ -1930,7 +1930,15 @@ function drawDestinations(
   ctx.fillText('NAVIGATION', 24, 52)
   ctx.textAlign = 'right'
   ctx.fillStyle = '#FDF4EC'
-  ctx.fillText(selectedId ? 'ROUTE SUMMARY' : 'PICK A DESTINATION', NAV_W - 24, 52)
+  ctx.fillText(
+    selectedId
+      ? 'ROUTE SUMMARY'
+      : view.transmittedCount > 0
+        ? `${view.transmittedCount}/${view.totalStories} RESTORED`
+        : 'PICK A DESTINATION',
+    NAV_W - 24,
+    52,
+  )
   ctx.textAlign = 'left'
 
   const selected = destinations.find((entry) => entry.id === selectedId)

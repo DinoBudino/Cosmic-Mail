@@ -2,6 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MARS_OBJECTS, REGION_INFO } from '../data/marsObjects'
+import { lensForKey } from '../data/scannerLenses'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
@@ -13,7 +14,11 @@ import { resolveBoulderCollision } from './landscape'
 import {
   inspectSpirit,
   requestFlightRestrictedNotice,
+  requestProtocolLine,
 } from './missionNarrative'
+import { SCANNER_LOCKED_LINE, areFreeScansAllowed } from '../data/arrivalProtocol'
+import { getCurrentProtocolStep } from './protocolStep'
+import { useNarrativeStore } from '../store/narrativeStore'
 import { ScannerFirstPersonView } from './ScannerFirstPersonView'
 import { Companion } from './Companion'
 import {
@@ -24,6 +29,7 @@ import {
 } from './cameraRig'
 import {
   consumeInteract,
+  consumeScannerLensKey,
   consumeScannerToggle,
   isBootHeld,
   isRunHeld,
@@ -32,6 +38,7 @@ import {
 } from './input'
 import { findNearbyRegion, findNearbySite, getAutoMove, resolveSiteCollision } from './interaction'
 import { stepVertical, type VerticalState } from './marsGravity'
+import { markFirstControl } from './pacing'
 import { playerPosition } from './playerPosition'
 import { findNearbySpirit, resolveSpiritCollision } from './spiritSite'
 import {
@@ -198,6 +205,7 @@ export function Player() {
 
     const dt = Math.min(delta, 0.05)
     const paused = isWorldPaused()
+    if (!paused) markFirstControl()
     if (paused) {
       velocity.current.set(0, 0, 0)
       motionRef.current = 0
@@ -215,10 +223,18 @@ export function Player() {
     if (consumeScannerToggle()) {
       if (store.scannerEquipped) {
         store.unequipScanner()
+      } else if (store.scannerLocked) {
+        requestProtocolLine(SCANNER_LOCKED_LINE)
       } else if (playerPosition.airborne < 0.25) {
         store.equipScanner(SPIRIT_SITE.missionId)
       }
       store = useGameStore.getState()
+    }
+
+    const lensKey = consumeScannerLensKey()
+    if (lensKey && store.scannerEquipped) {
+      const lens = lensForKey(lensKey)
+      if (lens) store.setScannerLens(lens)
     }
 
     if (consumeInteract()) {
@@ -370,9 +386,21 @@ export function Player() {
       store.setNearbySite(null)
     }
     const regionId = findNearbyRegion(player.position)
-    if (regionId && !store.visitedRegions[regionId]) {
+    if (
+      regionId &&
+      !store.visitedRegions[regionId] &&
+      areFreeScansAllowed(getCurrentProtocolStep())
+    ) {
+      // Region comments are ambient (P3): free exploration only, and they go
+      // through the central dialogue policy like every other PIP line.
       store.markRegionVisited(regionId)
-      if (!store.nearbySiteId) store.showPipMessage(REGION_INFO[regionId].pipMessage)
+      if (!store.nearbySiteId) {
+        useNarrativeStore.getState().enqueue({
+          id: `region:${regionId}`,
+          text: REGION_INFO[regionId].pipMessage,
+          priority: 'ambient',
+        })
+      }
     }
 
     const horizontalSpeed = Math.hypot(

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getMission } from '../data/missions'
+import { getRadarTarget, getRadarTargetKind } from '../data/arrivalProtocol'
 import { SPIRIT_SITE } from '../data/spiritSite'
+import { useProtocol } from './useProtocol'
 import { playerPosition } from '../game/playerPosition'
 import {
   getRadarSnapshot,
@@ -22,6 +24,7 @@ export function CosmicRadar() {
   const nearbySpirit = useGameStore((state) => state.nearbySpirit)
   const nearbySiteId = useGameStore((state) => state.nearbySiteId)
   const radarUnlocked = useGameStore((state) => state.radarUnlocked)
+  const scannerLocked = useGameStore((state) => state.scannerLocked)
   const cinematicFocus = useGameStore((state) => state.cinematicFocus)
   const activeSiteId = useGameStore((state) => state.activeSiteId)
   const settingsOpen = useGameStore((state) => state.settingsOpen)
@@ -43,10 +46,16 @@ export function CosmicRadar() {
   const setDestination = useJourneyStore((state) => state.setDestination)
   const resetMission = useJourneyStore((state) => state.resetMission)
 
+  const { step } = useProtocol()
+  const radarTarget = getRadarTarget(step, SPIRIT_SITE.position)
+  const targetKind = getRadarTargetKind(step)
+  const targetX = radarTarget.x
+  const targetZ = radarTarget.z
+
   const [snapshot, setSnapshot] = useState<RadarSnapshot>(() =>
     getRadarSnapshot(
       playerPosition,
-      SPIRIT_SITE.position,
+      { x: targetX, z: targetZ },
       SPIRIT_RADAR_RANGE,
     ),
   )
@@ -56,7 +65,7 @@ export function CosmicRadar() {
       setSnapshot(
         getRadarSnapshot(
           playerPosition,
-          SPIRIT_SITE.position,
+          { x: targetX, z: targetZ },
           SPIRIT_RADAR_RANGE,
         ),
       )
@@ -64,7 +73,7 @@ export function CosmicRadar() {
     update()
     const timer = window.setInterval(update, RADAR_UPDATE_MS)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [targetX, targetZ])
 
   if (
     settingsOpen ||
@@ -85,38 +94,14 @@ export function CosmicRadar() {
   const archiveCta = getArchiveCtaLabel(stage)
   const discovered = Boolean(progress?.discovered)
 
-  // Landing beat: hide exact distance and bearing until PIP has oriented the
-  // carrier. The full radar appears automatically after a few seconds or a
-  // short walk.
-  if (save && !radarUnlocked && !discovered) {
-    return (
-      <aside
-        className="cosmic-radar cosmic-radar--quiet"
-        aria-label="PIP is tracing the signal"
-      >
-        <p className="settings-eyebrow">Signal survey</p>
-        <p className="cosmic-radar__quiet-line">
-          PIP is tracing a faint signal. Take in the landscape for a moment.
-        </p>
-        {(save.environmentalDiscoveries.length ?? 0) > 0 && (
-          <button
-            type="button"
-            className="cosmic-radar__action"
-            data-records-trigger
-            onClick={() =>
-              useGameStore
-                .getState()
-                .openScannerRecords(SPIRIT_SITE.missionId)
-            }
-          >
-            Field notes
-          </button>
-        )}
-      </aside>
-    )
-  }
+  // The landing step (M0) shows no radar: it appears, animated, in M1.
+  if (save && !radarUnlocked && !discovered) return null
 
-  const signalLabel = discovered ? mission.machineName : 'Unknown signal'
+  const signalLabel = discovered
+    ? mission.machineName
+    : targetKind === 'station'
+      ? 'Calibration station'
+      : 'Unknown signal'
   const blipX = 50 + snapshot.x * 42
   const blipY = 50 + snapshot.y * 42
 
@@ -152,6 +137,8 @@ export function CosmicRadar() {
   return (
     <aside
       className={`cosmic-radar${nearbySpirit ? ' is-near' : ''}${
+        step === 'M1' || step === 'M3' ? ' is-guided' : ''
+      }${
         pipMessage ? ' is-pip-speaking' : ''
       }`}
       aria-label={`Cosmic radar: ${signalLabel}`}
@@ -251,7 +238,7 @@ export function CosmicRadar() {
         </p>
       )}
 
-      {nearbySpirit && save && (
+      {nearbySpirit && save && !scannerLocked && (
         <button
           type="button"
           className="site-action cosmic-radar__scan"
@@ -263,7 +250,7 @@ export function CosmicRadar() {
           <span className="touch-interact">Tap to equip scanner</span>
         </button>
       )}
-      {!nearbySpirit && save && (
+      {!nearbySpirit && save && step !== 'M1' && step !== 'M3' && (
         <p className="cosmic-radar__note">
           Press Q to equip the Cosmic Scanner. Move the mouse to aim and hold
           left click to scan.

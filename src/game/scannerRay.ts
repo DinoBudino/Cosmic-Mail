@@ -7,6 +7,8 @@
 export interface ScannerRayHit {
   componentId: string | null
   missionId: string | null
+  /** Real rover part that gives a PIP note but no progress. */
+  distractorId?: string | null
   /** Optional environmental observation anchored to a world mesh. */
   environmentalId?: string | null
   /** Distance from the camera along the ray. */
@@ -39,7 +41,19 @@ export interface EnvironmentalScannerTarget {
   z: number
 }
 
-export type ScannerPick = ScannerTarget | EnvironmentalScannerTarget | null
+export interface DistractorScannerTarget {
+  distractorId: string
+  distance: number
+  x: number
+  y: number
+  z: number
+}
+
+export type ScannerPick =
+  | ScannerTarget
+  | EnvironmentalScannerTarget
+  | DistractorScannerTarget
+  | null
 
 export function pickScannerTarget(
   hits: readonly ScannerRayHit[],
@@ -55,6 +69,19 @@ export function pickScannerTarget(
       if (distance > range) return null
       return {
         environmentalId: hit.environmentalId,
+        distance,
+        x: hit.x,
+        y: hit.y,
+        z: hit.z,
+      }
+    }
+
+    if (hit.distractorId) {
+      if (hit.missionId !== missionId) return null
+      const distance = Math.hypot(hit.x - player.x, hit.z - player.z)
+      if (distance > range) return null
+      return {
+        distractorId: hit.distractorId,
         distance,
         x: hit.x,
         y: hit.y,

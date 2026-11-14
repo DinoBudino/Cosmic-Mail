@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import './App.css'
 import { attachInput, clearInput } from './game/input'
 import { getEscapeAction } from './game/escapePriority'
+import { installPacing } from './game/pacing'
 import { MissionNarrativeController } from './game/MissionNarrativeController'
 import { isWorldPaused, useGameStore } from './store/gameStore'
 import { useOnboardingStore } from './store/onboardingStore'
@@ -19,6 +20,7 @@ import { SpiritInteraction } from './ui/SpiritInteraction'
 import { CinematicOverlay } from './ui/CinematicOverlay'
 import { Hud } from './ui/Hud'
 import { MissionPanel } from './ui/MissionPanel'
+import { ObjectiveBar } from './ui/ObjectiveBar'
 import { PipSpeech } from './ui/PipSpeech'
 import { SettingsMenu } from './ui/SettingsMenu'
 import { TouchControls } from './ui/TouchControls'
@@ -34,6 +36,8 @@ export default function App() {
   const onboardingActive = useOnboardingStore((state) => state.phase !== 'playing')
 
   useEffect(() => attachInput(isWorldPaused), [])
+
+  useEffect(() => installPacing(), [])
 
   useEffect(() => {
     const stopTravel = () => useGameStore.getState().cancelTravel()
@@ -100,6 +104,7 @@ export default function App() {
             </SceneBoundary>
 
             <Hud />
+            <ObjectiveBar />
             <MissionPanel />
             <CosmicRadar />
             <ScannerHud />

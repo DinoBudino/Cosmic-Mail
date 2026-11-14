@@ -20,6 +20,9 @@ export function TouchControls() {
     (state) => state.scannerRecordsOpen,
   )
   const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
+  const scannerEquipped = useGameStore((state) => state.scannerEquipped)
+  const scannerLocked = useGameStore((state) => state.scannerLocked)
+  const equipScanner = useGameStore((state) => state.equipScanner)
   const progress = useJourneyStore(
     (state) => state.save?.missions[SPIRIT_SITE.missionId] ?? null,
   )
@@ -118,6 +121,17 @@ export function TouchControls() {
         <div ref={knobRef} className="touch-knob" />
       </div>
       <p className="touch-hint">Drag to move · push far to run</p>
+      {!scannerEquipped && !scannerLocked && (
+        <button
+          type="button"
+          className="touch-scanner"
+          aria-label="Equip the Cosmic Scanner"
+          onClick={() => equipScanner(SPIRIT_SITE.missionId)}
+        >
+          Scanner
+        </button>
+      )}
+      {!flightLocked && (
       <button
         type="button"
         className="touch-boost"
@@ -139,6 +153,7 @@ export function TouchControls() {
       >
         Boost
       </button>
+      )}
     </div>
   )
 }

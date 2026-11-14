@@ -2,11 +2,19 @@ import { create } from 'zustand'
 import type { Quality } from '../game/worldConfig'
 import type { MissionId } from '../data/missions'
 import type { MarsObjectId } from '../data/marsObjects'
+import { DEFAULT_SCANNER_LENS, type ScannerLensId } from '../data/scannerLenses'
 import {
   clampVolume,
   sanitizeAudioPreferences,
   type AudioPreferences,
 } from '../game/audio/audioSettings'
+import {
+  createReconstruction,
+  revealFragment,
+  allFragmentsRevealed,
+  type MemoryFragmentKind,
+  type ReconstructionState,
+} from '../data/fullScanReconstruction'
 import { clearInput } from '../game/input'
 import { isOnboardingActive } from './onboardingStore'
 
@@ -130,6 +138,15 @@ interface GameState {
   scannerOpen: boolean
   scannerMissionId: MissionId | null
   scannerSelectedComponentId: string | null
+  /** Active scanner lens. Ephemeral: never persisted, never progress. */
+  scannerLens: ScannerLensId
+  /** True once the player has switched lens at least once this visit. */
+  lensTouched: boolean
+  /** Wrong-lens presses per component this visit (ephemeral). */
+  wrongLensAttempts: Record<string, number>
+  registerWrongLensAttempt: (componentId: string) => number
+  /** Distractor rover part under the reticle (gives a note, no progress). */
+  scannerDistractorId: string | null
   /** Primary 3D scanner mode: the astronaut physically holds the device. */
   scannerEquipped: boolean
   /** 0..1 hold-to-scan progress for the current target. */
@@ -142,10 +159,38 @@ interface GameState {
   scannerAnalysis: 'idle' | 'quick' | 'detailed'
   /** Left mouse / touch hold while the scanner is equipped. */
   scannerTriggerHeld: boolean
+  /**
+   * Touch: a quick tap latched the scan on the current target so the finger
+   * can lift. Always implies `scannerTriggerHeld`; releasing clears it.
+   */
+  scannerLatched: boolean
   /** Component explanation that temporarily blocks another historical scan. */
   historicalExplanationId: string | null
   /** Progressive radar: hidden during the first landing beat. */
   radarUnlocked: boolean
+  /** Arrival protocol: the scanner stays locked until the calibration station. */
+  scannerLocked: boolean
+  setScannerLocked: (locked: boolean) => void
+  /** Memorial landmarks open only in free exploration (protocol M7). */
+  landmarksLocked: boolean
+  setLandmarksLocked: (locked: boolean) => void
+  /**
+   * Full recognition scan (ephemeral, never persisted). The in-world sweep
+   * and the accessible panel share this one reconstruction state; the only
+   * persisted effect stays the single `completeFullScan` event.
+   */
+  fullScanRecon: ReconstructionState
+  fullScanSweepActive: boolean
+  scannerTraceKind: MemoryFragmentKind | null
+  setFullScanRecon: (
+    next: ReconstructionState | ((current: ReconstructionState) => ReconstructionState),
+  ) => void
+  resetFullScan: () => void
+  /** Leaves the dialog and starts sweeping the explorer in the world. */
+  startFullScanSweep: (missionId: MissionId) => void
+  /** Reveals one trace; the fourth one opens the rebuild step. */
+  revealFullScanTrace: (kind: MemoryFragmentKind, missionId: MissionId) => boolean
+  setScannerTraceTarget: (kind: MemoryFragmentKind | null) => void
   /** Short, skippable camera emphasis for sighting/identification. */
   cinematicFocus: {
     kind: 'sighting' | 'identification'
@@ -182,10 +227,13 @@ interface GameState {
   unequipScanner: () => void
   toggleScanner: (missionId: MissionId) => void
   setScannerTarget: (componentId: string | null) => void
+  setScannerLens: (lens: ScannerLensId) => void
+  setScannerDistractorTarget: (distractorId: string | null) => void
   setScannerEnvironmentalTarget: (environmentalId: string | null) => void
   setScannerPhysicalState: (state: ScannerPhysicalState) => void
   setScannerAnalysis: (analysis: 'idle' | 'quick' | 'detailed') => void
   setScannerTrigger: (held: boolean) => void
+  setScannerLatched: () => void
   setScannerScanProgress: (progress: number) => void
   setHistoricalExplanation: (cueId: string | null) => void
   setRadarUnlocked: (unlocked: boolean) => void
@@ -260,6 +308,10 @@ export const useGameStore = create<GameState>((set, get) => {
   scannerOpen: false,
   scannerMissionId: null,
   scannerSelectedComponentId: null,
+  scannerLens: DEFAULT_SCANNER_LENS,
+  lensTouched: false,
+  wrongLensAttempts: {},
+  scannerDistractorId: null,
   scannerEquipped: false,
   scannerScanProgress: 0,
   scannerEnvironmentalId: null,
@@ -267,8 +319,14 @@ export const useGameStore = create<GameState>((set, get) => {
   scannerPhysicalState: 'idle',
   scannerAnalysis: 'idle',
   scannerTriggerHeld: false,
+  scannerLatched: false,
   historicalExplanationId: null,
   radarUnlocked: false,
+  scannerLocked: false,
+  landmarksLocked: false,
+  fullScanRecon: createReconstruction(),
+  fullScanSweepActive: false,
+  scannerTraceKind: null,
   cinematicFocus: null,
   scannerCardComponentId: null,
   scannerRecordsOpen: false,
@@ -310,6 +368,7 @@ export const useGameStore = create<GameState>((set, get) => {
   openNearbySite: () => {
     const state = get()
     if (
+      state.landmarksLocked ||
       state.settingsOpen ||
       state.activeSiteId ||
       state.scannerOpen ||
@@ -350,6 +409,7 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerPhysicalState: 'idle',
       scannerAnalysis: 'idle',
       scannerTriggerHeld: false,
+      scannerLatched: false,
       scannerScanProgress: 0,
       travelTargetId: null,
     })
@@ -365,6 +425,7 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerPhysicalState: 'idle',
       scannerAnalysis: 'idle',
       scannerTriggerHeld: false,
+      scannerLatched: false,
       scannerScanProgress: 0,
       ...(equipped ? {} : { scannerMissionId: null }),
     })
@@ -376,6 +437,7 @@ export const useGameStore = create<GameState>((set, get) => {
   equipScanner: (scannerMissionId) => {
     const state = get()
     if (
+      state.scannerLocked ||
       state.settingsOpen ||
       state.activeSiteId ||
       state.scannerOpen ||
@@ -390,12 +452,14 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerEquipped: true,
       scannerMissionId,
       scannerSelectedComponentId: null,
+      scannerDistractorId: null,
       scannerEnvironmentalId: null,
       scannerTargetKind: null,
       scannerPhysicalState: 'idle',
       scannerAnalysis: 'idle',
       scannerScanProgress: 0,
       scannerTriggerHeld: false,
+      scannerLatched: false,
       travelTargetId: null,
     })
   },
@@ -404,13 +468,16 @@ export const useGameStore = create<GameState>((set, get) => {
     set({
       scannerEquipped: false,
       scannerMissionId: null,
+      scannerTraceKind: null,
       scannerSelectedComponentId: null,
+      scannerDistractorId: null,
       scannerEnvironmentalId: null,
       scannerTargetKind: null,
       scannerPhysicalState: 'idle',
       scannerAnalysis: 'idle',
       scannerScanProgress: 0,
       scannerTriggerHeld: false,
+      scannerLatched: false,
       scannerCardComponentId: null,
       scannerRecordsOpen: false,
     })
@@ -426,9 +493,41 @@ export const useGameStore = create<GameState>((set, get) => {
     set({
       scannerSelectedComponentId,
       scannerEnvironmentalId: null,
+      ...(scannerSelectedComponentId ? { scannerDistractorId: null } : {}),
       scannerTargetKind: scannerSelectedComponentId ? 'component' : null,
       scannerPhysicalState: scannerSelectedComponentId ? 'valid' : 'idle',
       scannerAnalysis: 'idle',
+      scannerScanProgress: 0,
+    })
+  },
+  setScannerLens: (scannerLens) => {
+    const state = get()
+    if (state.scannerLens === scannerLens) return
+    // Switching lens restarts any in-flight hold; movement is untouched.
+    set({ scannerLens, scannerScanProgress: 0, lensTouched: true })
+  },
+  registerWrongLensAttempt: (componentId) => {
+    const next = (get().wrongLensAttempts[componentId] ?? 0) + 1
+    set((state) => ({
+      wrongLensAttempts: { ...state.wrongLensAttempts, [componentId]: next },
+    }))
+    return next
+  },
+  setScannerDistractorTarget: (scannerDistractorId) => {
+    const state = get()
+    if (!state.scannerEquipped && scannerDistractorId !== null) return
+    if (state.scannerDistractorId === scannerDistractorId) return
+    set({
+      scannerDistractorId,
+      ...(scannerDistractorId
+        ? {
+            scannerSelectedComponentId: null,
+            scannerEnvironmentalId: null,
+            scannerTargetKind: null,
+            scannerPhysicalState: 'valid' as const,
+            scannerAnalysis: 'idle' as const,
+          }
+        : {}),
       scannerScanProgress: 0,
     })
   },
@@ -439,6 +538,7 @@ export const useGameStore = create<GameState>((set, get) => {
     set({
       scannerEnvironmentalId,
       scannerSelectedComponentId: null,
+      ...(scannerEnvironmentalId ? { scannerDistractorId: null } : {}),
       scannerTargetKind: scannerEnvironmentalId ? 'environmental' : null,
       scannerPhysicalState: scannerEnvironmentalId ? 'valid' : 'idle',
       scannerAnalysis: 'idle',
@@ -456,6 +556,14 @@ export const useGameStore = create<GameState>((set, get) => {
   setHistoricalExplanation: (historicalExplanationId) => {
     if (get().historicalExplanationId === historicalExplanationId) return
     set({ historicalExplanationId })
+  },
+  setLandmarksLocked: (landmarksLocked) => {
+    if (get().landmarksLocked === landmarksLocked) return
+    set({ landmarksLocked })
+  },
+  setScannerLocked: (scannerLocked) => {
+    if (get().scannerLocked === scannerLocked) return
+    set({ scannerLocked })
   },
   setRadarUnlocked: (radarUnlocked) => {
     if (get().radarUnlocked === radarUnlocked) return
@@ -482,8 +590,15 @@ export const useGameStore = create<GameState>((set, get) => {
     if (state.scannerTriggerHeld === scannerTriggerHeld) return
     set({
       scannerTriggerHeld,
-      ...(scannerTriggerHeld ? {} : { scannerScanProgress: 0 }),
+      // Releasing the trigger always drops a touch latch.
+      ...(scannerTriggerHeld ? {} : { scannerScanProgress: 0, scannerLatched: false }),
     })
+  },
+  setScannerLatched: () => {
+    const state = get()
+    if (!state.scannerEquipped || !state.scannerTriggerHeld) return
+    if (state.scannerLatched) return
+    set({ scannerLatched: true })
   },
   setScannerScanProgress: (progress) => {
     if (!get().scannerEquipped) return
@@ -497,6 +612,7 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerRecordsOpen: true,
       scannerCardComponentId,
       scannerTriggerHeld: false,
+      scannerLatched: false,
       scannerScanProgress: 0,
     })
   },
@@ -520,6 +636,7 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerPhysicalState: 'idle',
       scannerAnalysis: 'idle',
       scannerTriggerHeld: false,
+      scannerLatched: false,
       scannerScanProgress: 0,
       travelTargetId: null,
     })
@@ -541,6 +658,7 @@ export const useGameStore = create<GameState>((set, get) => {
       archiveView,
       archiveMissionId,
       scannerOpen: false,
+      scannerTraceKind: null,
       scannerEquipped: false,
       scannerMissionId: null,
       scannerSelectedComponentId: null,
@@ -549,6 +667,7 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerPhysicalState: 'idle',
       scannerAnalysis: 'idle',
       scannerTriggerHeld: false,
+      scannerLatched: false,
       scannerScanProgress: 0,
       scannerCardComponentId: null,
       scannerRecordsOpen: false,
@@ -559,6 +678,61 @@ export const useGameStore = create<GameState>((set, get) => {
   closeArchive: () => {
     clearInput()
     set({ archiveView: 'none', archiveMissionId: null })
+  },
+  setFullScanRecon: (next) => {
+    set((state) => ({
+      fullScanRecon:
+        typeof next === 'function' ? next(state.fullScanRecon) : next,
+    }))
+  },
+  resetFullScan: () => {
+    set({
+      fullScanRecon: createReconstruction(),
+      fullScanSweepActive: false,
+      scannerTraceKind: null,
+    })
+  },
+  startFullScanSweep: (missionId) => {
+    const state = get()
+    if (allFragmentsRevealed(state.fullScanRecon)) {
+      get().openArchive('full-scan', missionId)
+      return
+    }
+    if (state.archiveView !== 'none') get().closeArchive()
+    set({ fullScanSweepActive: true })
+    get().equipScanner(missionId)
+  },
+  revealFullScanTrace: (kind, missionId) => {
+    const result = revealFragment(get().fullScanRecon, kind)
+    if (result.action !== 'revealed') return false
+    set({
+      fullScanRecon: result.state,
+      scannerTraceKind: null,
+    })
+    if (allFragmentsRevealed(result.state)) {
+      set({ fullScanSweepActive: false })
+      get().openArchive('full-scan', missionId)
+    }
+    return true
+  },
+  setScannerTraceTarget: (kind) => {
+    const state = get()
+    if (!state.scannerEquipped && kind !== null) return
+    if (state.scannerTraceKind === kind) return
+    set({
+      scannerTraceKind: kind,
+      ...(kind
+        ? {
+            scannerSelectedComponentId: null,
+            scannerDistractorId: null,
+            scannerEnvironmentalId: null,
+            scannerTargetKind: null,
+            scannerPhysicalState: 'valid' as const,
+            scannerAnalysis: 'idle' as const,
+          }
+        : {}),
+      scannerScanProgress: 0,
+    })
   },
   setQuality: (quality) => {
     set({ quality })
@@ -630,6 +804,7 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerPhysicalState: 'idle',
       scannerAnalysis: 'idle',
       scannerTriggerHeld: false,
+      scannerLatched: false,
       scannerScanProgress: 0,
       scannerCardComponentId: null,
       scannerRecordsOpen: false,

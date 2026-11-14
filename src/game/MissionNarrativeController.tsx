@@ -1,10 +1,24 @@
 import { useEffect, useRef } from 'react'
+import {
+  LATER_LINE,
+  OFF_TRAIL_LINE,
+  SAMPLE_LENS_LINE,
+  STEP_ENTRY_LINES,
+  CALIBRATION_SAMPLE,
+  areFreeScansAllowed,
+  hasReachedStation,
+  hasWalkedEnough,
+  isCalibrationSampleId,
+  isOutsideCorridor,
+  isRadarVisible,
+  isScannerUnlocked,
+  type ProtocolStep,
+} from '../data/arrivalProtocol'
 import { getEnvironmentalSite } from '../data/environmentalSites'
 import { getMission } from '../data/missions'
 import {
   getAmbientCue,
   getEnvironmentalCue,
-  getEnvironmentalTutorialCue,
   getFirstEnvironmentalScanCue,
   getApproachedCue,
   getArchiveCue,
@@ -17,27 +31,25 @@ import {
   getMissionEntryCue,
   getNewComponentIds,
   getReturnToShipCue,
-  getScannerEquippedCue,
-  getScannerPromptCue,
-  getScanInterruptedCue,
-  getScanStartedCue,
   getSoftHintCue,
-  getTargetDetectedCue,
   scannedComponentCount,
   stageForProgress,
 } from '../data/missionNarrative'
+import { getFieldNotesView } from '../data/fieldNotes'
+import { getRevisitExploreCue } from '../data/sliceClosure'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { emitAudio } from './audio/audioEvents'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import {
-  isCoarsePointer,
+  requestProtocolLine,
   MISSION_APPROACH_RADIUS,
   MISSION_DETECT_RADIUS,
   MISSION_NARRATIVE_ID,
 } from './missionNarrative'
 import { stopPipVoice } from './pipVoice'
+import { getCurrentProtocolStep } from './protocolStep'
 import { playerPosition } from './playerPosition'
 import { PLAYER } from './worldConfig'
 import {
@@ -51,7 +63,12 @@ import {
   type GuideTimingState,
 } from './pipGuide'
 
-const SCAN_INTERRUPT_COOLDOWN_MS = 10_000
+/** True once the explorer is identified: far-sighting lines are then stale. */
+function isMissionDiscovered(): boolean {
+  return Boolean(
+    useJourneyStore.getState().save?.missions[MISSION_NARRATIVE_ID]?.discovered,
+  )
+}
 
 /**
  * Turns persistent mission progress and the player's world actions into
@@ -59,8 +76,10 @@ const SCAN_INTERRUPT_COOLDOWN_MS = 10_000
  * queue and Companion reacts to the ephemeral reaction/attention signals.
  *
  * Identity discipline: the far detection only says "something is there".
- * The journey store is not marked `discovered` until the player reaches the
- * inspection ring, and only then can PIP say Spirit's name.
+ * The journey store is not marked `discovered` by proximity: that only
+ * happens when the player reaches the inspection ring and presses E
+ * (`inspectSpirit`, called from SpiritInteraction). Only then can PIP say
+ * Spirit's name.
  *
  * Repetition discipline: every cue has a stable id. Narrative lines are
  * once per visit, scan-start is once per component, interruptions have a
@@ -68,7 +87,6 @@ const SCAN_INTERRUPT_COOLDOWN_MS = 10_000
  */
 export function MissionNarrativeController() {
   const save = useJourneyStore((state) => state.save)
-  const scannerEquipped = useGameStore((state) => state.scannerEquipped)
   const archiveView = useGameStore((state) => state.archiveView)
   const archiveMissionId = useGameStore((state) => state.archiveMissionId)
   const settingsOpen = useGameStore((state) => state.settingsOpen)
@@ -87,8 +105,6 @@ export function MissionNarrativeController() {
   const detectedRef = useRef(false)
   const approachedRef = useRef(false)
   const approachAtRef = useRef(0)
-  const promptedRef = useRef(false)
-  const scannerInstructionRef = useRef(false)
   const previousScannedRef = useRef<string[]>([])
   const previousTransmittedRef = useRef(false)
   const previousLetterRef = useRef(false)
@@ -96,23 +112,14 @@ export function MissionNarrativeController() {
   const archiveWasOpenRef = useRef(false)
   const identifiedRef = useRef(false)
   const previousTargetRef = useRef<string | null>(null)
-  const targetHintShownRef = useRef(false)
-  const scanStartedRef = useRef(false)
-  const scanStartedTargetRef = useRef<string | null>(null)
-  const lastInterruptAtRef = useRef(0)
   const lastPlayerRef = useRef({ x: playerPosition.x, z: playerPosition.z })
   const lastStageRef = useRef(stage)
   const lastScannedCountRef = useRef(scannedComponentCount(progress))
   const guideTimingRef = useRef<GuideTimingState>(createGuideTiming(0))
   const enteredAtRef = useRef(0)
-  const startPositionRef = useRef({
-    x: playerPosition.x,
-    z: playerPosition.z,
-  })
   const previousEnvironmentalRef = useRef<string[]>([])
   const previousEnvironmentalDetailedRef = useRef<string[]>([])
   const environmentalIntroShownRef = useRef(false)
-  const environmentalTutorialShownRef = useRef(false)
 
   // A new Mars visit starts from a clean ephemeral narrative session.
   useEffect(
@@ -129,6 +136,17 @@ export function MissionNarrativeController() {
     enteredRef.current = true
     const cue = getMissionEntryCue(mission, progress)
     if (cue) useNarrativeStore.getState().enqueue(cue)
+    // A restored mission is free exploration: field notes are the goal now.
+    const notes = getFieldNotesView({
+      environmentalDiscoveries: save.environmentalDiscoveries ?? [],
+      memorialVisits: save.memorialVisits ?? [],
+    })
+    const exploreCue = getRevisitExploreCue(
+      mission.id,
+      progress,
+      notes.totalCount - notes.unlockedCount,
+    )
+    if (exploreCue) useNarrativeStore.getState().enqueue(exploreCue)
     previousScannedRef.current = [...(progress?.scannedComponentIds ?? [])]
     previousTransmittedRef.current = Boolean(progress?.transmittedAt)
     previousLetterRef.current = Boolean(progress?.smartLetterCreatedAt)
@@ -141,7 +159,6 @@ export function MissionNarrativeController() {
     lastScannedCountRef.current = scannedComponentCount(progress)
     guideTimingRef.current = createGuideTiming(Date.now())
     lastPlayerRef.current = { x: playerPosition.x, z: playerPosition.z }
-    startPositionRef.current = { x: playerPosition.x, z: playerPosition.z }
     enteredAtRef.current = Date.now()
     previousEnvironmentalRef.current = [
       ...(save.environmentalDiscoveries ?? []),
@@ -149,17 +166,6 @@ export function MissionNarrativeController() {
     previousEnvironmentalDetailedRef.current = [
       ...(save.environmentalDetailedDiscoveries ?? []),
     ]
-    // A brand-new landing hides the detailed radar; a revisit already knows
-    // the route and can show it immediately.
-    useGameStore
-      .getState()
-      .setRadarUnlocked(
-        Boolean(
-          progress?.discovered ||
-            progress?.scannedComponentIds.length ||
-            progress?.memoryRecoveredAt,
-        ),
-      )
   }, [save, mission, progress])
 
   // Detection, identification, scanner hints and voluntary guidance are
@@ -200,22 +206,6 @@ export function MissionNarrativeController() {
       }
       guideTimingRef.current = timing
 
-      // Progressive radar: the landing beat keeps the detailed distance and
-      // bearing hidden until the player has looked around or walked a little.
-      if (!game.radarUnlocked) {
-        const walked = Math.hypot(
-          playerPosition.x - startPositionRef.current.x,
-          playerPosition.z - startPositionRef.current.z,
-        )
-        if (
-          (enteredAtRef.current > 0 &&
-            now - enteredAtRef.current > 6500) ||
-          walked > 6
-        ) {
-          game.setRadarUnlocked(true)
-        }
-      }
-
       // Reading modals and site panels own the screen; no world dialogue and
       // no proactive help while the player is reading.
       if (
@@ -240,22 +230,6 @@ export function MissionNarrativeController() {
         playerPosition.z - SPIRIT_SITE.position.z,
       )
 
-      // After the landing orientation, invite the player to try the same
-      // scanner on the landscape. Equipping it early suppresses this line.
-      if (
-        !game.scannerEquipped &&
-        !currentProgress.discovered &&
-        currentSave.environmentalDiscoveries.length === 0 &&
-        !environmentalTutorialShownRef.current &&
-        now - enteredAtRef.current > 8000 &&
-        distance > MISSION_DETECT_RADIUS + 2 &&
-        !narrative.current &&
-        narrative.queue.length === 0
-      ) {
-        environmentalTutorialShownRef.current = true
-        narrative.enqueue(getEnvironmentalTutorialCue(isCoarsePointer()))
-      }
-
       const withinApproach =
         distance <= MISSION_APPROACH_RADIUS &&
         playerPosition.airborne <= PLAYER.inspectMaxHeight
@@ -268,7 +242,9 @@ export function MissionNarrativeController() {
         if (!currentProgress.discovered && !withinApproach) {
           emitAudio('pipSurprised')
           const cue = getDetectedCue(mission)
-          if (cue) narrative.enqueue(cue)
+          if (cue) {
+            narrative.enqueue({ ...cue, cancelWhen: isMissionDiscovered })
+          }
           narrative.react('detect', undefined, 2200)
           game.startCinematic(
             'sighting',
@@ -291,27 +267,13 @@ export function MissionNarrativeController() {
         if (!wasDiscovered) {
           emitAudio('pipCurious')
           const approached = getApproachedCue(mission)
-          if (approached) narrative.enqueue(approached)
+          if (approached) {
+            narrative.enqueue({ ...approached, cancelWhen: isMissionDiscovered })
+          }
           narrative.react('approach', undefined, 2400)
         } else {
           narrative.react('approach', undefined, 2400)
         }
-      }
-
-      // Give the player a few seconds to equip the scanner themselves before
-      // PIP repeats the control hint. Equipping earlier suppresses it.
-      if (
-        approachedRef.current &&
-        currentProgress.discovered &&
-        scannedComponentCount(currentProgress) === 0 &&
-        !promptedRef.current &&
-        !game.scannerEquipped &&
-        distance <= MISSION_APPROACH_RADIUS &&
-        now - approachAtRef.current >= 4500
-      ) {
-        promptedRef.current = true
-        const prompt = getScannerPromptCue(mission, isCoarsePointer())
-        if (prompt) narrative.enqueue(prompt)
       }
 
       // First time the reticle rests on a landscape feature, explain that the
@@ -319,6 +281,8 @@ export function MissionNarrativeController() {
       if (
         game.scannerEquipped &&
         game.scannerEnvironmentalId &&
+        !isCalibrationSampleId(game.scannerEnvironmentalId) &&
+        areFreeScansAllowed(getCurrentProtocolStep(currentSave)) &&
         !environmentalIntroShownRef.current &&
         !narrative.current &&
         narrative.queue.length === 0
@@ -327,82 +291,14 @@ export function MissionNarrativeController() {
         narrative.enqueue(getFirstEnvironmentalScanCue())
       }
 
-      // The reticle resting on a valid part earns one short acknowledgement.
+      // The reticle label, the scanner panel and the objective bar own the
+      // aiming and holding feedback; PIP stays quiet there so nothing is said
+      // twice. Only the reaction animation remains.
       const targetId = game.scannerSelectedComponentId
       if (targetId !== previousTargetRef.current) {
-        const wasScanning = scanStartedRef.current
-        const previousTarget = scanStartedTargetRef.current
-        if (
-          wasScanning &&
-          previousTarget &&
-          !currentProgress.scannedComponentIds.includes(previousTarget)
-        ) {
-          if (now - lastInterruptAtRef.current >= SCAN_INTERRUPT_COOLDOWN_MS) {
-            lastInterruptAtRef.current = now
-            if (!narrative.current && narrative.queue.length === 0) {
-              const interrupted = getScanInterruptedCue(mission)
-              if (interrupted) narrative.enqueue(interrupted)
-            }
-          }
-        }
         previousTargetRef.current = targetId
-        scanStartedRef.current = false
-        scanStartedTargetRef.current = null
-      }
-
-      if (
-        targetId &&
-        !targetHintShownRef.current &&
-        currentProgress.discovered &&
-        !currentProgress.scannedComponentIds.includes(targetId) &&
-        !game.scannerScanProgress &&
-        !narrative.current &&
-        narrative.queue.length === 0
-      ) {
-        targetHintShownRef.current = true
-        const cue = getTargetDetectedCue(mission)
-        if (cue) narrative.enqueue(cue)
-        narrative.react('scan', targetId, 2200)
-      }
-
-      // A real hold-to-scan starts. One short line per component per visit.
-      if (
-        targetId &&
-        game.scannerScanProgress > 0.08 &&
-        !scanStartedRef.current
-      ) {
-        scanStartedRef.current = true
-        scanStartedTargetRef.current = targetId
-        // Never queue "keep holding" behind an older instruction or behind
-        // the explanation of an already-completed scan.
-        if (!narrative.current && narrative.queue.length === 0) {
-          const cue = getScanStartedCue(mission, targetId)
-          if (cue) narrative.enqueue(cue)
-        }
-        narrative.react('scan', targetId, 2600)
-      }
-
-      // Released, aimed away or cancelled before completion.
-      if (
-        scanStartedRef.current &&
-        !game.scannerScanProgress &&
-        !game.scannerTriggerHeld
-      ) {
-        const startedTarget = scanStartedTargetRef.current
-        const completed = startedTarget
-          ? currentProgress.scannedComponentIds.includes(startedTarget)
-          : true
-        scanStartedRef.current = false
-        scanStartedTargetRef.current = null
-        if (
-          !completed &&
-          now - lastInterruptAtRef.current >= SCAN_INTERRUPT_COOLDOWN_MS
-        ) {
-          lastInterruptAtRef.current = now
-          if (!narrative.current && narrative.queue.length === 0) {
-            const interrupted = getScanInterruptedCue(mission)
-            if (interrupted) narrative.enqueue(interrupted)
-          }
+        if (targetId && currentProgress.discovered) {
+          narrative.react('scan', targetId, 2200)
         }
       }
 
@@ -455,16 +351,92 @@ export function MissionNarrativeController() {
     return () => window.clearInterval(timer)
   }, [save, mission])
 
-  // First scanner equip gets one short aiming instruction.
+  // Arrival protocol: flags, gates and one line per step. Everything here is
+  // derived from the journey save plus ephemeral flags, so a reload resumes
+  // at the right step. It runs even after transmission (M7 opens the world).
+  const lastStepRef = useRef<ProtocolStep | null>(null)
   useEffect(() => {
-    if (!scannerEquipped || scannerInstructionRef.current) return
-    if (!save || progress?.transmittedAt || !progress?.discovered) return
-    // The scanner tutorial is only useful before the first historical scan.
-    if (scannedComponentCount(progress) !== 0) return
-    scannerInstructionRef.current = true
-    const cue = getScannerEquippedCue(mission)
-    if (cue) useNarrativeStore.getState().enqueue(cue)
-  }, [scannerEquipped, save, mission, progress])
+    if (!save) return
+    const tick = () => {
+      const currentSave = useJourneyStore.getState().save
+      if (!currentSave) return
+      const narrative = useNarrativeStore.getState()
+      const game = useGameStore.getState()
+      const currentProgress = currentSave.missions[MISSION_NARRATIVE_ID]
+
+      // Ephemeral facts earned by playing; only before the explorer is known.
+      if (!currentProgress?.discovered) {
+        if (!narrative.protocol.walked && hasWalkedEnough(playerPosition)) {
+          narrative.markProtocol('walked')
+        }
+        const afterWalk = useNarrativeStore.getState().protocol
+        if (
+          afterWalk.walked &&
+          !afterWalk.stationReached &&
+          hasReachedStation(playerPosition)
+        ) {
+          narrative.markProtocol('stationReached')
+        }
+      }
+
+      const step = getCurrentProtocolStep(currentSave)
+      game.setRadarUnlocked(isRadarVisible(step))
+      game.setScannerLocked(!isScannerUnlocked(step))
+      game.setLandmarksLocked(!areFreeScansAllowed(step))
+      narrative.setAmbientAllowed(areFreeScansAllowed(step))
+      if (!isScannerUnlocked(step) && game.scannerEquipped) {
+        game.unequipScanner()
+      }
+
+      const previous = lastStepRef.current
+      if (previous !== step) {
+        lastStepRef.current = step
+        // The first observed step is the starting point (landing line or a
+        // resumed save): only real transitions get a new line.
+        const entry = STEP_ENTRY_LINES[step]
+        if (previous !== null && entry) {
+          narrative.enqueue({
+            id: entry.id,
+            text: entry.text,
+            priority: 'mission',
+            expression: 'focused',
+            tier: 0,
+            // Cancelled if the player has already moved on to another step.
+            cancelWhen: () => getCurrentProtocolStep() !== step,
+          })
+        }
+      }
+
+      const quiet =
+        game.settingsOpen ||
+        game.scannerOpen ||
+        game.scannerRecordsOpen ||
+        game.scannerCardComponentId ||
+        game.archiveView !== 'none' ||
+        game.activeSiteId
+
+      if (!quiet) {
+        if (isOutsideCorridor(step, playerPosition)) {
+          requestProtocolLine(OFF_TRAIL_LINE, 25_000)
+        }
+        if (game.nearbySiteId && game.landmarksLocked) {
+          requestProtocolLine(LATER_LINE, 30_000)
+        }
+        if (
+          step === 'M2' &&
+          game.scannerEquipped &&
+          game.scannerEnvironmentalId === CALIBRATION_SAMPLE.id &&
+          game.scannerLens !== CALIBRATION_SAMPLE.lens
+        ) {
+          // The sample's lens is explained once, in the open.
+          requestProtocolLine(SAMPLE_LENS_LINE, Number.MAX_SAFE_INTEGER)
+        }
+      }
+    }
+    tick()
+    const timer = window.setInterval(tick, 250)
+    return () => window.clearInterval(timer)
+  }, [save])
 
   // A new record produces exactly one explanation, even through assisted review.
   useEffect(() => {
@@ -498,8 +470,8 @@ export function MissionNarrativeController() {
         if (!assistOpen) {
           const cue = getComponentCue(mission, id)
           if (cue && narrative.enqueue(cue)) {
-            // Block only the start of another historical scan until this
-            // explanation really ends or is skipped.
+            // Marks the explanation as active so ambient lines wait for it.
+            // It never blocks scanning: the player can always keep going.
             useGameStore.getState().setHistoricalExplanation(cue.id)
           }
           narrative.showAttention(id, 'scan', 2600)
@@ -557,16 +529,15 @@ export function MissionNarrativeController() {
       (id) => !previousQuick.includes(id) && !newDetailed.includes(id),
     )
 
+    // One short P3 comment per observation, free exploration only. The
+    // detailed reading lives in the reading card and the passport field notes.
     const narrative = useNarrativeStore.getState()
-    for (const id of newDetailed) {
-      const site = getEnvironmentalSite(id)
-      if (!site) continue
-      narrative.enqueue(getEnvironmentalCue(id, true, site.detailedLine))
-    }
-    for (const id of newQuick) {
-      const site = getEnvironmentalSite(id)
-      if (!site) continue
-      narrative.enqueue(getEnvironmentalCue(id, false, site.quickLine))
+    if (areFreeScansAllowed(getCurrentProtocolStep(save))) {
+      for (const id of [...newQuick, ...newDetailed]) {
+        const site = getEnvironmentalSite(id)
+        if (!site) continue
+        narrative.enqueue(getEnvironmentalCue(id, false, site.shortLine))
+      }
     }
 
     previousEnvironmentalRef.current = [...quick]

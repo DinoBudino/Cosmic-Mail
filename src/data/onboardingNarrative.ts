@@ -63,7 +63,7 @@ export const INTRO_BEATS: readonly IntroBeat[] = [
   // A — Normality
   {
     moment: 'arrival',
-    line: "Hi! I'm PIP! Welcome aboard Mailwing!",
+    line: "Hi, I'm PIP! Welcome aboard Mailwing!",
     emotion: 'welcome',
     hologram: 'none',
     camera: 'welcome',
@@ -262,6 +262,18 @@ export const HUB_TOUR_LINES: readonly string[] = [
   "When you find the explorer, use the scanner. I'll help you recognize its parts.",
 ]
 
+export function storiesRestoredLabel(restored: number, total: number): string {
+  return `${restored} of ${total} ${total === 1 ? 'story' : 'stories'} restored`
+}
+
+export function restoredLine(restored: number, total: number): string {
+  return `${storiesRestoredLabel(restored, total)}. Great work, carrier!`
+}
+
+/** PIP's note about another signal. No machine, planet or order is named. */
+export const NEW_SIGNAL_LINE =
+  "I'm picking up another faint signal. It's still too weak to follow, but the Archive has marked it for later."
+
 export const HUB_RETURNING_LINE =
   'Welcome back, carrier. The archive is waiting for your next delivery.'
 
@@ -275,8 +287,16 @@ export function hubDialogueLines(options: {
   routeConfirmed: boolean
   hubVisited: boolean
   hubTourDone: boolean
+  /** Delivered stories so far; closes the slice once there is at least one. */
+  restoredCount?: number
+  totalStories?: number
 }): string[] {
   if (options.routeConfirmed) return [ROUTE_READY_LINE]
+  const restored = options.restoredCount ?? 0
+  const total = options.totalStories ?? 3
+  if (options.hubVisited && restored > 0 && restored < total) {
+    return [restoredLine(restored, total), NEW_SIGNAL_LINE]
+  }
   if (options.hubVisited) return [HUB_RETURNING_LINE]
   if (options.hubTourDone) return []
   return [HUB_ASSIGNMENT_LINE, ...HUB_TOUR_LINES]
@@ -290,7 +310,7 @@ export const LAUNCH_CABIN_LINE =
 
 /** Canonical success state after a mission transmission. */
 export const TRANSMISSION_SUCCESS_LINE =
-  'ENTREGA COMPLETADA — HISTORIA RESTORADA'
+  'ENTREGA COMPLETADA — HISTORIA RESTAURADA'
 
 export const TRANSMISSION_DESTINATION = 'Earth Cosmic Archive'
 

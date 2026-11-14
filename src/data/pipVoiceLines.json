@@ -1,7 +1,7 @@
 [
   {
     "key": "intro-01",
-    "text": "Hi! I'm PIP! Welcome aboard Mailwing!",
+    "text": "Hi, I'm PIP! Welcome aboard Mailwing!",
     "speed": 1.06,
     "category": "onboarding"
   },
@@ -139,13 +139,13 @@
   },
   {
     "key": "mars-arrival",
-    "text": "We're here! The signal is somewhere ahead. Let's take a look!",
+    "text": "We're here! The signal is somewhere ahead, so let's take a look.",
     "speed": 1.06,
     "category": "mars"
   },
   {
     "key": "mars-detected",
-    "text": "Look! Something's over there. Could that be our missing explorer?",
+    "text": "Look, something's over there! Could that be our missing explorer?",
     "speed": 1.03,
     "category": "mars"
   },
@@ -157,7 +157,7 @@
   },
   {
     "key": "mars-identified",
-    "text": "My archive just reconnected a record. This is Spirit, a Mars Exploration Rover! It was sent to study rocks and soil for clues about ancient water.",
+    "text": "My archive reconnected a record: this is Spirit, a Mars Exploration Rover! It was sent to study rocks and soil for clues about ancient water.",
     "speed": 1,
     "category": "mars"
   },
@@ -295,7 +295,7 @@
   },
   {
     "key": "mars-return-to-ship",
-    "text": "We did it! Now we can bring this explorer's story back to Earth. Return to Mailwing and transmit the letter.",
+    "text": "We did it! Return to Mailwing and transmit the letter to bring this story back to Earth.",
     "speed": 1.06,
     "category": "mars"
   },

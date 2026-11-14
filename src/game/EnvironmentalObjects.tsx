@@ -1,10 +1,14 @@
 import { useGLTF } from '@react-three/drei'
-import { useEffect, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { CALIBRATION_SAMPLE, stepIndex } from '../data/arrivalProtocol'
 import {
   ENVIRONMENTAL_SITES,
+  getEnvironmentalSite,
   type EnvironmentalSite,
 } from '../data/environmentalSites'
+import { useProtocol } from '../ui/useProtocol'
 import { useGameStore } from '../store/gameStore'
 import { buildRockGeometry } from './landscape'
 import { getTerrainHeight } from './terrainHeight'
@@ -173,6 +177,57 @@ export function EnvironmentalObjects() {
           analysis={analysis}
         />
       ))}
+      <CalibrationStation />
+    </group>
+  )
+}
+
+/**
+ * The calibration sample at the survey station. It uses the ordinary rock
+ * visual and the same scannerEnvironmentalId contract, plus a pulsing ring
+ * while the player is calibrating. It exists only during the opening steps.
+ */
+function CalibrationStation() {
+  const { step } = useProtocol()
+  const selectedId = useGameStore((state) => state.scannerEnvironmentalId)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const site = getEnvironmentalSite(CALIBRATION_SAMPLE.id)
+  const ring = useRef<THREE.MeshBasicMaterial>(null)
+  const active = step === 'M2'
+
+  useFrame((state) => {
+    if (!ring.current) return
+    ring.current.opacity = active
+      ? reducedMotion
+        ? 0.7
+        : 0.5 + Math.sin(state.clock.elapsedTime * 3) * 0.25
+      : 0.25
+  })
+
+  if (!site || stepIndex(step) > stepIndex('M3')) return null
+  const ground = getTerrainHeight(site.position.x, site.position.z)
+
+  return (
+    <group name="CalibrationStation">
+      <EnvironmentalVisual
+        site={site}
+        selected={selectedId === site.id}
+        analysis="idle"
+      />
+      <mesh
+        position={[site.position.x, ground + 0.06, site.position.z]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        userData={{ scannerIgnore: true }}
+      >
+        <ringGeometry args={[1.5, 1.72, 40]} />
+        <meshBasicMaterial
+          ref={ring}
+          color={PALETTE.accent}
+          transparent
+          opacity={0.25}
+          depthWrite={false}
+        />
+      </mesh>
     </group>
   )
 }

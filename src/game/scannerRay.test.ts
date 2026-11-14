@@ -192,4 +192,26 @@ describe('pickScannerTarget', () => {
       ),
     ).toBeNull()
   })
+
+  it('returns a distractor in range without treating it as a component', () => {
+    const pick = pickScannerTarget(
+      [hit({ distractorId: 'spirit-wheels', missionId: MISSION, z: 4 })],
+      MISSION,
+      PLAYER,
+      14,
+    )
+    expect(pick).toMatchObject({ distractorId: 'spirit-wheels' })
+    expect(pick && 'componentId' in pick).toBe(false)
+  })
+
+  it('rejects distractors from another mission, out of range or occluded', () => {
+    const d = { distractorId: 'spirit-wheels', missionId: MISSION }
+    expect(
+      pickScannerTarget([hit({ ...d, missionId: 'surveyor-3' })], MISSION, PLAYER, 14),
+    ).toBeNull()
+    expect(pickScannerTarget([hit({ ...d, z: 30 })], MISSION, PLAYER, 14)).toBeNull()
+    expect(
+      pickScannerTarget([hit({ opaque: true }), hit(d)], MISSION, PLAYER, 14),
+    ).toBeNull()
+  })
 })

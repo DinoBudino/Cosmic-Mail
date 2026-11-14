@@ -85,6 +85,7 @@ describe('new onboarding flow', () => {
   it('returns to Mailwing from a mission without losing progress', () => {
     prepareJourney()
     useOnboardingStore.setState({ phase: 'playing' })
+    useJourneyStore.getState().discoverMission('spirit')
     useJourneyStore.getState().scan('spirit', 'spirit-pancam')
 
     useOnboardingStore.getState().returnToShip()

@@ -4,7 +4,9 @@ import {
   hubDialogueLines,
 } from '../../data/onboardingNarrative'
 import { speakPip, stopPipVoice } from '../../game/pipVoice'
+import { getSliceClosure } from '../../data/sliceClosure'
 import { useGameStore } from '../../store/gameStore'
+import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { PipAvatar } from '../PipSpeech'
 
@@ -14,12 +16,20 @@ function useDialogueLines(): string[] {
   const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
   const hubVisited = useOnboardingStore((state) => state.hubVisited)
   const hubTourDone = useOnboardingStore((state) => state.hubTourDone)
+  const save = useJourneyStore((state) => state.save)
+  // PIP stays quiet while an archive dialog (letter, delivery) is open, so
+  // the slice-closing lines never talk over the delivery ceremony.
+  const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
+  const closure = getSliceClosure(save)
+  if (phase === 'hub' && archiveOpen) return []
   if (phase === 'registration') return [REGISTRATION_LINE]
   if (phase === 'hub') {
     return hubDialogueLines({
       routeConfirmed,
       hubVisited,
       hubTourDone,
+      restoredCount: closure.restored,
+      totalStories: closure.total,
     })
   }
   return []
@@ -77,6 +87,14 @@ function PipLine({
     }
   }, [line, reducedMotion, voiceEnabled, voiceName, setPipTalking, onDone])
 
+  // Complete the visible line during render when a skip arrives (React's
+  // "adjust state while rendering" pattern) instead of inside an effect.
+  const [seenSkip, setSeenSkip] = useState(skipNonce)
+  if (seenSkip !== skipNonce) {
+    setSeenSkip(skipNonce)
+    if (skipNonce !== 0 && !reducedMotion) setTyped(line)
+  }
+
   useEffect(() => {
     if (skipNonce === 0 || reducedMotion) return
     if (intervalRef.current !== null) {
@@ -84,7 +102,6 @@ function PipLine({
       intervalRef.current = null
     }
     stopPipVoice()
-    setTyped(line)
     if (!doneRef.current) {
       doneRef.current = true
       setPipTalking(false)

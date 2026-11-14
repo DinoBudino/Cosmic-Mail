@@ -16,6 +16,7 @@ import {
   type MissionId,
 } from '../data/missions'
 import { isEnvironmentalSiteId } from '../data/environmentalSites'
+import { MARS_OBJECTS } from '../data/marsObjects'
 import {
   createMissionProgress,
   type JourneySave,
@@ -96,6 +97,7 @@ export type ScanStatus =
   | 'scanned'
   | 'duplicate'
   | 'invalid-component'
+  | 'not-discovered'
   | 'unknown-mission'
   | 'mission-transmitted'
 
@@ -107,8 +109,10 @@ export interface ScanResult {
 }
 
 /**
- * Records one recognized component. Repeating the same component is
- * idempotent: it never creates duplicates or rewrites the save.
+ * Records one recognized component. The explorer must already be
+ * discovered (identified on site): scanning before that changes nothing.
+ * Repeating the same component is idempotent: it never creates duplicates
+ * or rewrites the save.
  */
 export function scanComponent(
   save: JourneySave,
@@ -156,9 +160,17 @@ export function scanComponent(
     }
   }
 
+  if (!progress.discovered) {
+    return {
+      save,
+      status: 'not-discovered',
+      scannedCount,
+      fullScanUnlocked: false,
+    }
+  }
+
   const nextProgress: MissionProgress = {
     ...progress,
-    discovered: true,
     scannedComponentIds: [...progress.scannedComponentIds, componentId],
   }
   const nextSave = setMissionProgress(save, missionId, nextProgress, now)
@@ -218,6 +230,34 @@ export function recordEnvironmentalScan(
       updatedAt: now,
     },
     status: detailed ? 'detailed' : 'quick',
+  }
+}
+
+export type MemorialVisitStatus = 'recorded' | 'duplicate' | 'unknown-memorial'
+
+/**
+ * Records that a Mars memorial's field note was read. Optional track: it
+ * never touches mission stages, fragments, memory, letters or stamps, and a
+ * repeat returns the very same save object.
+ */
+export function recordMemorialVisit(
+  save: JourneySave,
+  memorialId: string,
+  now: number = Date.now(),
+): { save: JourneySave; status: MemorialVisitStatus } {
+  if (!MARS_OBJECTS.some((object) => object.id === memorialId)) {
+    return { save, status: 'unknown-memorial' }
+  }
+  if (save.memorialVisits.includes(memorialId)) {
+    return { save, status: 'duplicate' }
+  }
+  return {
+    save: {
+      ...save,
+      memorialVisits: [...save.memorialVisits, memorialId],
+      updatedAt: now,
+    },
+    status: 'recorded',
   }
 }
 

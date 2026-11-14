@@ -42,12 +42,21 @@ describe('audio event plans', () => {
 
     play.mockClear()
     emitAudio('transmissionCompleted')
+    // The commit only plays the "received on Earth" cue; stamp and
+    // history-restored belong to the carrier's stamping action.
     expect(play.mock.calls.map(([id, options]) => [id, options?.delayMs])).toEqual([
       ['transmission.received', 1100],
-      ['transmission.stamp', 1700],
-      ['transmission.historyRestored', 2000],
     ])
     expect(music).toHaveBeenCalledWith('transmission')
+  })
+
+  it('plays the stamp and history-restored cues when the passport is stamped', () => {
+    const play = vi.spyOn(audioManager, 'playSfx').mockImplementation(() => {})
+    emitAudio('passportStamped')
+    expect(play.mock.calls.map(([id, options]) => [id, options?.delayMs])).toEqual([
+      ['transmission.stamp', undefined],
+      ['transmission.historyRestored', 350],
+    ])
   })
 
   it('routes launch beds without leaving engine loops behind', () => {

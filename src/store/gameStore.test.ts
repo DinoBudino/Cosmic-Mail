@@ -392,3 +392,129 @@ describe('scanner accessibility settings', () => {
     useGameStore.getState().setAssistedScanEnabled(false)
   })
 })
+
+describe('scanner lens and distractor state', () => {
+  beforeEach(() => {
+    useGameStore.getState().unequipScanner()
+    useGameStore.setState({ scannerLens: 'visual' })
+  })
+
+  it('switches lens without unequipping or blocking the scanner', () => {
+    const store = useGameStore.getState()
+    store.equipScanner('spirit')
+    expect(useGameStore.getState().scannerEquipped).toBe(true)
+
+    useGameStore.setState({ scannerScanProgress: 0.6 })
+    store.setScannerLens('thermal')
+    const next = useGameStore.getState()
+    expect(next.scannerLens).toBe('thermal')
+    expect(next.scannerEquipped).toBe(true)
+    // A lens switch restarts any in-flight hold.
+    expect(next.scannerScanProgress).toBe(0)
+  })
+
+  it('keeps the chosen lens when putting the scanner away and back', () => {
+    const store = useGameStore.getState()
+    store.equipScanner('spirit')
+    store.setScannerLens('contact')
+    store.unequipScanner()
+    store.equipScanner('spirit')
+    expect(useGameStore.getState().scannerLens).toBe('contact')
+  })
+
+  it('tracks a distractor target exclusively and clears it on component target', () => {
+    const store = useGameStore.getState()
+    store.setScannerDistractorTarget('spirit-wheels')
+    expect(useGameStore.getState().scannerDistractorId).toBeNull()
+
+    store.equipScanner('spirit')
+    store.setScannerDistractorTarget('spirit-wheels')
+    expect(useGameStore.getState().scannerDistractorId).toBe('spirit-wheels')
+    expect(useGameStore.getState().scannerSelectedComponentId).toBeNull()
+
+    store.setScannerTarget('spirit-pancam')
+    const after = useGameStore.getState()
+    expect(after.scannerDistractorId).toBeNull()
+    expect(after.scannerSelectedComponentId).toBe('spirit-pancam')
+
+    store.setScannerDistractorTarget('spirit-antenna')
+    store.unequipScanner()
+    expect(useGameStore.getState().scannerDistractorId).toBeNull()
+  })
+})
+
+describe('touch scan latch', () => {
+  beforeEach(() => {
+    useGameStore.getState().unequipScanner()
+  })
+
+  it('latches only while the trigger is held and the scanner is equipped', () => {
+    const store = useGameStore.getState()
+    store.setScannerLatched()
+    expect(useGameStore.getState().scannerLatched).toBe(false)
+
+    store.equipScanner('spirit')
+    store.setScannerLatched()
+    expect(useGameStore.getState().scannerLatched).toBe(false)
+
+    store.setScannerTrigger(true)
+    store.setScannerLatched()
+    expect(useGameStore.getState().scannerLatched).toBe(true)
+    expect(useGameStore.getState().scannerTriggerHeld).toBe(true)
+  })
+
+  it('releasing the trigger or putting the scanner away drops the latch', () => {
+    const store = useGameStore.getState()
+    store.equipScanner('spirit')
+    store.setScannerTrigger(true)
+    store.setScannerLatched()
+    store.setScannerTrigger(false)
+    expect(useGameStore.getState().scannerLatched).toBe(false)
+
+    store.setScannerTrigger(true)
+    store.setScannerLatched()
+    store.unequipScanner()
+    expect(useGameStore.getState().scannerLatched).toBe(false)
+    expect(useGameStore.getState().scannerTriggerHeld).toBe(false)
+  })
+})
+
+describe('full scan sweep (ephemeral)', () => {
+  beforeEach(() => {
+    useGameStore.getState().resetFullScan()
+    useGameStore.getState().unequipScanner()
+    useGameStore.getState().closeArchive()
+  })
+
+  it('starts sweeping in the world with the scanner equipped', () => {
+    useGameStore.getState().openArchive('full-scan', 'spirit')
+    useGameStore.getState().startFullScanSweep('spirit')
+    const state = useGameStore.getState()
+    expect(state.archiveView).toBe('none')
+    expect(state.fullScanSweepActive).toBe(true)
+    expect(state.scannerEquipped).toBe(true)
+  })
+
+  it('opens the rebuild step only after the fourth trace, once each', () => {
+    const game = useGameStore.getState()
+    game.startFullScanSweep('spirit')
+    expect(game.revealFullScanTrace('identity', 'spirit')).toBe(true)
+    expect(game.revealFullScanTrace('identity', 'spirit')).toBe(false)
+    game.revealFullScanTrace('trajectory', 'spirit')
+    game.revealFullScanTrace('discoveries', 'spirit')
+    expect(useGameStore.getState().archiveView).toBe('none')
+    game.revealFullScanTrace('missionEnd', 'spirit')
+    const state = useGameStore.getState()
+    expect(state.archiveView).toBe('full-scan')
+    expect(state.fullScanSweepActive).toBe(false)
+    expect(state.fullScanRecon.revealed).toHaveLength(4)
+  })
+
+  it('shares progress with the panel and never persists anything', () => {
+    const before = JSON.stringify(localStorage?.length ?? 0)
+    useGameStore.getState().revealFullScanTrace('identity', 'spirit')
+    useGameStore.getState().startFullScanSweep('spirit')
+    expect(useGameStore.getState().fullScanRecon.revealed).toEqual(['identity'])
+    expect(JSON.stringify(localStorage?.length ?? 0)).toBe(before)
+  })
+})

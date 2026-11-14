@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { getMission } from '../data/missions'
 import { MARS_OBJECTS, REGION_INFO, type MarsObjectId } from '../data/marsObjects'
+import { isStepAtLeast } from '../data/arrivalProtocol'
 import { SPIRIT_SITE } from '../data/spiritSite'
+import { useProtocol } from './useProtocol'
 import { requestMissionHint } from '../game/missionNarrative'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
@@ -53,7 +55,11 @@ export function MissionPanel() {
   const radarUnlocked = useGameStore((state) => state.radarUnlocked)
   const cinematicFocus = useGameStore((state) => state.cinematicFocus)
   const save = useJourneyStore((state) => state.save)
+  const { step } = useProtocol()
+  // The objective bar carries the objective; this is optional detail that
+  // joins once the explorer is identified.
   if (
+    !isStepAtLeast(step, 'M4') ||
     !radarUnlocked ||
     cinematicFocus !== null ||
     settingsOpen ||
@@ -92,14 +98,11 @@ export function MissionPanel() {
 
   return (
     <aside className="mission-panel" aria-label="Mission briefing">
-      <p className="settings-eyebrow">Mission 01 · Mars</p>
-      <h2 className="mission-objective">
-        {stage === 'transmitted'
-          ? 'History restored'
-          : discovered
-            ? `Recognize ${signalLabel}`
-            : 'Follow the silent signal'}
-      </h2>
+     <details className="mission-panel__details">
+      <summary className="mission-panel__summary">
+        <span className="settings-eyebrow">Mission 01 · Mars</span>
+        <span className="mission-panel__state">{spiritStatus}</span>
+      </summary>
 
       <div
         className={`mission-pilot${
@@ -174,6 +177,7 @@ export function MissionPanel() {
         </ul>
         <TravelControls />
       </details>
+     </details>
     </aside>
   )
 }

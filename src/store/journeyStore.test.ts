@@ -30,6 +30,7 @@ function completeSpirit(store: ReturnType<typeof createJourneyStore>) {
   const state = () => store.getState()
   const mission = getMission('spirit')
   expect(state().startJourney('Ada')).toBe(true)
+  expect(state().discoverMission('spirit')).toBe(true)
   for (const component of mission.components) {
     expect(state().scan('spirit', component.id)?.status).toBe('scanned')
   }
@@ -114,6 +115,10 @@ describe('journey store', () => {
     const state = () => store.getState()
 
     expect(state().startJourney('Ada')).toBe(true)
+    expect(state().scan('spirit', 'spirit-pancam')?.status).toBe(
+      'not-discovered',
+    )
+    expect(state().discoverMission('spirit')).toBe(true)
     expect(state().scan('spirit', 'spirit-pancam')?.status).toBe('scanned')
     expect(state().completeFullScan('spirit')?.status).toBe('locked')
     expect(state().save?.missions.spirit.memoryRecoveredAt).toBeNull()
@@ -142,6 +147,7 @@ describe('journey store', () => {
     const storage = new MemoryStorage()
     const first = createJourneyStore(storage)
     expect(first.getState().startJourney('Ada')).toBe(true)
+    expect(first.getState().discoverMission('spirit')).toBe(true)
     expect(first.getState().scan('spirit', 'spirit-pancam')?.status).toBe(
       'scanned',
     )
@@ -204,6 +210,7 @@ describe('journey store', () => {
     completeSpirit(store)
     state().completeOnboarding()
     state().setDestination('mars')
+    expect(state().discoverMission('surveyor-3')).toBe(true)
     expect(
       state().scan('surveyor-3', 'surveyor-3-tv-camera')?.status,
     ).toBe('scanned')
@@ -248,5 +255,81 @@ describe('journey store', () => {
     expect(storage.getItem(JOURNEY_STORAGE_KEY)).toBeNull()
     expect(storage.getItem(LEGACY_JOURNEY_STORAGE_KEY)).toBe('v3')
     expect(storage.getItem(RETIRED_V2_KEY)).toBe('v2')
+  })
+})
+
+describe('reload at every intermediate point of the Mars cycle', () => {
+  it('restores the exact stage after a reload at each step and never skips ahead', () => {
+    const storage = new MemoryStorage()
+    let store = createJourneyStore(storage)
+    const reload = () => {
+      store = createJourneyStore(storage)
+    }
+    const mission = () => store.getState().save!.missions.spirit
+    const state = () => store.getState()
+    const ids = getMission('spirit').components.map((c) => c.id)
+
+    expect(state().startJourney('Ada')).toBe(true)
+    reload()
+    expect(mission().discovered).toBe(false)
+
+    // Scanning before the explorer is identified records nothing.
+    expect(state().scan('spirit', ids[0])?.status).toBe('not-discovered')
+    reload()
+    expect(mission().scannedComponentIds).toEqual([])
+
+    state().discoverMission('spirit')
+    reload()
+    expect(mission().discovered).toBe(true)
+
+    state().scan('spirit', ids[0])
+    reload()
+    expect(mission().scannedComponentIds).toEqual([ids[0]])
+    // 1/3 cannot jump ahead.
+    expect(state().completeFullScan('spirit')?.status).toBe('locked')
+
+    state().scan('spirit', ids[1])
+    state().scan('spirit', ids[2])
+    reload()
+    expect(mission().scannedComponentIds).toHaveLength(3)
+    expect(mission().memoryRecoveredAt).toBeNull()
+    // 3/3 never goes straight to a letter or a delivery.
+    expect(state().prepareSmartLetter('spirit')?.status).toBe('locked')
+    expect(state().transmit('spirit')?.status).toBe('letter-missing')
+
+    state().completeFullScan('spirit')
+    reload()
+    expect(mission().fullScanCompletedAt).not.toBeNull()
+    expect(mission().memoryRecoveredAt).toBe(mission().fullScanCompletedAt)
+    expect(mission().transmittedAt).toBeNull()
+
+    state().prepareSmartLetter('spirit')
+    reload()
+    expect(mission().smartLetterCreatedAt).not.toBeNull()
+    expect(mission().stampEarned).toBe(false)
+
+    state().markReconstructionWatched('spirit')
+    reload()
+    expect(mission().reconstructionWatchedAt).not.toBeNull()
+    expect(mission().stampEarned).toBe(false)
+
+    state().transmit('spirit')
+    reload()
+    const deliveredAt = mission().transmittedAt
+    expect(deliveredAt).not.toBeNull()
+    expect(mission().stampEarned).toBe(true)
+
+    // Repeating after a reload duplicates nothing.
+    expect(state().transmit('spirit')?.status).toBe('already-transmitted')
+    expect(mission().transmittedAt).toBe(deliveredAt)
+  })
+
+  it('leaves a corrupt save untouched and starts no journey over it', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(JOURNEY_STORAGE_KEY, '{not json')
+    const store = createJourneyStore(storage)
+    expect(store.getState().loadStatus).toBe('corrupt')
+    expect(store.getState().save).toBeNull()
+    expect(storage.getItem(JOURNEY_STORAGE_KEY)).toBe('{not json')
   })
 })

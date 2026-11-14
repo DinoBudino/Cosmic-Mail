@@ -1747,3 +1747,50 @@
   font-size: 0.7rem;
   line-height: 1.45;
 }
+
+/* ------------------------------------------------------ Passport field notes */
+.passport__notes {
+  margin-top: 16px;
+}
+
+.passport__notes-intro {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.passport__notes-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passport__note {
+  padding: 8px 10px;
+  border: 1px dashed rgba(42, 26, 51, 0.28);
+  border-radius: 8px;
+  opacity: 0.7;
+}
+
+.passport__note.is-unlocked {
+  border-style: solid;
+  opacity: 1;
+}
+
+.passport__note h3 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+
+.passport__note p {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.passport__note-meta {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}

@@ -24,6 +24,7 @@ import {
   type MissionId,
 } from '../data/missions'
 import { isEnvironmentalSiteId } from '../data/environmentalSites'
+import { MARS_OBJECTS } from '../data/marsObjects'
 
 export const JOURNEY_SCHEMA_VERSION = 4
 export const JOURNEY_STORAGE_KEY = 'cosmic-mail:journey:v4'
@@ -74,6 +75,12 @@ export interface JourneySave {
    */
   environmentalDiscoveries: string[]
   environmentalDetailedDiscoveries: string[]
+  /**
+   * Optional: Mars memorials whose field note was read. Added to v4
+   * additively; saves without it read as []. Same rule as above: it never
+   * affects mission progress, memory, letters or stamps.
+   */
+  memorialVisits: string[]
   finalQuoteShown: boolean
   /** 3 when this journey was conservatively migrated from a B save. */
   migratedFrom: 3 | null
@@ -119,6 +126,16 @@ export function createMissionProgress(): MissionProgress {
   }
 }
 
+function validMemorialIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const valid = new Set<string>(MARS_OBJECTS.map((object) => object.id))
+  return [
+    ...new Set(
+      value.filter((id): id is string => typeof id === 'string' && valid.has(id)),
+    ),
+  ]
+}
+
 function validEnvironmentalIds(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return [
@@ -158,6 +175,7 @@ export function createJourney(
     missions: createEmptyMissionRecord(),
     environmentalDiscoveries: [],
     environmentalDetailedDiscoveries: [],
+    memorialVisits: [],
     finalQuoteShown: false,
     migratedFrom: null,
     createdAt: now,
@@ -299,6 +317,7 @@ export function parseJourneySave(value: unknown): JourneySave | null {
     missions,
     environmentalDiscoveries,
     environmentalDetailedDiscoveries,
+    memorialVisits: validMemorialIds(value.memorialVisits),
     finalQuoteShown: value.finalQuoteShown === true,
     migratedFrom: value.migratedFrom === 3 ? 3 : null,
     createdAt: isTimestamp(value.createdAt) ? value.createdAt : 0,
@@ -363,6 +382,7 @@ export function migrateV3Save(value: unknown): JourneySave | null {
     missions,
     environmentalDiscoveries: [],
     environmentalDetailedDiscoveries: [],
+    memorialVisits: [],
     finalQuoteShown: value.finalQuoteShown === true,
     migratedFrom: 3,
     createdAt: isTimestamp(value.createdAt) ? value.createdAt : 0,

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { MARS_OBJECTS, REGION_INFO, type ObjectState } from '../data/marsObjects'
 import { useGameStore } from '../store/gameStore'
+import { useJourneyStore } from '../store/journeyStore'
 
 const STATE_LABELS: Record<ObjectState, string> = {
   landmark: 'Historic landmark',
@@ -26,11 +27,22 @@ export function SiteInteraction() {
   )
   const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
   const travelTargetId = useGameStore((state) => state.travelTargetId)
+  const landmarksLocked = useGameStore((state) => state.landmarksLocked)
   const openSite = useGameStore((state) => state.openNearbySite)
   const closeSite = useGameStore((state) => state.closeSite)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const active = MARS_OBJECTS.find((site) => site.id === activeId)
   const nearby = MARS_OBJECTS.find((site) => site.id === nearbyId)
+
+  const noteSaved = useJourneyStore((state) =>
+    activeId ? state.save?.memorialVisits.includes(activeId) === true : false,
+  )
+
+  // Reading a memorial adds its field note to the passport. Optional track:
+  // it never changes mission progress.
+  useEffect(() => {
+    if (activeId) useJourneyStore.getState().recordMemorialVisit(activeId)
+  }, [activeId])
 
   useEffect(() => {
     if (!activeId) return
@@ -48,6 +60,7 @@ export function SiteInteraction() {
   return (
     <>
       {!active &&
+        !landmarksLocked &&
         !settingsOpen &&
         !scannerOpen &&
         !scannerEquipped &&
@@ -119,6 +132,11 @@ export function SiteInteraction() {
             does not speak or respond; it is not part of the mission
             progression.
           </p>
+          {noteSaved && (
+            <p className="settings-hint" role="status">
+              Field note added to your passport.
+            </p>
+          )}
           <nav aria-label="NASA mission sources" className="site-sources">
             {active.sources.map((source, index) => (
               <a

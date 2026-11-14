@@ -143,7 +143,7 @@ describe('Proposal A onboarding beat sheet', () => {
   it('defines the Earth Archive transmission labels', () => {
     expect(TRANSMISSION_DESTINATION).toBe('Earth Cosmic Archive')
     expect(TRANSMISSION_SUCCESS_LINE).toContain('ENTREGA COMPLETADA')
-    expect(TRANSMISSION_SUCCESS_LINE).toContain('HISTORIA RESTORADA')
+    expect(TRANSMISSION_SUCCESS_LINE).toContain('HISTORIA RESTAURADA')
   })
 
   it('connects accepting the mission with registration', () => {

@@ -2,6 +2,8 @@ import { SPIRIT_SITE } from '../data/spiritSite'
 import { isFlightUnlocked } from '../game/flight'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
+import { isStepAtLeast } from '../data/arrivalProtocol'
+import { useProtocol } from './useProtocol'
 
 function GearIcon() {
   return (
@@ -32,11 +34,16 @@ export function Hud() {
     (state) => state.save?.missions[SPIRIT_SITE.missionId] ?? null,
   )
   const flightLocked = progress != null && !isFlightUnlocked(progress)
+  const { step } = useProtocol()
+  // Show only the keys the current step needs: movement first, then the
+  // scanner, then inspect. Boots appear only once they work.
+  const showScanner = isStepAtLeast(step, 'M2')
+  const showInspect = isStepAtLeast(step, 'M3')
 
   return (
     <>
       {!scannerEquipped && cinematicFocus === null && (
-        <details className="hud-controls">
+        <details className="hud-controls" open={step === 'M0' || undefined}>
           <summary>Controls</summary>
           <div className="hud-controls__row">
             <span className="hud-control">
@@ -47,20 +54,24 @@ export function Hud() {
               <span className="hud-key">Drag</span>
               <span className="hud-label">look</span>
             </span>
-            <span className="hud-control">
-              <span className="hud-key">Space</span>
-              <span className="hud-label">
-                {flightLocked ? 'boots locked' : 'jet boots'}
+            {!flightLocked && (
+              <span className="hud-control">
+                <span className="hud-key">Space</span>
+                <span className="hud-label">jet boots</span>
               </span>
-            </span>
-            <span className="hud-control">
-              <span className="hud-key">Q</span>
-              <span className="hud-label">scanner</span>
-            </span>
-            <span className="hud-control">
-              <span className="hud-key">E</span>
-              <span className="hud-label">interact</span>
-            </span>
+            )}
+            {showScanner && (
+              <span className="hud-control">
+                <span className="hud-key">Q</span>
+                <span className="hud-label">scanner</span>
+              </span>
+            )}
+            {showInspect && (
+              <span className="hud-control">
+                <span className="hud-key">E</span>
+                <span className="hud-label">interact</span>
+              </span>
+            )}
           </div>
         </details>
       )}

@@ -3,6 +3,8 @@ import {
   STORY_STATUS_LABEL,
   getPassportView,
 } from '../../data/passport'
+import { getSliceClosure } from '../../data/sliceClosure'
+import { NEW_SIGNAL_LINE } from '../../data/onboardingNarrative'
 import { useJourneyStore } from '../../store/journeyStore'
 import type { JourneySave } from '../../store/journeySchema'
 import { useOnboardingStore } from '../../store/onboardingStore'
@@ -28,6 +30,7 @@ export function DestinationNavigation({
   const clearSelection = useOnboardingStore((state) => state.clearSelection)
   const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
   const view = getPassportView(save)
+  const closure = getSliceClosure(save)
   const selected = DESTINATIONS.find((entry) => entry.id === selectedId) ?? null
   const selectedStory = selected
     ? (view.stories.find(
@@ -50,6 +53,13 @@ export function DestinationNavigation({
               : 'Pick a destination'}
           </span>
         </div>
+
+        {closure.label && (
+          <p className="destination-summary__ready" role="status">
+            {closure.label}.{' '}
+            {closure.newSignal ? NEW_SIGNAL_LINE : ''}
+          </p>
+        )}
 
         <div className="choice-list">
           {DESTINATIONS.map((destination) => {

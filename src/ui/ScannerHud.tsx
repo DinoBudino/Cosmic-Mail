@@ -5,8 +5,23 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import {
+  CALIBRATION_SAMPLE,
+  isCalibrationSampleId,
+} from '../data/arrivalProtocol'
 import { getEnvironmentalSite } from '../data/environmentalSites'
+import { wrongLensPanelLine } from '../data/lensFeedback'
+import { RETICLE_STATUS_LABEL, getReticleStatus } from '../data/reticleStatus'
+import { SCANNER_LENSES } from '../data/scannerLenses'
+import { fragmentLabel } from '../data/scanMarkers'
+import { SPIRIT_SCAN_ANCHORS } from '../data/spiritSite'
+import { useProtocol } from './useProtocol'
+
+const MARKER_ORDER = SPIRIT_SCAN_ANCHORS.map((anchor) => anchor.componentId)
 import { getMission } from '../data/missions'
+import { lensMatchesComponent } from '../data/scannerLenses'
+import { resolveScanRelease } from '../game/scannerLatch'
+import { ScannerLensPicker } from './ScannerLensPicker'
 import { requestMissionHint } from '../game/missionNarrative'
 import { stopPipVoice } from '../game/pipVoice'
 import {
@@ -36,12 +51,12 @@ export function ScannerHud() {
   const environmentalId = useGameStore(
     (state) => state.scannerEnvironmentalId,
   )
+  const distractorId = useGameStore((state) => state.scannerDistractorId)
+  const traceKind = useGameStore((state) => state.scannerTraceKind)
+  const scannerLens = useGameStore((state) => state.scannerLens)
   const scannerAnalysis = useGameStore((state) => state.scannerAnalysis)
   const scannerPhysicalState = useGameStore(
     (state) => state.scannerPhysicalState,
-  )
-  const historicalExplanationId = useGameStore(
-    (state) => state.historicalExplanationId,
   )
   const scannerCamera = useGameStore((state) => state.scannerCamera)
   const assistedScanEnabled = useGameStore(
@@ -49,6 +64,7 @@ export function ScannerHud() {
   )
   const scanProgress = useGameStore((state) => state.scannerScanProgress)
   const triggerHeld = useGameStore((state) => state.scannerTriggerHeld)
+  const latched = useGameStore((state) => state.scannerLatched)
   const scannerOpen = useGameStore((state) => state.scannerOpen)
   const scannerCard = useGameStore(
     (state) => state.scannerCardComponentId,
@@ -74,7 +90,9 @@ export function ScannerHud() {
   const startJourney = useJourneyStore((state) => state.startJourney)
   const setDestination = useJourneyStore((state) => state.setDestination)
   const resetMission = useJourneyStore((state) => state.resetMission)
+  const protocol = useProtocol()
   const cursorRef = useRef<HTMLDivElement>(null)
+  const pressRef = useRef({ at: 0, startedLatched: false })
 
   // Keep the real mouse position ready even before the scanner is equipped,
   // so the reticle never starts pinned to the screen centre.
@@ -171,6 +189,13 @@ export function ScannerHud() {
   const target =
     mission.components.find((component) => component.id === selectedId) ??
     null
+  const distractor = distractorId
+    ? (mission.distractors?.find((entry) => entry.id === distractorId) ??
+      null)
+    : null
+  const wrongLens = Boolean(
+    target && !lensMatchesComponent(target, scannerLens),
+  )
   const environmental = environmentalId
     ? getEnvironmentalSite(environmentalId)
     : null
@@ -185,9 +210,14 @@ export function ScannerHud() {
   const alreadyScanned = target
     ? (progress?.scannedComponentIds.includes(target.id) ?? false)
     : false
+  // A part keeps a neutral "Fragment N" label until it is recorded.
+  const partLabel = target
+    ? alreadyScanned
+      ? target.shortName
+      : fragmentLabel(MARKER_ORDER, target.id)
+    : ''
   const stage = getMissionStage(progress)
   const archiveCta = getArchiveCtaLabel(stage)
-  const historicalLocked = Boolean(historicalExplanationId)
   const obscured = Boolean(
     scannerOpen ||
       scannerCard ||
@@ -198,6 +228,19 @@ export function ScannerHud() {
   )
   const targetStatus = !save
     ? 'Start the pilot save to record scans.'
+    : traceKind
+      ? triggerHeld
+        ? 'Reading the memory trace…'
+        : 'Memory trace · Hold to scan'
+    : environmental && isCalibrationSampleId(environmental.id)
+      ? scannerLens === CALIBRATION_SAMPLE.lens
+        ? triggerHeld
+          ? 'Calibrating…'
+          : 'Calibration sample · Hold to scan'
+        : wrongLensPanelLine(
+            'Calibration sample',
+            SCANNER_LENSES[scannerLens].label,
+          )
     : environmental
       ? environmentalDetailed
         ? `${environmental.name} · detailed comparison saved`
@@ -210,24 +253,48 @@ export function ScannerHud() {
         ? 'The target is blocked. Change position for a clear line of sight.'
         : scannerPhysicalState === 'out-of-range'
           ? 'Move closer to read this target.'
-          : !target
+          : distractor
             ? discovered
-              ? `Aim at a ${mission.machineName} component or a landscape feature.`
-              : 'Aim at a rock, soil patch or formation — or follow the signal.'
-        : historicalLocked
-          ? 'PIP is explaining the recovered fragment. Walk and look while listening.'
-          : !discovered
-            ? 'Inspect the explorer first: press E near it before recording its parts.'
-            : alreadyScanned
-              ? `${target.shortName} · already recorded`
+              ? `${distractor.shortName} · Hold to scan`
+              : 'Inspect the explorer first: press E near it before recording its parts.'
+          : !target
+            ? protocol.step === 'M2'
+              ? 'Aim at the glowing calibration sample.'
+              : !discovered
+                ? 'Follow the signal. Inspect it with E before scanning.'
+                : protocol.step === 'M7'
+                  ? `Aim at a ${mission.machineName} part or a landscape feature.`
+                  : `Aim at a ${mission.machineName} component.`
+        : !discovered
+          ? 'Inspect the explorer first: press E near it before recording its parts.'
+          : alreadyScanned
+            ? `${target.shortName} · already recorded`
+            : wrongLens
+              ? wrongLensPanelLine(
+                  partLabel,
+                  SCANNER_LENSES[scannerLens].label,
+                )
               : triggerHeld
-                ? `Scanning ${target.shortName}…`
-                : `${target.shortName} · Hold left click to scan`
+                ? `Scanning ${partLabel}…`
+                : `${partLabel} · Hold left click to scan`
+  const calibrationWrongLens = Boolean(
+    environmental &&
+      isCalibrationSampleId(environmental.id) &&
+      scannerLens !== CALIBRATION_SAMPLE.lens,
+  )
+  // One status word under the label, consistent with the panel and bar.
+  const reticleStatus = getReticleStatus({
+    hasTarget: Boolean(target || environmental || distractor || traceKind),
+    physicalState: scannerPhysicalState,
+    triggerHeld,
+    wrongLens: wrongLens || calibrationWrongLens,
+    recorded: alreadyScanned || environmentalDetailed,
+  })
   const scanDisabled =
     !save ||
-    (!target && !environmental) ||
+    (!target && !environmental && !distractor && !traceKind) ||
     (Boolean(target) &&
-      (!discovered || alreadyScanned || historicalLocked)) ||
+      (!discovered || alreadyScanned)) ||
     Boolean(environmental && environmentalDetailed)
   let reticleState:
     | 'idle'
@@ -237,28 +304,33 @@ export function ScannerHud() {
     | 'scanning'
     | 'completed'
     | 'already-scanned'
-    | 'narrative-locked'
     | 'inspect'
   if (scannerPhysicalState === 'out-of-range') {
     reticleState = 'out-of-range'
   } else if (scannerPhysicalState === 'occluded') {
     reticleState = 'occluded'
+  } else if (traceKind) {
+    reticleState = triggerHeld ? 'scanning' : 'valid'
   } else if (environmental) {
     reticleState = environmentalDetailed
       ? 'completed'
       : triggerHeld
         ? 'scanning'
         : 'valid'
+  } else if (distractor) {
+    reticleState = !discovered
+      ? 'inspect'
+      : triggerHeld
+        ? 'scanning'
+        : 'valid'
   } else if (target) {
-    reticleState = historicalLocked
-      ? 'narrative-locked'
-      : !discovered
-        ? 'inspect'
-        : alreadyScanned
-          ? 'already-scanned'
-          : triggerHeld
-            ? 'scanning'
-            : 'valid'
+    reticleState = !discovered
+      ? 'inspect'
+      : alreadyScanned
+        ? 'already-scanned'
+        : triggerHeld
+          ? 'scanning'
+          : 'valid'
   } else {
     reticleState = 'idle'
   }
@@ -298,12 +370,39 @@ export function ScannerHud() {
     requestMissionHint(mission.id)
   }
 
-  const holdScan = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    held: boolean,
-  ) => {
-    if (held) event.currentTarget.setPointerCapture(event.pointerId)
-    setScannerTrigger(held)
+  // Touch ergonomics: a quick tap latches the scan on the current target so
+  // the player can lift the finger; a long press is the classic hold.
+  const hasAnyTarget = Boolean(
+    target || environmental || distractor || traceKind,
+  )
+
+  const pressScan = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const startedLatched = useGameStore.getState().scannerLatched
+    pressRef.current = { at: performance.now(), startedLatched }
+    // Pressing while latched cancels it; the release below is a no-op.
+    setScannerTrigger(startedLatched ? false : true)
+  }
+
+  const releaseScan = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const { at, startedLatched } = pressRef.current
+    const action = resolveScanRelease({
+      pointerType: event.pointerType,
+      durationMs: performance.now() - at,
+      hasTarget: hasAnyTarget,
+      startedLatched,
+    })
+    pressRef.current = { at: 0, startedLatched: false }
+    if (action === 'latch') {
+      useGameStore.getState().setScannerLatched()
+    } else if (action === 'release') {
+      setScannerTrigger(false)
+    }
+    // 'unlatch' already released the trigger on pointer down.
+  }
+
+  const releaseUnlessLatched = () => {
+    if (!useGameStore.getState().scannerLatched) setScannerTrigger(false)
   }
 
   const handleScanKey = (
@@ -329,10 +428,12 @@ export function ScannerHud() {
           <div
             data-state={reticleState}
             className={`scanner-reticle${
-              target || environmental ? ' is-target' : ''
+              target || environmental || distractor ? ' is-target' : ''
             }${
               triggerHeld &&
-              (target ? !alreadyScanned : Boolean(environmental))
+              (target
+                ? !alreadyScanned && !wrongLens
+                : Boolean(environmental || distractor))
                 ? ' is-scanning'
                 : ''
             }${
@@ -355,16 +456,30 @@ export function ScannerHud() {
                 : environmentalQuick
                   ? `${environmental.shortName} · quick`
                   : environmental.shortName
+              : distractor
+                ? discovered
+                  ? distractor.shortName
+                  : 'Unidentified fragment'
               : target
                 ? !discovered
                   ? 'Unidentified fragment'
                   : alreadyScanned
                     ? `${target.shortName} · recorded`
-                    : target.shortName
+                    : partLabel
                 : discovered
                   ? `Aim at a ${mission.machineName} component`
-                  : 'Aim at a landscape feature'}
+                  : protocol.step === 'M2'
+                    ? 'Aim at the calibration sample'
+                    : 'Follow the signal'}
           </p>
+          {reticleStatus && (
+            <p
+              className="scanner-reticle__status"
+              data-status={reticleStatus}
+            >
+              {RETICLE_STATUS_LABEL[reticleStatus]}
+            </p>
+          )}
         </div>
       )}
 
@@ -380,7 +495,9 @@ export function ScannerHud() {
               Cosmic Scanner ·{' '}
               {environmental ? 'Mars field survey' : signalLabel}
             </p>
-            <span className="scanner-hud__prototype">Prototype device</span>
+            {import.meta.env.DEV && (
+              <span className="scanner-hud__prototype">Prototype device</span>
+            )}
           </div>
           <button
             type="button"
@@ -396,9 +513,11 @@ export function ScannerHud() {
           {targetStatus}
         </p>
 
+        <ScannerLensPicker />
+
         <div className="scanner-hud__row">
           <span className="scanner-hud__count">
-            {scannedCount}/3
+            Recognition {scannedCount}/3
           </span>
           {environmentalCount > 0 && (
             <span
@@ -456,21 +575,21 @@ export function ScannerHud() {
           type="button"
           className="scanner-hud__scan"
           disabled={scanDisabled}
-          onPointerDown={(event) => holdScan(event, true)}
-          onPointerUp={() => setScannerTrigger(false)}
+          onPointerDown={pressScan}
+          onPointerUp={releaseScan}
           onPointerCancel={() => setScannerTrigger(false)}
-          onLostPointerCapture={() => setScannerTrigger(false)}
+          onLostPointerCapture={releaseUnlessLatched}
           onKeyDown={(event) => handleScanKey(event, true)}
           onKeyUp={(event) => handleScanKey(event, false)}
-          onBlur={() => setScannerTrigger(false)}
+          onBlur={releaseUnlessLatched}
         >
           {triggerHeld
-            ? 'Scanning…'
+            ? latched
+              ? 'Scanning… tap to cancel'
+              : 'Scanning…'
             : target && !discovered
               ? 'Inspect first'
-              : historicalLocked && target
-                ? 'Listening to PIP…'
-                : environmental && environmentalQuick && !environmentalDetailed
+              : environmental && environmentalQuick && !environmentalDetailed
                 ? 'Keep holding for detail'
                 : 'Hold to scan'}
         </button>
@@ -483,8 +602,8 @@ export function ScannerHud() {
           </span>
           <span className="touch-interact">
             {scannerCamera === 'first-person'
-              ? 'Drag to look · Reticle centred · Hold Scan to record'
-              : 'Drag to aim · Hold Scan to record'}
+              ? 'Drag to look · Reticle centred · Tap Scan to lock on, or hold it'
+              : 'Drag to aim · Tap Scan to lock on, or hold it'}
           </span>
         </p>
 

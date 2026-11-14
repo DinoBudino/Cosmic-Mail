@@ -1,29 +1,55 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { scannerAim } from './scannerAim'
+import { approachAlpha, computeBeamSegment } from './scannerBeamSegment'
+
+const BEAM_RADIUS = 0.006
+const BEAM_UP = new THREE.Vector3(0, 1, 0)
+const BEAM_START = new THREE.Vector3()
+const BEAM_DIR = new THREE.Vector3()
+const BEAM_CENTER = new THREE.Vector3()
+const BEAM_SCALE = new THREE.Vector3()
+const BEAM_QUAT = new THREE.Quaternion()
+const BEAM_END = { x: 0, y: 0, z: 0 }
 
 interface SharedBeam {
   mesh: THREE.Mesh
   material: THREE.MeshBasicMaterial
 }
 
-const BEAM_UP = new THREE.Vector3(0, 1, 0)
-const BEAM_START = new THREE.Vector3()
-const BEAM_END = new THREE.Vector3()
-const BEAM_DIRECTION = new THREE.Vector3()
-const BEAM_MIDPOINT = new THREE.Vector3()
-
 let sharedBeam: SharedBeam | null = null
 
 function getSharedBeam(): SharedBeam {
   if (sharedBeam) return sharedBeam
-  const geometry = new THREE.CylinderGeometry(0.014, 0.014, 1, 6, 1, true)
+  // Unit-height open cylinder along +Y: y=-0.5 is the emitter end, y=+0.5
+  // the impact end. Vertex colours fade it towards the target so the tip
+  // never competes with the reticle.
+  const geometry = new THREE.CylinderGeometry(
+    BEAM_RADIUS,
+    BEAM_RADIUS * 0.6,
+    1,
+    6,
+    1,
+    true,
+  )
+  const position = geometry.getAttribute('position')
+  const colors = new Float32Array(position.count * 3)
+  for (let i = 0; i < position.count; i += 1) {
+    const tip = position.getY(i) > 0
+    const level = tip ? 0.3 : 1
+    colors[i * 3] = level
+    colors[i * 3 + 1] = level
+    colors[i * 3 + 2] = level
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+
   const material = new THREE.MeshBasicMaterial({
     color: '#E3D9FF',
+    vertexColors: true,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0,
     depthWrite: false,
     toneMapped: false,
     blending: THREE.AdditiveBlending,
@@ -32,74 +58,100 @@ function getSharedBeam(): SharedBeam {
   const mesh = new THREE.Mesh(geometry, material)
   mesh.visible = false
   mesh.frustumCulled = false
+  mesh.matrixAutoUpdate = false
+  mesh.renderOrder = 5
   mesh.userData.scannerIgnore = true
   sharedBeam = { mesh, material }
   return sharedBeam
 }
 
 /**
- * Cheap reading beam from the hand device to the highlighted component.
- * A single reusable open cylinder, no particles or per-frame allocations.
+ * Reading beam from the device emitter to the targeted surface.
+ *
+ * The beam geometry is placed in `onBeforeRender`, i.e. after every
+ * `useFrame` of the frame (player, camera, animation mixer and the
+ * first-person device) has settled. Reading the emitter earlier gave a
+ * one-frame-stale origin that detached the beam from the device. No
+ * positive-priority frame callback is used, because that would take over
+ * rendering in the Low-quality path.
  */
 export function ScannerBeam() {
   const scene = useThree((state) => state.scene)
   const emitter = useRef<THREE.Object3D | null>(null)
   const emitterName = useRef<string | null>(null)
+  const alpha = useRef(0)
+  const wantsBeam = useRef(false)
+  const pulse = useRef(0)
 
-  useFrame(() => {
-    const { mesh, material } = getSharedBeam()
+  useFrame((state, delta) => {
+    const { mesh } = getSharedBeam()
     const store = useGameStore.getState()
-    const firstPerson =
-      store.scannerEquipped && store.scannerCamera === 'first-person'
     const active =
       store.scannerEquipped &&
       store.scannerTriggerHeld &&
       Boolean(
-        store.scannerSelectedComponentId || store.scannerEnvironmentalId,
+        store.scannerSelectedComponentId ||
+          store.scannerEnvironmentalId ||
+          store.scannerDistractorId ||
+          store.scannerTraceKind,
       ) &&
+      store.scannerPhysicalState === 'valid' &&
       scannerAim.valid &&
       !isWorldPaused()
 
-    if (!active) {
-      mesh.visible = false
-      return
-    }
+    wantsBeam.current = active
+    alpha.current = approachAlpha(alpha.current, active ? 1 : 0, delta)
+    pulse.current = store.reducedMotion
+      ? 0.5
+      : 0.5 + Math.sin(state.clock.elapsedTime * 14) * 0.5
+    mesh.visible = alpha.current > 0.01
 
-    const activeEmitterName = firstPerson
-      ? 'FP_ScannerEmitter'
-      : 'ScannerEmitter'
-    if (emitterName.current !== activeEmitterName) {
-      emitterName.current = activeEmitterName
-      emitter.current = scene.getObjectByName(activeEmitterName) ?? null
+    const firstPerson = store.scannerCamera === 'first-person'
+    const name = firstPerson ? 'FP_ScannerEmitter' : 'ScannerEmitter'
+    if (emitterName.current !== name) {
+      emitterName.current = name
+      emitter.current = null
     }
-    if (!emitter.current) {
-      emitter.current = scene.getObjectByName(activeEmitterName) ?? null
-    }
-
-    if (!emitter.current) {
-      mesh.visible = false
-      return
-    }
-
-    emitter.current.getWorldPosition(BEAM_START)
-    BEAM_END.set(scannerAim.x, scannerAim.y, scannerAim.z)
-    BEAM_DIRECTION.subVectors(BEAM_END, BEAM_START)
-    const length = BEAM_DIRECTION.length()
-    if (length < 1e-4) {
-      mesh.visible = false
-      return
-    }
-
-    BEAM_MIDPOINT.addVectors(BEAM_START, BEAM_END).multiplyScalar(0.5)
-    mesh.position.copy(BEAM_MIDPOINT)
-    mesh.quaternion.setFromUnitVectors(
-      BEAM_UP,
-      BEAM_DIRECTION.normalize(),
-    )
-    mesh.scale.set(1, length, 1)
-    material.opacity = 0.38 + store.scannerScanProgress * 0.5
-    mesh.visible = true
+    if (!emitter.current) emitter.current = scene.getObjectByName(name) ?? null
   })
+
+  useEffect(() => {
+    const { mesh, material } = getSharedBeam()
+    mesh.onBeforeRender = () => {
+      const source = emitter.current
+      if (!source || alpha.current <= 0.01) {
+        material.opacity = 0
+        return
+      }
+      source.updateWorldMatrix(true, false)
+      source.getWorldPosition(BEAM_START)
+      BEAM_END.x = scannerAim.x
+      BEAM_END.y = scannerAim.y
+      BEAM_END.z = scannerAim.z
+      const segment = computeBeamSegment(BEAM_START, BEAM_END)
+      if (!segment) {
+        material.opacity = 0
+        return
+      }
+      BEAM_DIR.set(
+        segment.direction.x,
+        segment.direction.y,
+        segment.direction.z,
+      )
+      BEAM_CENTER.set(segment.center.x, segment.center.y, segment.center.z)
+      BEAM_QUAT.setFromUnitVectors(BEAM_UP, BEAM_DIR)
+      BEAM_SCALE.set(1, segment.length, 1)
+      mesh.matrix.compose(BEAM_CENTER, BEAM_QUAT, BEAM_SCALE)
+      mesh.matrixWorld.copy(mesh.matrix)
+
+      const progress = useGameStore.getState().scannerScanProgress
+      material.opacity =
+        alpha.current * (0.34 + progress * 0.4 + pulse.current * 0.12)
+    }
+    return () => {
+      mesh.onBeforeRender = () => {}
+    }
+  }, [])
 
   return <primitive object={getSharedBeam().mesh} />
 }

@@ -1,7 +1,13 @@
+import { FullScanTraces } from './FullScanTraces'
+import { ScanMarkers } from './ScanMarkers'
 import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useRef, type ReactElement } from 'react'
 import * as THREE from 'three'
-import { SPIRIT_SITE } from '../data/spiritSite'
+import {
+  SPIRIT_DISTRACTOR_ANCHORS,
+  SPIRIT_SCAN_ANCHORS,
+  SPIRIT_SITE,
+} from '../data/spiritSite'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import { getTerrainHeight } from './terrainHeight'
@@ -199,6 +205,20 @@ function Rat({
   )
 }
 
+type PartVisualProps = {
+  selected: boolean
+  progress: number
+  attention: 'hint' | 'scan' | null
+}
+
+/** Provisional visuals per component id; a final model replaces these. */
+const PART_VISUALS: Record<string, (props: PartVisualProps) => ReactElement> =
+  {
+    'spirit-pancam': Pancam,
+    'spirit-mini-tes': MiniTes,
+    'spirit-rock-abrasion-tool': Rat,
+  }
+
 export function SpiritPlaceholder() {
   const selectedId = useGameStore((state) =>
     (state.scannerEquipped || state.scannerOpen) &&
@@ -304,77 +324,60 @@ export function SpiritPlaceholder() {
           roughness={0.5}
         />
       </mesh>
-      <group
-        name="ScannerTarget_spirit-pancam"
-        position={[0.5, 2.16, -0.35]}
-        userData={{
-          scannerMissionId: SPIRIT_SITE.missionId,
-          scannerComponentId: 'spirit-pancam',
-          scannerTarget: true,
-        }}
-      >
-        <mesh visible={false} position={[0, 0, 0.04]}>
-          <boxGeometry args={[0.78, 0.5, 0.5]} />
-          <meshBasicMaterial />
-        </mesh>
-        <Pancam
-          selected={selectedId === 'spirit-pancam'}
-          progress={scanProgress}
-          attention={
-            attentionId === 'spirit-pancam' ? attentionKind : null
-          }
-        />
-      </group>
+      <ScanMarkers />
+      <FullScanTraces />
 
-      {/* Mini-TES on the mast */}
-      <group
-        name="ScannerTarget_spirit-mini-tes"
-        position={[0.18, 1.9, -0.58]}
-        userData={{
-          scannerMissionId: SPIRIT_SITE.missionId,
-          scannerComponentId: 'spirit-mini-tes',
-          scannerTarget: true,
-        }}
-      >
-        <mesh visible={false} position={[0, 0, 0.04]}>
-          <boxGeometry args={[0.5, 0.5, 0.5]} />
-          <meshBasicMaterial />
-        </mesh>
-        <MiniTes
-          selected={selectedId === 'spirit-mini-tes'}
-          progress={scanProgress}
-          attention={
-            attentionId === 'spirit-mini-tes' ? attentionKind : null
-          }
-        />
-      </group>
+      {/* Scan targets: positions and hit boxes come from data */}
+      {SPIRIT_SCAN_ANCHORS.map((anchor) => {
+        const Part = PART_VISUALS[anchor.componentId]
+        return (
+          <group
+            key={anchor.componentId}
+            name={`ScannerTarget_${anchor.componentId}`}
+            position={[...anchor.position]}
+            userData={{
+              scannerMissionId: SPIRIT_SITE.missionId,
+              scannerComponentId: anchor.componentId,
+              scannerTarget: true,
+            }}
+          >
+            <mesh visible={false} position={[...anchor.hitOffset]}>
+              <boxGeometry args={[...anchor.hitSize]} />
+              <meshBasicMaterial />
+            </mesh>
+            {Part && (
+              <Part
+                selected={selectedId === anchor.componentId}
+                progress={scanProgress}
+                attention={
+                  attentionId === anchor.componentId ? attentionKind : null
+                }
+              />
+            )}
+          </group>
+        )
+      })}
 
-      {/* Robotic arm + Rock Abrasion Tool */}
-      <group
-        name="ScannerTarget_spirit-rock-abrasion-tool"
-        position={[0.72, 0.92, 0.58]}
-        userData={{
-          scannerMissionId: SPIRIT_SITE.missionId,
-          scannerComponentId: 'spirit-rock-abrasion-tool',
-          scannerTarget: true,
-        }}
-      >
-        <mesh visible={false} position={[0, 0, 0.32]}>
-          <boxGeometry args={[0.5, 0.5, 0.9]} />
-          <meshBasicMaterial />
-        </mesh>
-        <Rat
-          selected={selectedId === 'spirit-rock-abrasion-tool'}
-          progress={scanProgress}
-          attention={
-            attentionId === 'spirit-rock-abrasion-tool'
-              ? attentionKind
-              : null
-          }
-        />
-      </group>
+      {/* Distractor parts: invisible hit boxes, data-driven, no progress */}
+      {SPIRIT_DISTRACTOR_ANCHORS.map((anchor) => (
+        <group
+          key={anchor.distractorId}
+          name={`ScannerDistractor_${anchor.distractorId}`}
+          position={[...anchor.position]}
+          userData={{
+            scannerMissionId: SPIRIT_SITE.missionId,
+            scannerDistractorId: anchor.distractorId,
+            scannerTarget: true,
+          }}
+        >
+          <mesh visible={false} position={[...anchor.hitOffset]}>
+            <boxGeometry args={[...anchor.hitSize]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
+      ))}
 
-      {/* High-gain antenna and a small UHF whip */}
+      {/* Antenna and a small UHF whip */}
       <mesh position={[-0.72, 1.22, -0.36]} castShadow>
         <cylinderGeometry args={[0.04, 0.04, 0.55, 6]} />
         <meshStandardMaterial color={SPIRIT_CREAM} />

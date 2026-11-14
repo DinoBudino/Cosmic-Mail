@@ -5,6 +5,7 @@
  * it does not claim a chemical analysis from appearance alone.
  */
 
+import { CALIBRATION_SAMPLE } from './calibrationSample'
 import { pipLine } from './pipVoiceCatalog'
 import type { WorldPosition } from './marsObjects'
 
@@ -32,7 +33,12 @@ export interface EnvironmentalSite {
   scanRange: number
   /** Solid footprint for the larger outcrops/rocks; 0 for flat features. */
   collisionRadius: number
-  /** Short result after the quick hold. */
+  /**
+   * The only line PIP says about this site (P3, free exploration, max 15
+   * words). Not a recorded line: it uses the controlled TTS fallback.
+   */
+  shortLine: string
+  /** Short result after the quick hold (reading card / passport). */
   quickLine: string
   /** Deeper context after the detailed hold. */
   detailedLine: string
@@ -52,6 +58,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'rock',
     scanRange: 10,
     collisionRadius: 1.1,
+    shortLine: 'A dark, rough rock. Worth a closer look!',
     quickLine: pipLine('mars-env-volcanic-quick'),
     detailedLine: pipLine('mars-env-volcanic-detail'),
     scienceNote:
@@ -68,6 +75,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'soil',
     scanRange: 9,
     collisionRadius: 0,
+    shortLine: 'Fine, loose Martian dust. Easy for wind to move.',
     quickLine: pipLine('mars-env-soil-quick'),
     detailedLine: pipLine('mars-env-soil-detail'),
     scienceNote:
@@ -84,6 +92,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'wind',
     scanRange: 10,
     collisionRadius: 0,
+    shortLine: 'Streaks in the dust. They could be shaped by wind.',
     quickLine: pipLine('mars-env-wind-quick'),
     detailedLine: pipLine('mars-env-wind-detail'),
     scienceNote:
@@ -100,6 +109,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'outcrop',
     scanRange: 11,
     collisionRadius: 1.9,
+    shortLine: 'Layers of rock, stacked up. Interesting!',
     quickLine: pipLine('mars-env-outcrop-quick'),
     detailedLine: pipLine('mars-env-outcrop-detail'),
     scienceNote:
@@ -116,6 +126,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'rock',
     scanRange: 10,
     collisionRadius: 1.1,
+    shortLine: 'Another dark, rough rock. Worth a closer look!',
     quickLine: pipLine('mars-env-volcanic-quick'),
     detailedLine: pipLine('mars-env-volcanic-detail'),
     scienceNote:
@@ -132,6 +143,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'soil',
     scanRange: 9,
     collisionRadius: 0,
+    shortLine: 'More fine, loose dust. Easy for wind to move.',
     quickLine: pipLine('mars-env-soil-quick'),
     detailedLine: pipLine('mars-env-soil-detail'),
     scienceNote:
@@ -148,6 +160,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'outcrop',
     scanRange: 11,
     collisionRadius: 1.9,
+    shortLine: "Layers of rock again. Let's take a look!",
     quickLine: pipLine('mars-env-outcrop-quick'),
     detailedLine: pipLine('mars-env-outcrop-detail'),
     scienceNote:
@@ -164,6 +177,7 @@ export const ENVIRONMENTAL_SITES: readonly EnvironmentalSite[] = [
     visual: 'wind',
     scanRange: 10,
     collisionRadius: 0,
+    shortLine: 'More streaks in the dust. Perhaps wind-shaped.',
     quickLine: pipLine('mars-env-wind-quick'),
     detailedLine: pipLine('mars-env-wind-detail'),
     scienceNote:
@@ -178,7 +192,30 @@ export const ENVIRONMENTAL_SITE_IDS = ENVIRONMENTAL_SITES.map(
 
 const BY_ID = new Map(ENVIRONMENTAL_SITES.map((site) => [site.id, site] as const))
 
+/**
+ * Scanner-facing view of the calibration sample. It is resolved here so the
+ * scanner and HUD can treat it as a target, but it is deliberately absent
+ * from ENVIRONMENTAL_SITES and BY_ID: no save entry, no field note.
+ */
+const CALIBRATION_AS_SITE: EnvironmentalSite = {
+  id: CALIBRATION_SAMPLE.id,
+  category: 'volcanic-rock',
+  categoryLabel: 'Calibration',
+  name: CALIBRATION_SAMPLE.name,
+  shortName: 'Calibration sample',
+  position: CALIBRATION_SAMPLE.position,
+  visual: 'rock',
+  scanRange: CALIBRATION_SAMPLE.scanRange,
+  collisionRadius: 0,
+  shortLine: '',
+  quickLine: '',
+  detailedLine: '',
+  scienceNote: '',
+  sources: [],
+}
+
 export function getEnvironmentalSite(id: string): EnvironmentalSite | null {
+  if (id === CALIBRATION_SAMPLE.id) return CALIBRATION_AS_SITE
   return BY_ID.get(id) ?? null
 }
 

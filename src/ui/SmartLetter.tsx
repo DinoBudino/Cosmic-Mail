@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   TRANSMISSION_DESTINATION,
   TRANSMISSION_SUCCESS_LINE,
 } from '../data/onboardingNarrative'
 import { findMission } from '../data/missions'
 import { getArchiveCue } from '../data/missionNarrative'
+import {
+  advanceDelivery,
+  createDelivery,
+  isDeliveryInProgress,
+  type DeliveryEvent,
+  type DeliveryState,
+} from '../data/postalDelivery'
 import { emitAudio } from '../game/audio/audioEvents'
 import { speakPip, stopPipVoice } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
@@ -13,6 +20,7 @@ import { useNarrativeStore } from '../store/narrativeStore'
 import { useOnboardingStore } from '../store/onboardingStore'
 import { getMissionStage } from './missionStage'
 import { PipAvatar } from './PipSpeech'
+import { PostalDelivery } from './PostalDelivery'
 
 /**
  * The Proposal A smart letter: a digital capsule with the recovered memory
@@ -85,9 +93,10 @@ function SmartLetter({
   const voiceName = useGameStore((state) => state.voiceName)
   const openArchive = useGameStore((state) => state.openArchive)
   const phase = useOnboardingStore((state) => state.phase)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
 
   const [message, setMessage] = useState<string | null>(null)
-  const [justTransmitted, setJustTransmitted] = useState(false)
+  const [delivery, setDelivery] = useState<DeliveryState | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
   const previousFocus = useRef<Element | null>(null)
@@ -97,6 +106,10 @@ function SmartLetter({
   const memoryRecovered = progress?.memoryRecoveredAt != null
   const hasLetter = progress?.smartLetterCreatedAt != null
   const transmitted = progress?.transmittedAt != null
+  // While the ceremony runs, the stamp and "Delivered" appear only when the
+  // carrier actually stamps the passport, not the moment the data commits.
+  const ceremonyRunning = isDeliveryInProgress(delivery)
+  const showDelivered = transmitted && !ceremonyRunning
   const isAboardMailwing = phase === 'hub'
   const cue = getArchiveCue(mission, progress)
   const activeCue = archiveLine?.missionId === mission.id ? archiveLine : cue
@@ -150,22 +163,32 @@ function SmartLetter({
     )
   }
 
-  const handleTransmit = () => {
+  const handleAdvance = useCallback((event: DeliveryEvent) => {
+    setDelivery((current) =>
+      current ? advanceDelivery(current, event) : current,
+    )
+  }, [])
+
+  const handleBeginDelivery = () => {
+    setMessage(null)
+    setDelivery(createDelivery(transmitted))
+  }
+
+  /** The one real transmission. Idempotent: repeats never duplicate it. */
+  const handleSend = (): boolean => {
     emitAudio('transmissionStarted')
     const result = transmit(mission.id)
     if (!result) {
       emitAudio('uiError')
       setMessage('No active journey save. Return to exploring and try again.')
-      return
+      return false
     }
-    if (result.status === 'transmitted') {
-      setJustTransmitted(true)
+    if (
+      result.status === 'transmitted' ||
+      result.status === 'already-transmitted'
+    ) {
       setMessage(null)
-      return
-    }
-    if (result.status === 'already-transmitted') {
-      setMessage('This history is already restored in the Archive.')
-      return
+      return true
     }
     emitAudio('uiError')
     setMessage(
@@ -173,6 +196,7 @@ function SmartLetter({
         ? 'Prepare the smart letter before transmitting it.'
         : 'This mission is not available.',
     )
+    return false
   }
 
   const handleReconstruction = () => {
@@ -213,8 +237,8 @@ function SmartLetter({
           <div className="smart-letter__stamp-slot">
             <Stamp
               label={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
-              transmitted={transmitted}
-              animate={justTransmitted}
+              transmitted={showDelivered}
+              animate={false}
             />
           </div>
           <button
@@ -232,7 +256,7 @@ function SmartLetter({
           <span className="smart-letter__postmark" aria-hidden="true">
             ✦
           </span>
-          <span>{transmitted ? 'Delivered' : 'Awaiting transmission'}</span>
+          <span>{showDelivered ? 'Delivered' : 'Awaiting transmission'}</span>
         </div>
 
         <p className="smart-letter__summary">{mission.summary}</p>
@@ -348,9 +372,11 @@ function SmartLetter({
             )}
 
             <p className="smart-letter__status" role="status">
-              {transmitted
+              {showDelivered
                 ? TRANSMISSION_SUCCESS_LINE
-                : 'Smart letter prepared. It must be transmitted from Mailwing to the Earth Cosmic Archive.'}
+                : ceremonyRunning
+                  ? 'Delivery in progress.'
+                  : 'Smart letter prepared. It must be transmitted from Mailwing to the Earth Cosmic Archive.'}
             </p>
 
             <div className="archive-actions">
@@ -364,13 +390,13 @@ function SmartLetter({
                   ? 'Replay historical reconstruction'
                   : 'View historical reconstruction'}
               </button>
-              {!transmitted && isAboardMailwing && (
+              {!transmitted && isAboardMailwing && !delivery && (
                 <button
                   type="button"
                   className="archive-action archive-action--primary"
-                  onClick={handleTransmit}
+                  onClick={handleBeginDelivery}
                 >
-                  Transmit to {TRANSMISSION_DESTINATION}
+                  Prepare delivery to {TRANSMISSION_DESTINATION}
                 </button>
               )}
               {!transmitted && !isAboardMailwing && (
@@ -383,6 +409,16 @@ function SmartLetter({
                 </button>
               )}
             </div>
+
+            {delivery && (
+              <PostalDelivery
+                delivery={delivery}
+                stampLabel={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
+                reducedMotion={reducedMotion}
+                onAdvance={handleAdvance}
+                onSend={handleSend}
+              />
+            )}
           </>
         )}
 

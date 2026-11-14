@@ -19,6 +19,7 @@ import {
   markReconstructionWatched,
   prepareSmartLetter,
   recordEnvironmentalScan,
+  recordMemorialVisit,
   resetMissionProgress,
   scanComponent,
   setCurrentDestination,
@@ -49,13 +50,21 @@ class MemoryStorage implements StorageLike {
   }
 }
 
+/** A journey where every mission explorer was already identified on site. */
+function createDiscoveredJourney(): JourneySave {
+  return MISSION_IDS.reduce(
+    (current, id) => markMissionDiscovered(current, id, 1050),
+    createJourney('Ada', 1000),
+  )
+}
+
 const SPIRIT_COMPONENTS = [
   'spirit-pancam',
   'spirit-rock-abrasion-tool',
   'spirit-mini-tes',
 ] as const
 
-function scanAllSpirit(save = createJourney('Ada', 1000)) {
+function scanAllSpirit(save = createDiscoveredJourney()) {
   return SPIRIT_COMPONENTS.reduce(
     (current, componentId, index) =>
       scanComponent(current, 'spirit', componentId, 2000 + index).save,
@@ -64,7 +73,7 @@ function scanAllSpirit(save = createJourney('Ada', 1000)) {
 }
 
 /** Full A cycle up to a prepared smart letter. */
-function readyLetter(save = createJourney('Ada', 1000)): JourneySave {
+function readyLetter(save = createDiscoveredJourney()): JourneySave {
   let current = scanAllSpirit(save)
   current = completeFullScan(current, 'spirit', 3000).save
   return prepareSmartLetter(current, 'spirit', 4000).save
@@ -118,7 +127,7 @@ describe('Cosmic Scanner rules', () => {
   })
 
   it('scans a valid component once and persists the progress snapshot', () => {
-    const save = createJourney('Ada', 1000)
+    const save = createDiscoveredJourney()
     const result = scanComponent(save, 'spirit', 'spirit-pancam', 2000)
 
     expect(result.status).toBe('scanned')
@@ -129,6 +138,24 @@ describe('Cosmic Scanner rules', () => {
     ])
     expect(result.save.updatedAt).toBe(2000)
     expect(save.missions.spirit.scannedComponentIds).toEqual([])
+  })
+
+  it('does not record a scan before the explorer is discovered', () => {
+    const save = createJourney('Ada', 1000)
+    const result = scanComponent(save, 'spirit', 'spirit-pancam', 2000)
+
+    expect(result.status).toBe('not-discovered')
+    expect(result.scannedCount).toBe(0)
+    expect(result.save).toBe(save)
+    expect(save.missions.spirit.discovered).toBe(false)
+    expect(save.missions.spirit.scannedComponentIds).toEqual([])
+
+    const discovered = markMissionDiscovered(save, 'spirit', 1100)
+    const first = scanComponent(discovered, 'spirit', 'spirit-pancam', 2000)
+    expect(first.status).toBe('scanned')
+    expect(
+      scanComponent(first.save, 'spirit', 'spirit-pancam', 3000).status,
+    ).toBe('duplicate')
   })
 
   it('rejects components from another mission and unknown missions', () => {
@@ -142,7 +169,7 @@ describe('Cosmic Scanner rules', () => {
   })
 
   it('never duplicates a scanned component', () => {
-    const save = createJourney('Ada', 1000)
+    const save = createDiscoveredJourney()
     const first = scanComponent(save, 'spirit', 'spirit-pancam', 2000)
     const duplicate = scanComponent(first.save, 'spirit', 'spirit-pancam', 3000)
 
@@ -153,7 +180,7 @@ describe('Cosmic Scanner rules', () => {
   })
 
   it('unlocks the full scan only after all three fragments', () => {
-    let save = createJourney('Ada', 1000)
+    let save = createDiscoveredJourney()
     for (const componentId of SPIRIT_COMPONENTS.slice(0, 2)) {
       save = scanComponent(save, 'spirit', componentId).save
       expect(isFullScanUnlocked(save, 'spirit')).toBe(false)
@@ -167,7 +194,7 @@ describe('Cosmic Scanner rules', () => {
 describe('Full recognition scan and memory core', () => {
   it('is locked before all three fragments', () => {
     const save = scanComponent(
-      createJourney('Ada', 1000),
+      createDiscoveredJourney(),
       'spirit',
       'spirit-pancam',
     ).save
@@ -192,7 +219,7 @@ describe('Full recognition scan and memory core', () => {
   })
 
   it('rejects an unknown mission safely', () => {
-    const save = createJourney('Ada', 1000)
+    const save = createDiscoveredJourney()
     const result = completeFullScan(save, 'apollo-11' as MissionId)
     expect(result.status).toBe('unknown-mission')
     expect(result.save).toBe(save)
@@ -227,7 +254,7 @@ describe('Smart letter, reconstruction and transmission', () => {
   })
 
   it('never lets the recreation create rewards', () => {
-    const save = createJourney('Ada', 1000)
+    const save = createDiscoveredJourney()
     const locked = markReconstructionWatched(save, 'spirit', 2000)
     expect(locked.status).toBe('locked')
     expect(locked.save).toBe(save)
@@ -258,7 +285,7 @@ describe('Smart letter, reconstruction and transmission', () => {
   })
 
   it('records exactly one stamp per transmitted mission', () => {
-    let save = createJourney('Ada', 1000)
+    let save = createDiscoveredJourney()
     let now = 2000
 
     for (const mission of MISSION_IDS.map((id) => getMission(id))) {
@@ -280,7 +307,7 @@ describe('Smart letter, reconstruction and transmission', () => {
   })
 
   it('reports an unknown mission safely', () => {
-    const save = createJourney('Ada', 1000)
+    const save = createDiscoveredJourney()
     expect(
       prepareSmartLetter(save, 'apollo-11' as MissionId).status,
     ).toBe('unknown-mission')
@@ -292,7 +319,7 @@ describe('Smart letter, reconstruction and transmission', () => {
 
 describe('Reset pilot rules', () => {
   it('clears only the selected mission while preserving identity and others', () => {
-    let save = createJourney('Ada', 1000)
+    let save = createDiscoveredJourney()
     save = markOnboardingComplete(
       setCurrentDestination(save, 'mars', 1100),
       1200,
@@ -440,5 +467,33 @@ describe('optional environmental discoveries', () => {
       recordEnvironmentalScan(save, 'not-a-site', true, 5000).status,
     ).toBe('unknown-site')
     expect(save.environmentalDiscoveries).toEqual([])
+  })
+})
+
+describe('memorial field-note track', () => {
+  it('records a memorial once and never touches mission progress', () => {
+    const save = createJourney('Ada', 1000)
+    const first = recordMemorialVisit(save, 'insight', 2000)
+    expect(first.status).toBe('recorded')
+    expect(first.save.memorialVisits).toEqual(['insight'])
+    expect(first.save.missions).toBe(save.missions)
+
+    const again = recordMemorialVisit(first.save, 'insight', 3000)
+    expect(again.status).toBe('duplicate')
+    expect(again.save).toBe(first.save)
+    expect(recordMemorialVisit(save, 'not-a-site').status).toBe(
+      'unknown-memorial',
+    )
+  })
+
+  it('never grants a stamp, memory or stage', () => {
+    let save = createJourney('Ada', 1000)
+    for (const id of ['opportunity', 'viking1', 'ingenuity', 'insight']) {
+      save = recordMemorialVisit(save, id).save
+    }
+    save = recordEnvironmentalScan(save, 'env-volcanic-landing', true).save
+    expect(getEarnedStampIds(save)).toEqual([])
+    expect(getMissionStage(save.missions.spirit)).toBe('unknown')
+    expect(save.missions.spirit.stampEarned).toBe(false)
   })
 })

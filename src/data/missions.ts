@@ -13,6 +13,7 @@
  */
 
 import { pipLine } from './pipVoiceCatalog'
+import type { ScannerLensId } from './scannerLenses'
 
 export const DESTINATION_IDS = ['moon', 'mars', 'deep-space'] as const
 export type DestinationId = (typeof DESTINATION_IDS)[number]
@@ -56,8 +57,38 @@ export interface MissionComponent {
   pipDirectHint?: string
   /** Short spatial hint for the 3D hotspot. */
   scanHint: string
+  /**
+   * Scanner lens that recognizes this component, matching how the real
+   * instrument works. Undefined means any lens works (content not yet
+   * designed for lenses).
+   */
+  lens?: ScannerLensId
+  /**
+   * Graduated Ask PIP lines about the lens. `context` points at the
+   * instrument's function; `direct` may name the way of observing.
+   */
+  lensHints?: { context: string; direct: string }
   /** Optional position on the scanner map; falls back to a list. */
   hotspot?: HotspotPosition
+  sources: readonly MissionSource[]
+  validation: ContentStatus
+}
+
+/**
+ * A real part of the explorer that is not one of the mission's educational
+ * components. Scanning it gives a short PIP note and never adds progress.
+ * Every distractor must be backed by linked NASA sources
+ * (`validation: 'source-checked'`) or it must not exist.
+ */
+export interface MissionDistractor {
+  /** Globally unique across all missions (mission-prefixed). */
+  id: string
+  name: string
+  shortName: string
+  /** Historical claim backed by `sources`. */
+  historicalRecord: string
+  /** PIP's brief note. Only shown after the explorer is identified. */
+  pipNote: string
   sources: readonly MissionSource[]
   validation: ContentStatus
 }
@@ -151,6 +182,8 @@ export interface MissionDefinition {
   pipBriefing: string
   worldMode: WorldMode
   components: readonly [MissionComponent, MissionComponent, MissionComponent]
+  /** Scannable parts that look relevant but add no progress. */
+  distractors?: readonly MissionDistractor[]
   /** Content destined for the Earth Cosmic Archive. */
   smartLetter: SmartLetterContent
   /** First-person recreation unlocked by the smart letter. */
@@ -296,6 +329,12 @@ export const MISSIONS: readonly MissionDefinition[] = [
         pipLine: pipLine('mars-pancam'),
         pipHint: pipLine('mars-hint-pancam'),
         pipDirectHint: pipLine('mars-direct-pancam'),
+        lens: 'visual',
+        lensHints: {
+          context:
+            'Some tools look, some touch and some sense heat. This one is all about looking.',
+          direct: 'This part works like a camera. Try the visual lens (1).',
+        },
         scanHint: 'The pair of cameras at the top of the mast.',
         hotspot: { x: 62, y: 24 },
         sources: SPIRIT_SOURCES,
@@ -310,6 +349,12 @@ export const MISSIONS: readonly MissionDefinition[] = [
         pipLine: pipLine('mars-rat'),
         pipHint: pipLine('mars-hint-rat'),
         pipDirectHint: pipLine('mars-direct-rat'),
+        lens: 'contact',
+        lensHints: {
+          context:
+            'Some tools look, some touch and some sense heat. This one works by touching rock.',
+          direct: 'This tool touches and grinds stone. Try the contact lens (2).',
+        },
         scanHint: 'A small tool on the robotic arm.',
         hotspot: { x: 34, y: 64 },
         sources: SPIRIT_SOURCES,
@@ -324,8 +369,50 @@ export const MISSIONS: readonly MissionDefinition[] = [
         pipLine: pipLine('mars-mini-tes'),
         pipHint: pipLine('mars-hint-mini-tes'),
         pipDirectHint: pipLine('mars-direct-mini-tes'),
+        lens: 'thermal',
+        lensHints: {
+          context:
+            'Some tools look, some touch and some sense heat. This one reads invisible light.',
+          direct:
+            'This instrument reads heat and infrared light. Try the thermal lens (3).',
+        },
         scanHint: 'An instrument beside the cameras on the mast.',
         hotspot: { x: 72, y: 46 },
+        sources: SPIRIT_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    distractors: [
+      {
+        id: 'spirit-solar-panels',
+        name: 'Solar panels',
+        shortName: 'Solar panels',
+        historicalRecord:
+          'Spirit was powered by solar panels. After landing, the rover deployed its petal solar panels.',
+        pipNote:
+          "Solar panels! They gave Spirit its power. Nice find, but they won't unlock a memory fragment.",
+        sources: SPIRIT_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'spirit-wheels',
+        name: 'Wheels',
+        shortName: 'Wheels',
+        historicalRecord:
+          'Spirit rolled on six wheels. Its right rear wheel eventually stopped working.',
+        pipNote:
+          "Six wheels carried Spirit across Mars. They're important, but this is not a memory fragment.",
+        sources: SPIRIT_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'spirit-antenna',
+        name: 'Antenna',
+        shortName: 'Antenna',
+        historicalRecord:
+          'Spirit transmitted data to Earth via orbiters such as Mars Global Surveyor and 2001 Mars Odyssey.',
+        pipNote:
+          'Antennas helped Spirit send its data home through orbiters. Good to know, but not a fragment.',
         sources: SPIRIT_SOURCES,
         validation: 'source-checked',
       },

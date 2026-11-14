@@ -7,6 +7,7 @@
  * or its parts. After discovery, PIP may explain what the player scans.
  */
 
+import type { PipTier } from './pipDialogPolicy'
 import { getMissionStage, type MissionStage } from '../store/journeyLogic'
 import { pipLine } from './pipVoiceCatalog'
 import type {
@@ -54,6 +55,12 @@ export interface NarrativeCue {
   once?: boolean
   expression?: NarrativeExpression
   componentId?: string
+  /** Explicit dialogue tier (0 most important). Defaults from `priority`. */
+  tier?: PipTier
+  /** The player asked for it (Ask PIP) or caused it directly. */
+  solicited?: boolean
+  /** The player already moved on: the line is cancelled instead of played. */
+  cancelWhen?: () => boolean
 }
 
 export type ArchiveCueKind = 'locked' | 'memory' | 'letter' | 'transmitted'
@@ -610,5 +617,72 @@ export function getArchiveCue(
     text:
       narrative?.fullScanReady ??
       'The archive needs the complete recognition scan before it can recover this memory.',
+  }
+}
+
+/* ------------------------------------------------------------------ lenses */
+
+/**
+ * Soft feedback when a component is scanned with the wrong lens. Never a
+ * failure: no penalty, no lost progress. Level 0 is a gentle nudge;
+ * level 1 points at the instrument's function without naming the lens.
+ * Only reachable after discovery, so naming the part stays allowed.
+ */
+export function getWrongLensCue(
+  mission: MissionDefinition,
+  component: MissionComponent,
+  level: number = 0,
+): NarrativeCue {
+  const useContext = level >= 1 && Boolean(component.lensHints)
+  return {
+    id: `${mission.id}:wrong-lens:${component.id}:${useContext ? 1 : 0}`,
+    text: useContext
+      ? component.lensHints!.context
+      : "Hmm, that lens isn't picking anything up here. Think about what this tool does, then try another lens.",
+    priority: 'hint',
+    once: false,
+    expression: 'thinking',
+    componentId: component.id,
+  }
+}
+
+/**
+ * Ask PIP help about the lens for one pending component: level 1 describes
+ * the function, level 2 may name the way of observing. Null before
+ * discovery (identity discipline) or when the part has no lens content.
+ */
+export function getLensHintCue(
+  mission: MissionDefinition,
+  component: MissionComponent,
+  progress: NarrativeProgress | null,
+  level: number,
+): NarrativeCue | null {
+  if (stageForProgress(progress) === 'unknown') return null
+  if (level < 1 || !component.lensHints) return null
+  return {
+    id: `${mission.id}:lens-hint:${component.id}:${level >= 2 ? 'direct' : 'context'}`,
+    text: level >= 2 ? component.lensHints.direct : component.lensHints.context,
+    priority: 'hint',
+    once: false,
+    expression: 'focused',
+    componentId: component.id,
+  }
+}
+
+/** Short PIP note for a distractor part. Never adds progress. */
+export function getDistractorCue(
+  mission: MissionDefinition,
+  distractorId: string,
+  progress: NarrativeProgress | null,
+): NarrativeCue | null {
+  if (!progress?.discovered) return null
+  const distractor = mission.distractors?.find((d) => d.id === distractorId)
+  if (!distractor) return null
+  return {
+    id: `${mission.id}:distractor:${distractor.id}`,
+    text: distractor.pipNote,
+    priority: 'hint',
+    once: false,
+    expression: 'curious',
   }
 }

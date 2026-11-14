@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   onPipVoiceEnded,
   speakPip,
@@ -40,28 +40,57 @@ export function PipAvatar() {
   )
 }
 
-/** One typewritten line, remounted per message so its state starts clean. */
-function PipLine({ message }: { message: string }) {
+/**
+ * One typewritten line, remounted per message so its state starts clean.
+ * `forceFull` shows the complete subtitle immediately (first press of the
+ * skip button); the voice keeps playing until the next press dismisses it.
+ */
+function PipLine({
+  message,
+  forceFull,
+  onFullyTyped,
+}: {
+  message: string
+  forceFull: boolean
+  onFullyTyped: () => void
+}) {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const [typed, setTyped] = useState(reducedMotion ? message : '')
+  const onFullyTypedRef = useRef(onFullyTyped)
 
   useEffect(() => {
-    if (reducedMotion) return
+    onFullyTypedRef.current = onFullyTyped
+  }, [onFullyTyped])
+
+  useEffect(() => {
+    if (reducedMotion || forceFull) return
     const interval = window.setInterval(() => {
-      setTyped((current) => {
-        const next = message.slice(0, current.length + 1)
-        if (next.length >= message.length) window.clearInterval(interval)
-        return next
-      })
+      setTyped((current) =>
+        current.length >= message.length
+          ? current
+          : message.slice(0, current.length + 1),
+      )
     }, TYPE_INTERVAL_MS)
     return () => window.clearInterval(interval)
-  }, [message, reducedMotion])
+  }, [message, reducedMotion, forceFull])
+
+  // Notify the parent from an effect, never from a state updater (which
+  // runs during render and would update PipSpeech mid-render).
+  const fullyTyped = typed.length >= message.length
+  useEffect(() => {
+    if (fullyTyped && !reducedMotion && !forceFull) {
+      onFullyTypedRef.current()
+    }
+  }, [fullyTyped, reducedMotion, forceFull])
+
+  const shown = reducedMotion || forceFull ? message : typed
+  const typing = !reducedMotion && !forceFull && typed.length < message.length
 
   return (
     <div role="status" aria-live="polite" aria-atomic="true">
       <p className="pip-text">
-        {typed}
-        <span className="pip-caret" aria-hidden="true" />
+        {shown}
+        {typing && <span className="pip-caret" aria-hidden="true" />}
       </p>
     </div>
   )
@@ -109,6 +138,10 @@ export function PipSpeech() {
       : null
   const activeText = current?.text ?? pipMessage ?? null
   const activeNarrative = Boolean(current)
+  const [forcedKey, setForcedKey] = useState<string | null>(null)
+  const [typedKey, setTypedKey] = useState<string | null>(null)
+  const lineFullyShown =
+    reducedMotion || (activeKey !== null && (forcedKey === activeKey || typedKey === activeKey))
   const activeEmotion = current?.expression ?? null
 
   useEffect(() => {
@@ -133,19 +166,44 @@ export function PipSpeech() {
     if (current && pipMessage) clearPipMessage()
   }, [current, pipMessage, clearPipMessage])
 
+  // Keep the latest "subtitle is complete" fact for the voice-end handler.
+  const fullyShownRef = useRef(false)
+  useEffect(() => {
+    fullyShownRef.current = lineFullyShown
+  }, [lineFullyShown])
+
+  // The player may move past a line while it plays (a step changed, the
+  // explorer was identified): such lines are cancelled, not finished.
+  const dropStaleCurrent = useNarrativeStore((state) => state.dropStaleCurrent)
+  useEffect(() => {
+    if (!activeNarrative || hidden) return
+    dropStaleCurrent()
+    const timer = window.setInterval(dropStaleCurrent, 400)
+    return () => window.clearInterval(timer)
+  }, [activeKey, activeNarrative, hidden, dropStaleCurrent])
+
   useEffect(() => {
     if (!activeText || hidden) return
     let finished = false
+    const pending: number[] = []
     const finish = () => {
       if (finished) return
       finished = true
       if (activeNarrative) completeNarrative()
       else clearPipMessage()
     }
-    // With voice enabled, the next line waits for the real recording. The
-    // timer is only a fallback for muted/blocked/missing audio.
+    // With voice enabled, the next line waits for the real recording. If the
+    // voice ends before the typewriter does, the full subtitle is shown and
+    // held briefly so the last word is never cut off.
     const unsubscribe = voiceEnabled
-      ? onPipVoiceEnded(finish)
+      ? onPipVoiceEnded(() => {
+          if (fullyShownRef.current) {
+            pending.push(window.setTimeout(finish, 500))
+          } else {
+            setForcedKey(activeKey)
+            pending.push(window.setTimeout(finish, 1300))
+          }
+        })
       : () => undefined
     const lifetime = activeNarrative
       ? voiceEnabled
@@ -156,6 +214,7 @@ export function PipSpeech() {
     return () => {
       finished = true
       window.clearTimeout(timer)
+      for (const id of pending) window.clearTimeout(id)
       unsubscribe()
     }
   }, [
@@ -171,6 +230,11 @@ export function PipSpeech() {
   if (!activeText || hidden) return null
 
   const skip = () => {
+    // First press completes the subtitle; the next press moves on.
+    if (!lineFullyShown) {
+      setForcedKey(activeKey)
+      return
+    }
     if (activeNarrative) completeNarrative()
     else clearPipMessage()
   }
@@ -180,6 +244,13 @@ export function PipSpeech() {
       className="pip-speech"
       data-emotion={activeEmotion ?? 'neutral'}
       aria-label="PIP is speaking"
+      onClick={(event) => {
+        // The Skip button handles itself; a click anywhere else on the box
+        // does the same. Space/Enter work on the focused button (Space stays
+        // the jet boots in the world).
+        if ((event.target as HTMLElement).closest('button')) return
+        skip()
+      }}
     >
       <PipAvatar />
       <div className="pip-speech__copy">
@@ -189,16 +260,27 @@ export function PipSpeech() {
             type="button"
             className="pip-speech__skip"
             onClick={skip}
-            aria-label="Dismiss PIP's message"
+            aria-label={
+              lineFullyShown
+                ? "Dismiss PIP's message"
+                : "Show PIP's full message"
+            }
           >
-            {activeNarrative && queueLength > 0
-              ? 'Next'
-              : reducedMotion
-                ? 'Close'
-                : 'Skip'}
+            {!lineFullyShown
+              ? 'Show all'
+              : activeNarrative && queueLength > 0
+                ? 'Next'
+                : reducedMotion
+                  ? 'Close'
+                  : 'Skip'}
           </button>
         </div>
-        <PipLine key={activeKey ?? 'pip'} message={activeText} />
+        <PipLine
+          key={activeKey ?? 'pip'}
+          message={activeText}
+          forceFull={forcedKey === activeKey}
+          onFullyTyped={() => setTypedKey(activeKey)}
+        />
       </div>
     </aside>
   )

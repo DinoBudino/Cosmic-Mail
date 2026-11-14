@@ -30,6 +30,7 @@ let touchBoot = false
 let touchRun = false
 let interactQueued = false
 let scannerToggleQueued = false
+let scannerLensKeyQueued: string | null = null
 
 /** Normalizes a 2D movement vector so diagonals are not faster. */
 export function normalizeMoveVector(x: number, z: number): MoveVector {
@@ -90,6 +91,13 @@ export function consumeScannerToggle(): boolean {
   return true
 }
 
+/** The queued lens key ('1' | '2' | '3'), consumed once, or null. */
+export function consumeScannerLensKey(): string | null {
+  const key = scannerLensKeyQueued
+  scannerLensKeyQueued = null
+  return key
+}
+
 /**
  * Reads keyboard and touch input as camera-relative axes: x is right, y is
  * forward. Values stay inside the unit circle so touch input can be analog.
@@ -142,6 +150,7 @@ export function clearInput(): void {
   touchRun = false
   interactQueued = false
   scannerToggleQueued = false
+  scannerLensKeyQueued = null
 }
 
 /** Attaches keyboard listeners once. Returns a cleanup function. */
@@ -159,6 +168,13 @@ export function attachInput(isPaused: () => boolean = () => false): () => void {
     if (key === SCANNER_KEY) {
       if (!event.repeat) scannerToggleQueued = true
       event.preventDefault()
+      return
+    }
+
+    if (key === '1' || key === '2' || key === '3') {
+      if (!event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        scannerLensKeyQueued = key
+      }
       return
     }
 

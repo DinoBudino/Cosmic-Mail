@@ -408,3 +408,39 @@ describe('optional environmental persistence', () => {
     expect(save!.environmentalDetailedDiscoveries).toEqual([])
   })
 })
+
+describe('memorialVisits (additive field)', () => {
+  it('reads a v4 save written before the field existed as an empty list', () => {
+    const base = createJourney('Ada', 1000)
+    const { memorialVisits: _omitted, ...legacy } = base
+    void _omitted
+    const parsed = parseJourneySave(legacy)
+    expect(parsed?.memorialVisits).toEqual([])
+    // Nothing else is altered by the missing field.
+    expect(parsed?.playerName).toBe('Ada')
+    expect(parsed?.missions).toEqual(base.missions)
+  })
+
+  it('keeps only valid, unique memorial ids', () => {
+    const parsed = parseJourneySave({
+      ...createJourney('Ada', 1000),
+      memorialVisits: ['insight', 'insight', 'bogus', 42, 'opportunity'],
+    })
+    expect(parsed?.memorialVisits).toEqual(['insight', 'opportunity'])
+    expect(
+      parseJourneySave({
+        ...createJourney('Ada', 1000),
+        memorialVisits: 'insight',
+      })?.memorialVisits,
+    ).toEqual([])
+  })
+
+  it('migrated v3 saves start without memorial visits', () => {
+    const migrated = migrateV3Save({
+      schemaVersion: 3,
+      playerName: 'Ada',
+      missions: {},
+    })
+    expect(migrated?.memorialVisits).toEqual([])
+  })
+})
