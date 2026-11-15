@@ -16,12 +16,12 @@ const EARTH_NIGHT = `${import.meta.env.BASE_URL}textures/earth/earth-night.jpg`
 const SKY = 400
 /**
  * Earth seen from the Moon spans about 1.9 deg (four times the Sun). On a
- * game screen that disc is too small to notice, so it is drawn three times
- * as large, and lower in the sky than it really is (see LunarSite.earth):
+ * game screen that disc is too small to notice, so it is drawn twice as
+ * large, and lower in the sky than it really is (see LunarSite.earth):
  * the two liberties taken so children can find it. It is lit by the same
  * Sun as the ground, so its phase is the real one for the scene's Sun.
  */
-const EARTH_DISPLAY_SCALE = 3
+const EARTH_DISPLAY_SCALE = 2
 const EARTH_RADIUS = SKY * Math.tan((1.9 / 2) * (Math.PI / 180)) * EARTH_DISPLAY_SCALE
 /** The Sun is about 0.53 deg across. */
 const SUN_RADIUS = SKY * Math.tan((0.53 / 2) * (Math.PI / 180))
