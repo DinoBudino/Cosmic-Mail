@@ -5,8 +5,7 @@ import { speakPip, stopPipVoice } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
 import { useJourneyStore } from '../../store/journeyStore'
 import { keepsakeDataFor } from '../keepsakeData'
-import { downloadKeepsake, drawCertificate, drawPostcard } from '../keepsakes'
-import { PipAvatar } from '../PipSpeech'
+import { downloadKeepsake, drawCertificate, drawPostcard, explorerPortraitUrl, loadKeepsakeArt, PIP_PORTRAIT_URL } from '../keepsakes'
 import './archiveRestored.css'
 
 /**
@@ -45,19 +44,19 @@ const ORANGE = '#FF8A22'
 const HUB = { x: 400, y: 92 }
 const EARTH = { x: 700, y: 120 }
 const CARDS = [
-  { x: 120, y: 300 },
-  { x: 260, y: 330 },
-  { x: 400, y: 342 },
-  { x: 540, y: 330 },
-  { x: 680, y: 300 },
+  { x: 116, y: 290 },
+  { x: 258, y: 316 },
+  { x: 400, y: 326 },
+  { x: 542, y: 316 },
+  { x: 684, y: 290 },
 ] as const
 
 function linkPath(i: number): string {
   const c = CARDS[i]!
-  return `M${HUB.x} ${HUB.y + 30} C${HUB.x} ${HUB.y + 120} ${c.x} ${c.y - 120} ${c.x} ${c.y - 44}`
+  return `M${HUB.x} ${HUB.y + 30} C${HUB.x} ${HUB.y + 110} ${c.x} ${c.y - 140} ${c.x} ${c.y - 72}`
 }
 
-function ArchiveHologram({ beat, names, worlds, elapsed }: { beat: Beat; names: string[]; worlds: string[]; elapsed: number }) {
+function ArchiveHologram({ beat, ids, names, worlds, elapsed }: { beat: Beat; ids: string[]; names: string[]; worlds: string[]; elapsed: number }) {
   const step = BEATS.indexOf(beat)
   const filesStart = TIMELINE[1]!.at
   const lit = (i: number) => step > 1 || (step === 1 && elapsed - filesStart > 700 + i * 900)
@@ -134,18 +133,28 @@ function ArchiveHologram({ beat, names, worlds, elapsed }: { beat: Beat; names: 
         const on = lit(i)
         return (
           <g key={i} className={`restored__card${on ? ' is-on' : ''}`} style={{ transformOrigin: `${c.x}px ${c.y}px` }}>
-            {on && <circle cx={c.x} cy={c.y} r={62} fill="url(#rs-glow-peach)" />}
-            <rect x={c.x - 46} y={c.y - 44} width={92} height={104} rx={8} fill={on ? 'rgba(255,217,168,0.16)' : 'rgba(253,244,236,0.05)'} stroke={on ? PEACH : LAVENDER} strokeWidth={on ? 2.4 : 1.4} strokeDasharray={on ? undefined : '5 5'} />
-            <circle cx={c.x} cy={c.y - 14} r={17} fill="none" stroke={on ? PEACH : LAVENDER} strokeWidth="1.6" />
-            <path
-              d={`M${c.x} ${c.y - 25} l3 6.5 7 .8 -5.2 4.8 1.4 7 -6.2 -3.5 -6.2 3.5 1.4 -7 -5.2 -4.8 7 -.8 z`}
-              fill={on ? PEACH : LAVENDER}
-              opacity={on ? 1 : 0.5}
+            {on && <circle cx={c.x} cy={c.y} r={78} fill="url(#rs-glow-peach)" />}
+            <rect x={c.x - 58} y={c.y - 70} width={116} height={140} rx={10} fill={on ? 'rgba(255,217,168,0.16)' : 'rgba(253,244,236,0.05)'} stroke={on ? PEACH : LAVENDER} strokeWidth={on ? 2.4 : 1.4} strokeDasharray={on ? undefined : '5 5'} />
+            {/* the explorer itself: a render of its game model */}
+            <image
+              href={explorerPortraitUrl(ids[i]!)}
+              x={c.x - 52}
+              y={c.y - 70}
+              width={104}
+              height={104}
+              preserveAspectRatio="xMidYMid meet"
+              opacity={on ? 1 : 0.12}
+              style={{ filter: on ? 'drop-shadow(0 4px 6px rgba(0,0,0,0.45))' : 'grayscale(1)' }}
             />
-            <text x={c.x} y={c.y + 22} textAnchor="middle" className="restored__name" fill={on ? CREAM : LAVENDER}>
-              {on ? names[i] : '?'}
+            {!on && (
+              <text x={c.x} y={c.y - 6} textAnchor="middle" className="restored__name" fill={LAVENDER}>
+                ?
+              </text>
+            )}
+            <text x={c.x} y={c.y + 46} textAnchor="middle" className="restored__name" fill={on ? CREAM : LAVENDER}>
+              {on ? names[i] : ''}
             </text>
-            <text x={c.x} y={c.y + 44} textAnchor="middle" className="restored__world" fill={on ? ORANGE : LAVENDER}>
+            <text x={c.x} y={c.y + 62} textAnchor="middle" className="restored__world" fill={on ? ORANGE : LAVENDER}>
               {on ? worlds[i]!.toUpperCase() : ''}
             </text>
           </g>
@@ -249,9 +258,15 @@ function NameConstellation({ name, reducedMotion }: { name: string; reducedMotio
 function KeepsakePreview({ kind, data }: { kind: 'certificate' | 'postcard'; data: ReturnType<typeof keepsakeDataFor> }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
-    if (!ref.current) return
-    if (kind === 'certificate') drawCertificate(ref.current, data)
-    else drawPostcard(ref.current, data)
+    let live = true
+    void loadKeepsakeArt(data.explorers.map((e) => e.id)).then((art) => {
+      if (!live || !ref.current) return
+      if (kind === 'certificate') drawCertificate(ref.current, data, art)
+      else drawPostcard(ref.current, data, art)
+    })
+    return () => {
+      live = false
+    }
   }, [kind, data])
   return <canvas ref={ref} className="restored__preview" aria-hidden="true" />
 }
@@ -273,6 +288,7 @@ export function ArchiveRestored({ onClose }: { onClose: () => void }) {
     const dialog = dialogRef.current
     if (dialog && !dialog.open) dialog.showModal()
     emitAudio('archiveActivated')
+    void loadKeepsakeArt(keepsakeDataFor(null).explorers.map((e) => e.id))
     return () => {
       stopPipVoice()
       if (dialog?.open) dialog.close()
@@ -317,6 +333,7 @@ export function ArchiveRestored({ onClose }: { onClose: () => void }) {
   }, [beat, elapsed])
 
   const step = BEATS.indexOf(beat)
+  const ids = data.explorers.map((e) => e.id)
   const names = data.explorers.map((e) => e.name)
   const worlds = data.explorers.map((e) => e.world)
 
@@ -334,12 +351,12 @@ export function ArchiveRestored({ onClose }: { onClose: () => void }) {
       </h2>
 
       <div className={`restored__stage${step >= 3 ? ' is-small' : ''}`}>
-        <ArchiveHologram beat={beat} names={names} worlds={worlds} elapsed={elapsed} />
+        <ArchiveHologram beat={beat} ids={ids} names={names} worlds={worlds} elapsed={elapsed} />
       </div>
 
       {step >= 2 && (
         <div className={`restored__pip${step === 2 ? ' is-remembering' : ''}`} aria-hidden="true">
-          <PipAvatar />
+          <img src={PIP_PORTRAIT_URL} alt="" />
           {step === 2 && (
             <span className="restored__sparks">
               {Array.from({ length: 10 }).map((_, i) => (
@@ -358,7 +375,7 @@ export function ArchiveRestored({ onClose }: { onClose: () => void }) {
           </p>
           <div className="restored__badge">
             <span className="restored__badge-face" aria-hidden="true">
-              <PipAvatar />
+              <img src={PIP_PORTRAIT_URL} alt="" />
             </span>
             <span>
               <small>Cosmic Carrier · ID {data.carrierId}</small>

@@ -202,10 +202,10 @@
 /* PIP gets his memories back: sparks fly into him. */
 .restored__pip {
   position: absolute;
-  left: 7%;
-  top: 44%;
-  width: 130px;
-  height: 130px;
+  left: 1.5%;
+  top: 30%;
+  width: 128px;
+  height: 154px;
   transform: translateY(-50%);
   transition:
     bottom 1s ease,
@@ -216,9 +216,10 @@
   animation: restored-float 2.4s ease-in-out infinite;
 }
 
-.restored__pip svg {
+.restored__pip img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .restored[data-beat='name'] .restored__pip,
@@ -331,14 +332,16 @@
 }
 
 .restored__badge-face {
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 64px;
+  margin: -10px 0;
   display: block;
 }
 
-.restored__badge-face svg {
+.restored__badge-face img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .restored__badge small {

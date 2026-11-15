@@ -19,6 +19,7 @@ export function keepsakeDataFor(save: JourneySave | null, now = new Date()): Kee
     explorers: ACTIVE_MISSION_IDS.map((id) => {
       const mission = getMission(id)
       return {
+        id: mission.id,
         name: mission.machineName,
         world: getDestination(mission.destination).name === 'Moon' ? ('Moon' as const) : ('Mars' as const),
         year: landingYear(mission.yearLabel),

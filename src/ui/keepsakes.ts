@@ -8,6 +8,8 @@
  */
 
 export interface KeepsakeExplorer {
+  /** Mission id: also the portrait file, public/finale/<id>.webp. */
+  id: string
   name: string
   world: 'Moon' | 'Mars'
   year: string
@@ -19,6 +21,53 @@ export interface KeepsakeData {
   /** Shown as written, e.g. "15 November 2026". */
   date: string
   explorers: readonly KeepsakeExplorer[]
+}
+
+/**
+ * Pictures drawn on the keepsakes: PIP's real portrait (the game's model,
+ * public/album/pip.webp) and a render of each explorer's game model
+ * (public/finale/<id>.webp). Loaded once; drawing falls back to simple
+ * shapes if an image is missing.
+ */
+export interface KeepsakeArt {
+  pip: HTMLImageElement | null
+  explorers: Record<string, HTMLImageElement | null>
+}
+
+const BASE = import.meta.env.BASE_URL ?? '/'
+
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+}
+
+let artCache: Promise<KeepsakeArt> | null = null
+
+export function explorerPortraitUrl(id: string): string {
+  return `${BASE}finale/${id}.webp`
+}
+
+export const PIP_PORTRAIT_URL = `${BASE}album/pip.webp`
+
+export function loadKeepsakeArt(ids: readonly string[]): Promise<KeepsakeArt> {
+  if (!artCache) {
+    artCache = Promise.all([loadImage(PIP_PORTRAIT_URL), ...ids.map((id) => loadImage(explorerPortraitUrl(id)))]).then(
+      ([pip, ...rest]) => ({ pip: pip ?? null, explorers: Object.fromEntries(ids.map((id, i) => [id, rest[i] ?? null])) }),
+    )
+  }
+  return artCache
+}
+
+/** Draws an image centred in a box, keeping its proportions. */
+function drawContained(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, box: number): void {
+  const k = box / Math.max(img.naturalWidth, img.naturalHeight)
+  const w = img.naturalWidth * k
+  const h = img.naturalHeight * k
+  ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h)
 }
 
 const PLUM = '#1b1029'
@@ -104,7 +153,11 @@ function earth(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): 
 }
 
 /** PIP's face, as in the game's avatar (PipSpeech PipAvatar). */
-function pip(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+function pip(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, art?: KeepsakeArt): void {
+  if (art?.pip) {
+    drawContained(ctx, art.pip, x, y, size * 1.15)
+    return
+  }
   const k = size / 48
   ctx.save()
   ctx.translate(x - size / 2, y - size / 2)
@@ -142,7 +195,7 @@ function pip(ctx: CanvasRenderingContext2D, x: number, y: number, size: number):
 }
 
 /** A postage stamp with perforated edges for one explorer. */
-function explorerStamp(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, explorer: KeepsakeExplorer, tilt: number): void {
+function explorerStamp(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, explorer: KeepsakeExplorer, tilt: number, art?: KeepsakeArt): void {
   ctx.save()
   ctx.translate(x + w / 2, y + h / 2)
   ctx.rotate(tilt)
@@ -190,9 +243,19 @@ function explorerStamp(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   ctx.clip()
   planet(ctx, w / 2, pad + h * 0.58 + w * 0.22, w * 0.5, WORLD_COLOR[explorer.world])
   ctx.restore()
-  ctx.fillStyle = PEACH
-  star(ctx, w / 2, pad + h * 0.24, 26, 11)
-  ctx.fill()
+  const portrait = art?.explorers[explorer.id]
+  if (portrait) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(pad, pad, w - pad * 2, h * 0.58)
+    ctx.clip()
+    drawContained(ctx, portrait, w / 2, pad + h * 0.31, Math.min(w - pad * 2, h * 0.58) * 1.02)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = PEACH
+    star(ctx, w / 2, pad + h * 0.24, 26, 11)
+    ctx.fill()
+  }
   // text
   ctx.fillStyle = PLUM
   ctx.textAlign = 'center'
@@ -205,7 +268,7 @@ function explorerStamp(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
 }
 
 /** Master Carrier certificate, 2400 × 1700 px (prints well on A4/Letter). */
-export function drawCertificate(canvas: HTMLCanvasElement, data: KeepsakeData): void {
+export function drawCertificate(canvas: HTMLCanvasElement, data: KeepsakeData, art?: KeepsakeArt): void {
   const W = 2400
   const H = 1700
   canvas.width = W
@@ -296,7 +359,7 @@ export function drawCertificate(canvas: HTMLCanvasElement, data: KeepsakeData): 
   const gap = 56
   const total = data.explorers.length * sw + (data.explorers.length - 1) * gap
   data.explorers.forEach((explorer, i) => {
-    explorerStamp(ctx, (W - total) / 2 + i * (sw + gap), 1030, sw, sh, explorer, (i % 2 === 0 ? -1 : 1) * 0.035)
+    explorerStamp(ctx, (W - total) / 2 + i * (sw + gap), 1030, sw, sh, explorer, (i % 2 === 0 ? -1 : 1) * 0.035, art)
   })
 
   // footer: date, carrier ID, PIP's signature
@@ -306,7 +369,7 @@ export function drawCertificate(canvas: HTMLCanvasElement, data: KeepsakeData): 
   ctx.fillText(`DATE  ${data.date}`, 180, 1520)
   ctx.fillText(`CARRIER ID  ${data.carrierId}`, 180, 1570)
   ctx.textAlign = 'right'
-  pip(ctx, W - 520, 1520, 110)
+  pip(ctx, W - 520, 1520, 120, art)
   ctx.fillStyle = PLUM
   ctx.font = `italic 700 54px ${SANS}`
   ctx.fillText('PIP', W - 180, 1515)
@@ -317,7 +380,7 @@ export function drawCertificate(canvas: HTMLCanvasElement, data: KeepsakeData): 
 }
 
 /** PIP's postcard, 1800 × 1200 px: picture side on the left, message on the right. */
-export function drawPostcard(canvas: HTMLCanvasElement, data: KeepsakeData): void {
+export function drawPostcard(canvas: HTMLCanvasElement, data: KeepsakeData, art?: KeepsakeArt): void {
   const W = 1800
   const H = 1200
   canvas.width = W
@@ -403,7 +466,7 @@ export function drawPostcard(canvas: HTMLCanvasElement, data: KeepsakeData): voi
   ctx.shadowColor = 'transparent'
   ctx.fillStyle = PLUM
   ctx.fillRect(14, 14, 142, 172)
-  pip(ctx, 85, 92, 110)
+  pip(ctx, 85, 88, 108, art)
   ctx.fillStyle = PEACH
   ctx.font = `800 18px ${MONO}`
   ctx.textAlign = 'center'
@@ -469,10 +532,11 @@ function safeName(name: string): string {
 }
 
 /** Draws a keepsake and starts a PNG download. */
-export function downloadKeepsake(kind: 'certificate' | 'postcard', data: KeepsakeData): void {
+export async function downloadKeepsake(kind: 'certificate' | 'postcard', data: KeepsakeData): Promise<void> {
+  const art = await loadKeepsakeArt(data.explorers.map((e) => e.id))
   const canvas = document.createElement('canvas')
-  if (kind === 'certificate') drawCertificate(canvas, data)
-  else drawPostcard(canvas, data)
+  if (kind === 'certificate') drawCertificate(canvas, data, art)
+  else drawPostcard(canvas, data, art)
   canvas.toBlob((blob) => {
     if (!blob) return
     const url = URL.createObjectURL(blob)
