@@ -12,7 +12,6 @@ export type PlanetKind = 'earth' | DestinationId
 export interface Destination {
   id: DestinationId
   name: string
-  glyph: string
   accent: string
   missionId: MissionId
   /** One-line description of the place for the navigation screen. */
@@ -33,7 +32,6 @@ export const DESTINATIONS: readonly Destination[] = [
   {
     id: 'moon',
     name: 'Moon',
-    glyph: '🌕',
     accent: '#d9c7c2',
     missionId: 'surveyor-3',
     kind: "Earth's natural satellite",
@@ -44,7 +42,6 @@ export const DESTINATIONS: readonly Destination[] = [
   {
     id: 'mars',
     name: 'Mars',
-    glyph: '🔴',
     accent: '#f2b28c',
     missionId: 'opportunity',
     kind: 'The red planet',

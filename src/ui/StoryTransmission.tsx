@@ -349,7 +349,7 @@ export function StoryTransmission({
                 className="story-tx__btn story-tx__btn--send"
                 onClick={send}
               >
-                <span aria-hidden="true">🚀</span> Send to Earth
+                Send to Earth
               </button>
             )}
           </div>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { getScanAnchors, SPIRIT_SITE } from '../data/spiritSite'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
-import { useNarrativeStore } from '../store/narrativeStore'
+import { disposePartGlows, preparePartGlow, updatePartGlows, type PartGlow } from './partGlow'
 import { ScanMarkers } from './ScanMarkers'
 import { getTerrainHeight } from './terrainHeight'
 import { TerrainRing } from './TerrainRing'
@@ -37,19 +37,11 @@ const DISTRACTOR_NODES: Readonly<Record<string, string>> = {
   Rover_Antenna: 'antenna',
 }
 
-const GLOW = new THREE.Color(PALETTE.accent)
-const HINT_GLOW = new THREE.Color('#FFE3A8')
-
-interface Highlight {
-  componentId: string
-  materials: THREE.MeshStandardMaterial[]
-}
-
 function RoverModel() {
   const { scene } = useGLTF(MODEL_URL)
   const { model, highlights } = useMemo(() => {
     const clone = scene.clone(true)
-    const list: Highlight[] = []
+    const list: PartGlow[] = []
     clone.traverse((object) => {
       if (object instanceof THREE.Mesh) {
         object.castShadow = true
@@ -63,22 +55,8 @@ function RoverModel() {
       if (!part) continue
       part.userData.scannerMissionId = SPIRIT_SITE.missionId
       part.userData.scannerComponentId = componentId
-      // Own materials, so one part can glow without lighting the others.
-      const materials: THREE.MeshStandardMaterial[] = []
-      part.traverse((object) => {
-        if (!(object instanceof THREE.Mesh)) return
-        const source = Array.isArray(object.material)
-          ? object.material
-          : [object.material]
-        const cloned = source.map((material) => {
-          const copy = (material as THREE.MeshStandardMaterial).clone()
-          copy.emissive = new THREE.Color(0, 0, 0)
-          materials.push(copy)
-          return copy
-        })
-        object.material = Array.isArray(object.material) ? cloned : cloned[0]!
-      })
-      list.push({ componentId, materials })
+      // Own materials and an outline, so one part can glow alone.
+      list.push(preparePartGlow(part, componentId))
     }
     for (const [node, partName] of Object.entries(DISTRACTOR_NODES)) {
       const distractorId = `${explorer}-${partName}`
@@ -91,43 +69,16 @@ function RoverModel() {
   }, [scene])
 
   // The glow is animated per frame through a ref (not the memo value).
-  const live = useRef<Highlight[]>([])
+  const live = useRef<PartGlow[]>([])
   useEffect(() => {
     live.current = highlights
     return () => {
       live.current = []
-      for (const highlight of highlights) {
-        for (const material of highlight.materials) material.dispose()
-      }
+      disposePartGlows(highlights)
     }
   }, [highlights])
 
-  useFrame((state) => {
-    const game = useGameStore.getState()
-    const attention = useNarrativeStore.getState().attention
-    const active =
-      (game.scannerEquipped || game.scannerOpen) &&
-      game.scannerMissionId === SPIRIT_SITE.missionId
-    const selected = active ? game.scannerSelectedComponentId : null
-    const pulse = game.reducedMotion
-      ? 0.5
-      : 0.5 + Math.sin(state.clock.elapsedTime * 4) * 0.5
-    for (const highlight of live.current) {
-      const hinted = attention?.componentId === highlight.componentId
-      const isSelected = selected === highlight.componentId
-      const intensity = hinted
-        ? 0.45 + pulse * 0.5
-        : isSelected
-          ? 0.25 + game.scannerScanProgress * 0.75
-          : 0
-      const color = hinted && attention?.kind === 'hint' ? HINT_GLOW : GLOW
-      for (const material of highlight.materials) {
-        if (material.emissiveIntensity === intensity && intensity === 0) continue
-        material.emissive.copy(color)
-        material.emissiveIntensity = intensity
-      }
-    }
-  })
+  useFrame((state) => updatePartGlows(live.current, state.clock.elapsedTime))
 
   return <primitive object={model} />
 }

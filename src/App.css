@@ -477,6 +477,20 @@
   gap: 8px;
   margin-bottom: 4px;
 }
+/* A "Press E" prompt (explorer, ship) takes the bottom-centre spot: the
+   tip moves up above it, so both stay readable. Phones already keep the
+   tip higher, above the touch controls. */
+@media (min-width: 421px) {
+  .game:has(.spirit-interaction) .pip-tip {
+    bottom: calc(190px + env(safe-area-inset-bottom, 0px));
+  }
+}
+.pip-tip__bulb {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  vertical-align: -2px;
+}
 .pip-tip__label {
   margin: 0;
   font-family: var(--font-mono);
@@ -3250,55 +3264,61 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: 8vh;
-  background: rgba(12, 7, 18, 0.78);
-  animation: hud-rise 260ms ease both;
+  height: 11vh;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  background: #07040b;
+  animation: cinematic-bar-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .cinematic-focus__bar--top {
   top: 0;
+  --bar-from: -100%;
 }
 
 .cinematic-focus__bar--bottom {
   bottom: 0;
+  justify-content: flex-end;
+  --bar-from: 100%;
 }
 
+@keyframes cinematic-bar-in {
+  from { transform: translateY(var(--bar-from)); }
+  to { transform: none; }
+}
+
+/* The label lives in the top bar, so the picture stays clear. */
 .cinematic-focus__label {
-  position: absolute;
-  left: 50%;
-  top: 12vh;
-  transform: translateX(-50%);
   display: grid;
   justify-items: center;
-  gap: 4px;
-  width: min(360px, calc(100vw - 40px));
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 217, 168, 0.26);
-  border-radius: 14px;
-  background: rgba(27, 16, 41, 0.82);
+  gap: 2px;
   color: var(--cream);
   text-align: center;
-  pointer-events: auto;
+  animation: hud-rise 600ms 300ms ease both;
 }
 
 .cinematic-focus__label p {
   margin: 0;
-  font-size: 0.76rem;
-  line-height: 1.4;
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .cinematic-focus__skip {
-  margin-top: 4px;
-  padding: 4px 10px;
-  border: 1px solid rgba(244, 180, 223, 0.3);
+  padding: 6px 14px;
+  border: 1px solid rgba(244, 180, 223, 0.35);
   border-radius: 999px;
   background: rgba(244, 180, 223, 0.1);
   color: var(--rose-300);
   font: inherit;
   font-family: var(--font-mono);
-  font-size: 0.56rem;
+  font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .cinematic-focus__skip:hover {

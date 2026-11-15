@@ -24,6 +24,8 @@ export function PipTipCard() {
   const expandTip = useNarrativeStore((state) => state.expandTip)
 
   const hidden = useGameStore((state) =>
+    // The identification film owns the screen; the tip waits for it.
+    state.cinematicFocus !== null ||
     isPipSpeechHidden({
       scannerEquipped: state.scannerEquipped,
       scannerOpen: state.scannerOpen,
@@ -66,7 +68,7 @@ export function PipTipCard() {
         onClick={expandTip}
         aria-label="Show PIP's tip"
       >
-        <span aria-hidden="true">💡</span> Tip
+        <BulbIcon /> Tip
       </button>
     )
   }
@@ -77,7 +79,7 @@ export function PipTipCard() {
       <div className="pip-tip__copy">
         <div className="pip-tip__head">
           <p className="pip-tip__label">
-            <span aria-hidden="true">💡</span> PIP&apos;s tip
+            <BulbIcon /> PIP&apos;s tip
           </p>
           <button
             type="button"
@@ -102,3 +104,19 @@ export function PipTipCard() {
 }
 
 function noop() {}
+
+/** A small line-drawn light bulb (the game's own icon style, no emoji). */
+function BulbIcon() {
+  return (
+    <svg className="pip-tip__bulb" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

@@ -72,15 +72,7 @@ function ScanMarker({
   reducedMotion: boolean
 }) {
   const sprite = useRef<THREE.Sprite>(null)
-  const outline = useRef<THREE.LineBasicMaterial>(null)
   const texture = useMemo(() => getMarkerTexture(number, state), [number, state])
-  const edges = useMemo(
-    () =>
-      new THREE.EdgesGeometry(
-        new THREE.BoxGeometry(hitSize[0] + 0.08, hitSize[1] + 0.08, hitSize[2] + 0.08),
-      ),
-    [hitSize],
-  )
 
   useFrame((frame) => {
     const node = sprite.current
@@ -95,21 +87,17 @@ function ScanMarker({
         ? 1
         : 1 + Math.sin(frame.clock.elapsedTime * 3.2) * 0.06
     node.scale.setScalar(base * emphasis * pulse)
-    if (outline.current) {
-      outline.current.opacity =
-        state === 'aimed'
-          ? 0.95
-          : reducedMotion
-            ? 0.55
-            : 0.4 + Math.sin(frame.clock.elapsedTime * 3.2) * 0.15
-    }
   })
 
   return (
     <group userData={{ scannerIgnore: true }}>
       <sprite
         ref={sprite}
-        position={[position[0], position[1] + 0.38, position[2]]}
+        position={[
+          position[0] + hitOffset[0],
+          position[1] + hitOffset[1] + hitSize[1] / 2 + 0.22,
+          position[2] + hitOffset[2],
+        ]}
         renderOrder={12}
         userData={{ scannerIgnore: true }}
       >
@@ -122,34 +110,13 @@ function ScanMarker({
           toneMapped={false}
         />
       </sprite>
-      {(state === 'aimed' || state === 'next') && (
-        <lineSegments
-          geometry={edges}
-          position={[
-            position[0] + hitOffset[0],
-            position[1] + hitOffset[1],
-            position[2] + hitOffset[2],
-          ]}
-          renderOrder={11}
-          userData={{ scannerIgnore: true }}
-        >
-          <lineBasicMaterial
-            ref={outline}
-            color={state === 'aimed' ? '#FFFFFF' : '#FFD9A8'}
-            transparent
-            opacity={0.6}
-            depthTest={false}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </lineSegments>
-      )}
     </group>
   )
 }
 
 /**
- * Parts hunt markers. While the scanner is out and the explorer is known:
+ * Parts hunt markers: a small number badge above each part (the part
+ * itself glows on the model, see partGlow.ts). While the scanner is out and the explorer is known:
  * - parts already recorded show a green check;
  * - the part to find now stays hidden at first (PIP gives a clue), and its
  *   marker appears after a while, when PIP is asked for help, or as soon as

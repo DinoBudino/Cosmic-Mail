@@ -847,6 +847,7 @@
   place-items: center;
   width: 44px;
   flex: none;
+  color: var(--rose-200, #f4b4df);
   border: 1px solid rgba(244, 180, 223, 0.35);
   border-radius: 14px;
   background: rgba(27, 16, 41, 0.88);
@@ -2338,3 +2339,15 @@
 .newgame__btn--start { border: 1px solid rgba(255, 140, 120, 0.55); background: rgba(255, 110, 90, 0.12); color: #ffb3a6; }
 .newgame__btn--start:hover { background: rgba(255, 110, 90, 0.22); color: #ffd0c8; }
 @media (max-width: 380px) { .newgame__actions { grid-template-columns: 1fr; } }
+
+/* Destination colour dot in the navigation screen (replaces emoji). */
+.planet-dot {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.15em;
+  border-radius: 50%;
+  vertical-align: -0.08em;
+  background: radial-gradient(circle at 35% 30%, #fff8 0, transparent 45%), var(--planet, #f2b28c);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--planet, #f2b28c) 60%, transparent);
+}

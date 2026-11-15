@@ -2,7 +2,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MARS_WORLD_SITES, REGION_INFO } from '../data/marsObjects'
-import { SPIRIT_SITE } from '../data/spiritSite'
+import { getActiveExplorer, getScanStationView, SPIRIT_SITE } from '../data/spiritSite'
+import { getExplorerShot } from './explorerShots'
 import { clampToLane, getGuideLane, getGuideMode, getPracticeRock } from './practiceGuide'
 import {
   getScanStationEyeHeight,
@@ -580,7 +581,22 @@ export function Player() {
       camera.lookAt(cameraTarget.current)
     }
 
-    if (cinematic && cinematicActive) {
+    if (cinematic && cinematicActive && cinematic.kind === 'identification') {
+      // Identification: a short film of the explorer (explorerShots.ts).
+      const span = Math.max(1, cinematic.until - cinematic.startedAt)
+      const view = getScanStationView()
+      const offset = view.lookOffset ?? { x: 0, z: 0 }
+      const frame = getExplorerShot(
+        (Date.now() - cinematic.startedAt) / span,
+        getActiveExplorer(),
+        { x: SPIRIT_SITE.position.x + offset.x * 0.5, z: SPIRIT_SITE.position.z + offset.z * 0.5 },
+        view.direction,
+        getTerrainHeight,
+      )
+      camera.position.set(frame.position.x, frame.position.y, frame.position.z)
+      cameraTarget.current.set(frame.look.x, frame.look.y, frame.look.z)
+      camera.lookAt(cameraTarget.current)
+    } else if (cinematic && cinematicActive) {
       cinematicLook.current.set(
         cinematic.target.x,
         getTerrainHeight(cinematic.target.x, cinematic.target.z) + 1.5,
@@ -600,7 +616,9 @@ export function Player() {
       const cameraDistance = camera.position.distanceTo(player.position)
       astronautRef.current.visible =
         !firstPersonActive &&
-        (!store.scannerEquipped || cameraDistance > 2.2)
+        (!store.scannerEquipped || cameraDistance > 2.2) &&
+        // A close film shot never looks through the astronaut's helmet.
+        !(cinematicActive && cinematic?.kind === 'identification' && cameraDistance < 3)
     }
   })
 

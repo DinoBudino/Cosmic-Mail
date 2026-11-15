@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { DESTINATIONS } from '../../data/destinations'
 import {
   STORY_STATUS_LABEL,
@@ -50,9 +51,13 @@ export function DestinationNavigation({
         <div className="tablet__header">
           <span>Navigation</span>
           <span className="tablet__header-status">
-            {selected
-              ? `${selected.glyph} ${selected.name}`
-              : 'Pick a destination'}
+            {selected ? (
+              <>
+                <PlanetDot color={selected.accent} /> {selected.name}
+              </>
+            ) : (
+              'Pick a destination'
+            )}
           </span>
         </div>
 
@@ -83,7 +88,7 @@ export function DestinationNavigation({
                 onClick={() => selectDestination(destination.id)}
               >
                 <span className="choice-option__title">
-                  {destination.glyph} {destination.name}
+                  <PlanetDot color={destination.accent} /> {destination.name}
                 </span>
                 <span className="destination-row__clue">
                   {destination.kind}. {destination.clue}
@@ -144,5 +149,16 @@ export function DestinationNavigation({
         )}
       </div>
     </section>
+  )
+}
+
+/** A small lit planet in the destination's colour (no emoji). */
+function PlanetDot({ color }: { color: string }) {
+  return (
+    <span
+      className="planet-dot"
+      style={{ '--planet': color } as CSSProperties}
+      aria-hidden="true"
+    />
   )
 }

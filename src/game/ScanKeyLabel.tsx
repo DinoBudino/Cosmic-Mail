@@ -66,7 +66,7 @@ export function ScanKeyLabel() {
       <div className="scan-key-label" aria-hidden="true">
         {touch ? (
           <>
-            Tap <span className="scan-key-label__key">🔍</span>
+            Tap <span className="scan-key-label__key">Scanner</span>
           </>
         ) : (
           <>

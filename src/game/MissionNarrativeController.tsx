@@ -134,6 +134,9 @@ function openTabletAfter(cueId: string | null, missionId: MissionId): void {
   check()
 }
 
+/** Length of the identification film (three shots of about 3 s). */
+const IDENTIFICATION_FILM_MS = 9600
+
 export function MissionNarrativeController() {
   const save = useJourneyStore((state) => state.save)
   // The landing-site title opens every landing; PIP speaks after it.
@@ -620,13 +623,15 @@ export function MissionNarrativeController() {
       const identified = getIdentifiedCue(mission)
       if (identified && useNarrativeStore.getState().enqueue(identified)) {
         useGameStore.getState().setHistoricalExplanation(identified.id)
+        // A pause to look at the machine: three close shots (reveal,
+        // close-up, low hero angle) while PIP says who it is.
         useGameStore.getState().startCinematic(
           'identification',
           {
             x: SPIRIT_SITE.position.x,
             z: SPIRIT_SITE.position.z,
           },
-          5200,
+          IDENTIFICATION_FILM_MS,
         )
         // PIP leads the next move: take out the scanner (the clue for the
         // first part follows once it is out).
