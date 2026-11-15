@@ -10,10 +10,11 @@ import {
 } from '../data/arrivalProtocol'
 import { getEnvironmentalSite } from '../data/environmentalSites'
 import { getMission } from '../data/missions'
+import { getScanAnchors } from '../data/spiritSite'
 import { isPartScannableNow } from '../data/scanMarkers'
 import { PRACTICE_SCAN_RESULT } from '../data/calibrationSample'
 import { emitAudio } from './audio/audioEvents'
-import { isWorldPaused, useGameStore } from '../store/gameStore'
+import { isPartFilmOn, isWorldPaused, useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { getCurrentProtocolStep } from './protocolStep'
 import { useNarrativeStore } from '../store/narrativeStore'
@@ -130,11 +131,16 @@ export function ScannerController() {
       return
     }
 
-    if (isWorldPaused()) {
+    // Paused, or PIP is showing the part just found up close.
+    if (isWorldPaused() || isPartFilmOn()) {
       if (store.scannerTriggerHeld) store.setScannerTrigger(false)
       if (holdProgress.current !== 0) {
         holdProgress.current = 0
         store.setScannerScanProgress(0)
+      }
+      if (isPartFilmOn() && lastTargetId.current !== null) {
+        lastTargetId.current = null
+        store.setScannerTarget(null)
       }
       return
     }
@@ -222,14 +228,23 @@ export function ScannerController() {
         z: ground.z,
         ignored: false,
         opaque: true,
+        ground: true,
       })
     }
 
+    // The part to find now (hunt order) is easier to hit than its
+    // neighbours.
+    const scannedIds = journeyState.save?.missions[missionId]?.scannedComponentIds ?? []
+    const nextPartId = explorerKnown
+      ? (getScanAnchors().find((anchor) => !scannedIds.includes(anchor.componentId))
+          ?.componentId ?? null)
+      : null
     const picked = pickScannerTarget(
       rayHits.current,
       missionId,
       playerPosition,
       SCANNER.range,
+      nextPartId,
     )
     // Before the explorer is identified the scanner does not react to it:
     // no target, no label. One short notice points the player to E.

@@ -21,6 +21,8 @@ export interface ScannerRayHit {
   ignored: boolean
   /** Opaque meshes occlude targets; transparent beacons do not. */
   opaque: boolean
+  /** The terrain: nothing behind it can be scanned. */
+  ground?: boolean
 }
 
 export interface ScannerTarget {
@@ -60,7 +62,30 @@ export function pickScannerTarget(
   missionId: string,
   player: { x: number; z: number },
   range: number,
+  /**
+   * The part the child is looking for now. If the ray goes through it
+   * anywhere above the ground, it wins over whatever is in front (a part
+   * already recorded, the explorer's frame): parts sit close together and
+   * small hands should not have to find a perfect gap.
+   */
+  preferComponentId: string | null = null,
 ): ScannerPick {
+  if (preferComponentId) {
+    for (const hit of hits) {
+      if (hit.ground) break
+      if (hit.ignored || hit.componentId !== preferComponentId) continue
+      if (hit.missionId !== missionId) break
+      const distance = Math.hypot(hit.x - player.x, hit.z - player.z)
+      if (distance > range) break
+      return {
+        componentId: hit.componentId,
+        distance,
+        x: hit.x,
+        y: hit.y,
+        z: hit.z,
+      }
+    }
+  }
   for (const hit of hits) {
     if (hit.ignored) continue
 

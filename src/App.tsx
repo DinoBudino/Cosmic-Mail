@@ -137,8 +137,12 @@ export default function App() {
             <CosmicRadar />
             <ScannerHud />
             {!briefingOpen && <ScanReward />}
-            {!briefingOpen && <PipSpeech />}
-            {!briefingOpen && <PipTipCard />}
+            {!briefingOpen && (
+              <div className="pip-dock">
+                <PipSpeech />
+                <PipTipCard />
+              </div>
+            )}
             <CinematicOverlay />
             {!briefingOpen && <TouchControls />}
             <MissionNarrativeController />

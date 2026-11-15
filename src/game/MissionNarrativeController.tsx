@@ -97,8 +97,9 @@ function isMissionDiscovered(): boolean {
  */
 /**
  * After the last part: PIP finishes the explanation and the celebration,
- * the scan station ends, the scanner goes away and the archive tablet opens
- * with the recovered memory. Nothing to walk to, nothing extra to scan.
+ * the scan station ends, the scanner goes away and the Cosmic Album opens
+ * on the explorer's card, where PIP guides sealing, watching and sending
+ * its story. Nothing to walk to, nothing extra to scan.
  */
 function openTabletAfter(cueId: string | null, missionId: MissionId): void {
   const startedAt = performance.now()
@@ -110,9 +111,14 @@ function openTabletAfter(cueId: string | null, missionId: MissionId): void {
     unsubscribe?.()
     window.clearTimeout(safety)
     const game = useGameStore.getState()
+    game.endCinematic()
     game.setScanStation(false)
     if (game.scannerEquipped) game.unequipScanner()
-    if (game.archiveView === 'none') game.openArchive('smart-letter', missionId)
+    if (game.archiveView !== 'none') return
+    if (game.albumOpen) game.closeAlbum()
+    useNarrativeStore.getState().clearDialogue()
+    stopPipVoice()
+    useGameStore.getState().openAlbum(missionId)
   }
   const pending = () => {
     if (!cueId) return false
@@ -128,11 +134,16 @@ function openTabletAfter(cueId: string | null, missionId: MissionId): void {
     const wait = Math.max(0, 1400 - (performance.now() - startedAt))
     window.setTimeout(open, wait)
   }
-  // Never stuck: the tablet opens even if the voice hangs.
+  // Never stuck: the album opens even if the voice hangs.
   const safety = window.setTimeout(open, 25_000)
   unsubscribe = useNarrativeStore.subscribe(check)
   check()
 }
+
+/** Part close-up: as long as PIP's line, at most this long (ms). */
+const PART_FILM_MAX_MS = 20000
+/** A short beat on the part after PIP's line ends. */
+const PART_FILM_TAIL_MS = 900
 
 /** Length of the identification film (three shots of about 3 s). */
 const IDENTIFICATION_FILM_MS = 9600
@@ -142,6 +153,8 @@ export function MissionNarrativeController() {
   // The landing-site title opens every landing; PIP speaks after it.
   const arrived = useGameStore((state) => state.arrivalStage === 'done')
   const archiveView = useGameStore((state) => state.archiveView)
+  // The album guides a completed story; the world waits until it closes.
+  const albumOpen = useGameStore((state) => state.albumOpen)
   const archiveMissionId = useGameStore((state) => state.archiveMissionId)
   const settingsOpen = useGameStore((state) => state.settingsOpen)
   const scannerOpen = useGameStore((state) => state.scannerOpen)
@@ -490,10 +503,13 @@ export function MissionNarrativeController() {
           playerPosition.z - SPIRIT_SITE.position.z,
         ) <=
         MISSION_APPROACH_RADIUS + 1.5
+      // The close-up of the last part still belongs to the hunt: the
+      // station (and the scanner) stay until PIP has told its story.
       const huntOn =
-        step === 'M4' &&
-        Boolean(currentProgress?.discovered) &&
-        !currentProgress?.memoryRecoveredAt
+        (step === 'M4' &&
+          Boolean(currentProgress?.discovered) &&
+          !currentProgress?.memoryRecoveredAt) ||
+        game.cinematicFocus?.kind === 'part'
       const explorerStation =
         huntOn &&
         game.scannerEquipped &&
@@ -658,6 +674,17 @@ export function MissionNarrativeController() {
             // Marks the explanation as active so ambient lines wait for it.
             // It never blocks scanning: the player can always keep going.
             useGameStore.getState().setHistoricalExplanation(cue.id)
+            // A pause to look: the camera comes close to the part and PIP
+            // flies in beside it to tell its story. It ends with his line.
+            // It lasts until PIP's line is done (see the explanation
+            // release below); this is only the safety cap. The last part
+            // gets it too, even though the scanner is put away right then.
+            useGameStore.getState().startCinematic(
+              'part',
+              { x: SPIRIT_SITE.position.x, z: SPIRIT_SITE.position.z },
+              PART_FILM_MAX_MS,
+              id,
+            )
           }
           narrative.showAttention(id, 'scan', 2600)
           narrative.react('scan', id)
@@ -679,7 +706,7 @@ export function MissionNarrativeController() {
     if (hasLetter && !previousLetterRef.current) {
       // The smart-letter dialog owns the first delivery of this line while
       // it is open; the world gets it once after the player closes it.
-      if (archiveView === 'none') {
+      if (archiveView === 'none' && !albumOpen) {
         previousLetterRef.current = true
         // The tablet already said "Sealed!": the world only points home.
         const back = getReturnToShipCue(mission)
@@ -704,7 +731,7 @@ export function MissionNarrativeController() {
     }
 
     previousScannedRef.current = [...scanned]
-  }, [save, mission, progress, archiveView])
+  }, [save, mission, progress, archiveView, albumOpen])
 
   // Optional environmental readings. They use the same queue, but ambient
   // priority means they can never delay or interrupt a historical beat.
@@ -745,6 +772,15 @@ export function MissionNarrativeController() {
         state.queue.some((line) => line.id === activeId)
       if (!pending) {
         useGameStore.getState().setHistoricalExplanation(null)
+        // The part's story is told: the close-up hands back to the hunt.
+        const film = useGameStore.getState().cinematicFocus
+        if (film?.kind === 'part') {
+          window.setTimeout(() => {
+            if (useGameStore.getState().cinematicFocus === film) {
+              useGameStore.getState().endCinematic()
+            }
+          }, PART_FILM_TAIL_MS)
+        }
       }
     })
   }, [])
@@ -775,12 +811,12 @@ export function MissionNarrativeController() {
   // A transmission completed while the modal was open becomes a small
   // world celebration.
   useEffect(() => {
-    if (archiveView !== 'none' || !pendingCelebrateRef.current) return
+    if (archiveView !== 'none' || albumOpen || !pendingCelebrateRef.current) return
     pendingCelebrateRef.current = false
     useNarrativeStore
       .getState()
       .react('celebrate', undefined, 2600)
-  }, [archiveView])
+  }, [archiveView, albumOpen])
 
   // Reading/settings panels pause and clear world dialogue.
   useEffect(() => {

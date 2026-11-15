@@ -2,8 +2,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MARS_WORLD_SITES, REGION_INFO } from '../data/marsObjects'
-import { getActiveExplorer, getScanStationView, SPIRIT_SITE } from '../data/spiritSite'
-import { getExplorerShot } from './explorerShots'
+import { findScanAnchor, getActiveExplorer, getScanStationView, SPIRIT_SITE } from '../data/spiritSite'
+import { getExplorerShot, getPartShot, getSendFilmFrame } from './explorerShots'
+import { getEarthDirection } from './earthDirection'
 import { clampToLane, getGuideLane, getGuideMode, getPracticeRock } from './practiceGuide'
 import {
   getScanStationEyeHeight,
@@ -149,6 +150,15 @@ export function Player() {
   const firstPersonDesired = useRef(new THREE.Vector3())
   const firstPersonLook = useRef(new THREE.Vector3())
   const cinematicLook = useRef(new THREE.Vector3())
+  // Part close-up: the camera eases from where it was into the shot.
+  const filmKey = useRef(0)
+  const filmPos = useRef(new THREE.Vector3())
+  const filmLook = useRef(new THREE.Vector3())
+  const filmPart = useRef<THREE.Object3D | null>(null)
+  const filmPartWorld = useRef(new THREE.Vector3())
+  const filmGoal = useRef(new THREE.Vector3())
+  const filmShot = useRef(0)
+  const filmGoalLook = useRef(new THREE.Vector3())
   const stationPoint = useRef(new THREE.Vector3())
   const astronautRef = useRef<THREE.Group>(null)
 
@@ -481,16 +491,17 @@ export function Player() {
     }
 
     const cinematic = useGameStore.getState().cinematicFocus
+    // A part close-up happens with the scanner out (it is part of the hunt)
+    // and, with reduced motion, as a still shot.
+    const partFilm = cinematic?.kind === 'part'
     const cinematicActive =
       Boolean(cinematic) &&
-      !store.scannerEquipped &&
-      !store.reducedMotion &&
+      (partFilm || (!store.scannerEquipped && !store.reducedMotion)) &&
       motionRef.current <= 0.2 &&
       Date.now() < (cinematic?.until ?? 0)
     if (
       cinematic &&
-      (store.scannerEquipped ||
-        store.reducedMotion ||
+      ((!partFilm && (store.scannerEquipped || store.reducedMotion)) ||
         motionRef.current > 0.2 ||
         Date.now() >= cinematic.until)
     ) {
@@ -581,7 +592,70 @@ export function Player() {
       camera.lookAt(cameraTarget.current)
     }
 
-    if (cinematic && cinematicActive && cinematic.kind === 'identification') {
+    if (cinematic && cinematicActive && cinematic.kind === 'part' && cinematic.componentId) {
+      // Part close-up (explorerShots.getPartShot): PIP flies beside it.
+      const name = `ScannerTarget_${cinematic.componentId}`
+      if (filmPart.current?.name !== name || !filmPart.current.parent) {
+        let root: THREE.Object3D = group.current ?? camera
+        while (root.parent) root = root.parent
+        filmPart.current = root.getObjectByName(name) ?? null
+      }
+      if (filmPart.current) {
+        const part = filmPart.current.getWorldPosition(filmPartWorld.current)
+        const anchor = findScanAnchor(cinematic.componentId)
+        const size = anchor ? Math.max(...anchor.hitSize) : 0.8
+        const span = Math.max(1, cinematic.until - cinematic.startedAt)
+        const progress = store.reducedMotion ? 0.5 : (Date.now() - cinematic.startedAt) / span
+        const frame = getPartShot(
+          progress,
+          part,
+          SPIRIT_SITE.position,
+          getScanStationView().direction,
+          size,
+          getTerrainHeight,
+          (camera as THREE.PerspectiveCamera).aspect ?? 16 / 9,
+        )
+        if (filmKey.current !== cinematic.startedAt) {
+          filmKey.current = cinematic.startedAt
+          filmPos.current.copy(camera.position)
+          filmLook.current.copy(cameraTarget.current)
+        }
+        const ease = store.reducedMotion ? 1 : 1 - Math.exp(-3.2 * dt)
+        filmPos.current.lerp(filmGoal.current.set(frame.position.x, frame.position.y, frame.position.z), ease)
+        filmLook.current.lerp(filmGoalLook.current.set(frame.look.x, frame.look.y, frame.look.z), ease)
+        camera.position.copy(filmPos.current)
+        cameraTarget.current.copy(filmLook.current)
+        camera.lookAt(cameraTarget.current)
+      }
+    } else if (cinematic && cinematicActive && cinematic.kind === 'send') {
+      // Before the story goes home: close on PIP and the message, then up
+      // to the sky (explorerShots.getSendFilmFrame).
+      const span = Math.max(1, cinematic.until - cinematic.startedAt)
+      const frame = getSendFilmFrame(
+        (Date.now() - cinematic.startedAt) / span,
+        getActiveExplorer(),
+        SPIRIT_SITE.position,
+        getScanStationView().direction,
+        getEarthDirection(),
+        getTerrainHeight,
+        (camera as THREE.PerspectiveCamera).aspect ?? 16 / 9,
+      )
+      if (filmKey.current !== cinematic.startedAt) {
+        filmKey.current = cinematic.startedAt
+        filmPos.current.copy(camera.position)
+        filmLook.current.copy(cameraTarget.current)
+        filmShot.current = frame.shot
+      }
+      // A cut between the two shots, a glide within each.
+      const cut = frame.shot !== filmShot.current
+      filmShot.current = frame.shot
+      const ease = cut ? 1 : 1 - Math.exp(-3.2 * dt)
+      filmPos.current.lerp(filmGoal.current.set(frame.position.x, frame.position.y, frame.position.z), ease)
+      filmLook.current.lerp(filmGoalLook.current.set(frame.look.x, frame.look.y, frame.look.z), ease)
+      camera.position.copy(filmPos.current)
+      cameraTarget.current.copy(filmLook.current)
+      camera.lookAt(cameraTarget.current)
+    } else if (cinematic && cinematicActive && cinematic.kind === 'identification') {
       // Identification: a short film of the explorer (explorerShots.ts).
       const span = Math.max(1, cinematic.until - cinematic.startedAt)
       const view = getScanStationView()
@@ -618,7 +692,11 @@ export function Player() {
         !firstPersonActive &&
         (!store.scannerEquipped || cameraDistance > 2.2) &&
         // A close film shot never looks through the astronaut's helmet.
-        !(cinematicActive && cinematic?.kind === 'identification' && cameraDistance < 3)
+        !(
+          cinematicActive &&
+          (cinematic?.kind === 'identification' || cinematic?.kind === 'send') &&
+          cameraDistance < 3
+        )
     }
   })
 

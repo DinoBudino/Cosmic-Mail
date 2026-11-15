@@ -49,7 +49,7 @@ describe('Passport progressive disclosure', () => {
       memoryRecoveredAt: 10,
     })
     expect(memory).toContain('Memory recovered')
-    expect(memory).not.toContain('Smart letter ready to transmit')
+    expect(memory).not.toContain('Letter sealed. Watch its story')
 
     const letter = showProgress({
       scannedComponentIds: [
@@ -61,8 +61,8 @@ describe('Passport progressive disclosure', () => {
       memoryRecoveredAt: 10,
       smartLetterCreatedAt: 20,
     })
-    expect(letter).toContain('Smart letter ready to transmit')
-    expect(letter).toContain('Smart letter')
+    expect(letter).toContain('Letter sealed. Watch its story')
+    expect(letter).toContain('Watch its story')
     expect(letter).not.toContain('Delivered to Earth')
 
     const delivered = showProgress({

@@ -40,7 +40,7 @@ export function CosmicRadar() {
   const archiveView = useGameStore((state) => state.archiveView)
   const equipScanner = useGameStore((state) => state.equipScanner)
   const openScannerRecords = useGameStore((state) => state.openScannerRecords)
-  const openArchive = useGameStore((state) => state.openArchive)
+  const openAlbum = useGameStore((state) => state.openAlbum)
   const save = useJourneyStore((state) => state.save)
   const loadStatus = useJourneyStore((state) => state.loadStatus)
   const startJourney = useJourneyStore((state) => state.startJourney)
@@ -159,7 +159,7 @@ export function CosmicRadar() {
             type="button"
             className="site-action cosmic-radar__archive"
             onClick={() =>
-              openArchive('smart-letter', SPIRIT_SITE.missionId)
+              openAlbum(SPIRIT_SITE.missionId)
             }
           >
             {archiveCta}

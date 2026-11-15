@@ -215,3 +215,24 @@ describe('pickScannerTarget', () => {
     ).toBeNull()
   })
 })
+
+describe('next part preference', () => {
+  const recorded = hit({ componentId: 'scoop', missionId: MISSION, distance: 3, opaque: true })
+  const next = hit({ componentId: 'radar', missionId: MISSION, distance: 3.4, opaque: true })
+
+  it('picks the part to find even behind a recorded neighbour', () => {
+    const pick = pickScannerTarget([recorded, next], MISSION, PLAYER, 14, 'radar')
+    expect(pick && 'componentId' in pick ? pick.componentId : null).toBe('radar')
+  })
+
+  it('keeps the nearest part when no preference is given', () => {
+    const pick = pickScannerTarget([recorded, next], MISSION, PLAYER, 14)
+    expect(pick && 'componentId' in pick ? pick.componentId : null).toBe('scoop')
+  })
+
+  it('never reaches through the ground', () => {
+    const ground = hit({ distance: 3.2, opaque: true, ground: true })
+    const pick = pickScannerTarget([recorded, ground, next], MISSION, PLAYER, 14, 'radar')
+    expect(pick && 'componentId' in pick ? pick.componentId : null).toBe('scoop')
+  })
+})

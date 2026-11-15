@@ -345,7 +345,7 @@ export function getObjective(ctx: ObjectiveContext): Objective {
     case 'M6':
       return {
         text: ctx.memoryRecovered
-          ? 'Seal the letter on your tablet'
+          ? 'Seal the letter in your album'
           : 'Watch its story and send it to Earth',
         highlight: null,
       }

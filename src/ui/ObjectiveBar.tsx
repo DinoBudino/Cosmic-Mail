@@ -21,8 +21,8 @@ function getPrimaryAction(
   const missionId = SPIRIT_SITE.missionId
   if (step === 'M6' && stage === 'memory_recovered') {
     return {
-      label: 'Open tablet',
-      run: () => useGameStore.getState().openArchive('smart-letter', missionId),
+      label: 'Open album',
+      run: () => useGameStore.getState().openAlbum(missionId),
     }
   }
   // Letter sealed: the child walks back to Mailwing (radar star) and boards.

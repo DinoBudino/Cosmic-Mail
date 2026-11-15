@@ -28,6 +28,8 @@ import { useJourneyStore } from '../store/journeyStore'
  */
 export function ScannerHud() {
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
+  // PIP's close-up of a part just found is a film moment: no reticle.
+  const partFilm = useGameStore((state) => state.cinematicFocus?.kind === 'part')
   const missionId = useGameStore((state) => state.scannerMissionId)
   const selectedId = useGameStore(
     (state) => state.scannerSelectedComponentId,
@@ -180,7 +182,8 @@ export function ScannerHud() {
       : fragmentLabel(markerOrder(), target.id)
     : ''
   const obscured = Boolean(
-    scannerOpen ||
+    partFilm ||
+      scannerOpen ||
       scannerCard ||
       scannerRecordsOpen ||
       archiveView !== 'none' ||

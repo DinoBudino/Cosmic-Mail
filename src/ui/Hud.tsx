@@ -93,7 +93,7 @@ export function Hud() {
       <button
         type="button"
         className="hud-album"
-        onClick={openAlbum}
+        onClick={() => openAlbum()}
         aria-label="Open the Cosmic Album"
         aria-haspopup="dialog"
       >

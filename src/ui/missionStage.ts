@@ -20,10 +20,10 @@ export function scannedComponentCount(
  */
 export function getArchiveCtaLabel(stage: MissionStage): string | null {
   switch (stage) {
-    // memory_recovered: the objective bar carries "Open tablet" itself.
+    // memory_recovered: the objective bar carries "Open album" itself.
     case 'smart_letter_ready':
     case 'transmitted':
-      return 'Open tablet'
+      return 'Open album'
     default:
       return null
   }

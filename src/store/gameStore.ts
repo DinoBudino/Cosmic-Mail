@@ -135,6 +135,11 @@ interface GameState {
   settingsOpen: boolean
   /** Cosmic Album tablet opened from the HUD while exploring. */
   albumOpen: boolean
+  /**
+   * Explorer the album opened for (its story was just completed): its card
+   * is highlighted and PIP guides sealing, watching and sending it.
+   */
+  albumFocusId: MissionId | null
   nearbySiteId: MarsObjectId | null
   activeSiteId: MarsObjectId | null
   /** Spirit's contextual scan range (independent from the four legacy sites). */
@@ -204,10 +209,17 @@ interface GameState {
   /** Memorial landmarks open only in free exploration (protocol M7). */
   landmarksLocked: boolean
   setLandmarksLocked: (locked: boolean) => void
-  /** Short, skippable camera emphasis for sighting/identification. */
+  /**
+   * Short, skippable camera moments: the sighting, the identification film
+   * and the close-up of each part just scanned (PIP explains it beside it).
+   */
   cinematicFocus: {
-    kind: 'sighting' | 'identification'
+    kind: CinematicKind
     target: { x: number; z: number }
+    /** The part shown in a 'part' close-up. */
+    componentId?: string
+    /** The story about to be sent home in a 'send' film. */
+    missionId?: MissionId
     startedAt: number
     until: number
   } | null
@@ -251,9 +263,11 @@ interface GameState {
   setHistoricalExplanation: (cueId: string | null) => void
   setRadarUnlocked: (unlocked: boolean) => void
   startCinematic: (
-    kind: 'sighting' | 'identification',
+    kind: CinematicKind,
     target: { x: number; z: number },
     durationMs: number,
+    componentId?: string,
+    missionId?: MissionId,
   ) => void
   endCinematic: () => void
   setScannerCamera: (camera: ScannerCamera) => void
@@ -277,11 +291,13 @@ interface GameState {
   setMuted: (muted: boolean) => void
   openSettings: () => void
   closeSettings: () => void
-  openAlbum: () => void
+  openAlbum: (focusId?: MissionId) => void
   closeAlbum: () => void
 }
 
 const initialSettings = loadSettings()
+
+export type CinematicKind = 'sighting' | 'identification' | 'part' | 'send'
 
 export const useGameStore = create<GameState>((set, get) => {
   const persistSettings = () => {
@@ -315,6 +331,7 @@ export const useGameStore = create<GameState>((set, get) => {
   muted: initialSettings.muted,
   settingsOpen: false,
   albumOpen: false,
+  albumFocusId: null,
   nearbySiteId: null,
   activeSiteId: null,
   nearbySpirit: false,
@@ -605,12 +622,15 @@ export const useGameStore = create<GameState>((set, get) => {
     if (get().radarUnlocked === radarUnlocked) return
     set({ radarUnlocked })
   },
-  startCinematic: (kind, target, durationMs) => {
+  startCinematic: (kind, target, durationMs, componentId, missionId) => {
     const now = Date.now()
+    if (kind === 'part' || kind === 'send') clearInput()
     set({
       cinematicFocus: {
         kind,
         target: { ...target },
+        ...(componentId ? { componentId } : {}),
+        ...(missionId ? { missionId } : {}),
         startedAt: now,
         until: now + Math.max(1000, durationMs),
       },
@@ -794,13 +814,12 @@ export const useGameStore = create<GameState>((set, get) => {
     clearInput()
     set({ settingsOpen: false })
   },
-  openAlbum: () => {
+  openAlbum: (focusId) => {
     const state = get()
     if (
       state.settingsOpen ||
       state.albumOpen ||
       state.activeSiteId ||
-      state.scannerOpen ||
       state.marsBriefingStep !== null ||
       state.archiveView !== 'none'
     ) {
@@ -809,7 +828,9 @@ export const useGameStore = create<GameState>((set, get) => {
     clearInput()
     set({
       albumOpen: true,
+      albumFocusId: focusId ?? null,
       travelTargetId: null,
+      scannerOpen: false,
       scannerEquipped: false,
       scannerMissionId: null,
       scannerSelectedComponentId: null,
@@ -826,10 +847,15 @@ export const useGameStore = create<GameState>((set, get) => {
   },
   closeAlbum: () => {
     clearInput()
-    set({ albumOpen: false })
+    set({ albumOpen: false, albumFocusId: null })
   },
   }
 })
+
+/** A part close-up is playing: the scanner rests until it ends. */
+export function isPartFilmOn(): boolean {
+  return useGameStore.getState().cinematicFocus?.kind === 'part'
+}
 
 export function isWorldPaused(): boolean {
   const state = useGameStore.getState()
@@ -838,7 +864,9 @@ export function isWorldPaused(): boolean {
     state.marsBriefingStep !== null ||
     state.arrivalStage !== 'done' ||
     state.settingsOpen ||
-    state.albumOpen ||
+    // The album steps aside (still open) for the film before a story is
+    // sent home: the world plays that film.
+    (state.albumOpen && state.cinematicFocus?.kind !== 'send') ||
     state.activeSiteId !== null ||
     state.scannerOpen ||
     state.scannerCardComponentId !== null ||

@@ -177,7 +177,11 @@ export function updatePartGlows(glows: readonly PartGlow[], elapsed: number): vo
       isNext: glow.componentId === nextId,
       isAimed,
       isRecorded: scanned.includes(glow.componentId),
-      hinted: attention?.componentId === glow.componentId,
+      // PIP is pointing at it: a hint, or the part on film right now.
+      hinted:
+        attention?.componentId === glow.componentId ||
+        (game.cinematicFocus?.kind === 'part' &&
+          game.cinematicFocus.componentId === glow.componentId),
       hintKind: attention ? (attention.kind === 'hint' ? 'hint' : 'other') : null,
       scanProgress: isAimed ? game.scannerScanProgress : 0,
       pulse,

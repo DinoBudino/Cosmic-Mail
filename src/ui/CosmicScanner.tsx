@@ -115,7 +115,7 @@ export function CosmicScanner() {
   const selectedId = useGameStore((state) => state.scannerSelectedComponentId)
   const selectComponent = useGameStore((state) => state.selectScannerComponent)
   const closeScanner = useGameStore((state) => state.closeScanner)
-  const openArchive = useGameStore((state) => state.openArchive)
+  const openAlbum = useGameStore((state) => state.openAlbum)
 
   const save = useJourneyStore((state) => state.save)
   const loadStatus = useJourneyStore((state) => state.loadStatus)
@@ -409,7 +409,7 @@ export function CosmicScanner() {
               type="button"
               className="settings-resume scanner-archive-cta"
               onClick={() =>
-                openArchive('smart-letter', mission.id)
+                openAlbum(mission.id)
               }
             >
               {archiveCta}

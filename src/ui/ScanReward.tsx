@@ -100,6 +100,8 @@ function RewardIcon({ celebration }: { celebration: ScanCelebration }) {
  */
 export function ScanReward() {
   const celebration = useGameStore((state) => state.scanCelebration)
+  // The part close-up names the part in its own top bar.
+  const partFilm = useGameStore((state) => state.cinematicFocus?.kind === 'part')
   const dismiss = useGameStore((state) => state.dismissScanCelebration)
   const [leavingSeq, setLeavingSeq] = useState<number | null>(null)
 
@@ -117,7 +119,7 @@ export function ScanReward() {
     }
   }, [celebration, dismiss])
 
-  if (!celebration) return null
+  if (!celebration || partFilm) return null
   const leaving = leavingSeq === celebration.seq
   const eyebrow =
     celebration.kind === 'practice'

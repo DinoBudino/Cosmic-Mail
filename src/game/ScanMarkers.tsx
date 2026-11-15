@@ -128,7 +128,9 @@ export function ScanMarkers() {
   const equipped = useGameStore(
     (state) =>
       state.scannerEquipped &&
-      state.scannerMissionId === SPIRIT_SITE.missionId,
+      state.scannerMissionId === SPIRIT_SITE.missionId &&
+      // The part close-up is a clean film shot: no badges.
+      state.cinematicFocus?.kind !== 'part',
   )
   const aimedId = useGameStore((state) => state.scannerSelectedComponentId)
   const reducedMotion = useGameStore((state) => state.reducedMotion)

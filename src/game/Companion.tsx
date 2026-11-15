@@ -1,8 +1,17 @@
+import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useRef, useState, type RefObject } from 'react'
 import * as THREE from 'three'
 import { MARS_WORLD_SITES, REGION_APPROACH_RADIUS } from '../data/marsObjects'
-import { SPIRIT_SITE, getScanAnchors } from '../data/spiritSite'
+import {
+  SPIRIT_SITE,
+  findScanAnchor,
+  getActiveExplorer,
+  getScanAnchors,
+  getScanStationView,
+} from '../data/spiritSite'
+import { getPartShot, getSendFilmFrame, pickPipSpot, type SpotCheck } from './explorerShots'
+import { getEarthDirection } from './earthDirection'
 import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { useNarrativeStore } from '../store/narrativeStore'
@@ -71,6 +80,83 @@ function pipExpressionFor(expression: Expression): HubPipExpression {
 }
 
 const PIP_WORLD_SCALE = 0.55
+const otherWorld = new THREE.Vector3()
+
+/**
+ * World box around the explorer's visible body (the model a part belongs
+ * to), leaving out hit boxes, glows, markers and anything the scanner
+ * ignores.
+ */
+const meshCenter = new THREE.Vector3()
+
+/**
+ * The visible meshes near a part that could hide PIP: the explorer's own
+ * pieces and the rocks around it (scanner roots are tagged; the part's
+ * hit target lives elsewhere in the scene, so search from the top).
+ */
+function meshesNear(part: THREE.Object3D, at: THREE.Vector3, radius = 8): THREE.Mesh[] {
+  let top: THREE.Object3D = part
+  while (top.parent) top = top.parent
+  const meshes: THREE.Mesh[] = []
+  top.traverse((root) => {
+    if (!root.userData?.scannerRoot) return
+    root.updateMatrixWorld(true)
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh) || !object.visible) return
+      for (let node: THREE.Object3D | null = object; node; node = node.parent) {
+        if (!node.visible || node.userData?.scannerIgnore) return
+      }
+      const geometry = object.geometry as THREE.BufferGeometry
+      if (!geometry.boundingSphere) geometry.computeBoundingSphere()
+      const sphere = geometry.boundingSphere
+      if (!sphere) return
+      meshCenter.copy(sphere.center).applyMatrix4(object.matrixWorld)
+      if (meshCenter.distanceTo(at) > radius + sphere.radius * object.matrixWorld.getMaxScaleOnAxis()) return
+      meshes.push(object)
+    })
+  })
+  return meshes
+}
+
+const spotRay = new THREE.Raycaster()
+const spotFrom = new THREE.Vector3()
+const spotTo = new THREE.Vector3()
+const spotDir = new THREE.Vector3()
+/** PIP's half size, for testing his edges. */
+const PIP_HALF = 0.3
+
+/**
+ * How much of PIP at `spot` is visible from `camera`: the share of his
+ * centre and four edges with a clear line to the lens and nothing just
+ * behind them (which would mean he is inside a piece of the machine).
+ */
+function pipInView(camera: THREE.Vector3, meshes: THREE.Mesh[]): SpotCheck {
+  return (spot, right, up) => {
+    const offsets: ReadonlyArray<readonly [number, number]> = [
+      [0, 0],
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]
+    let seen = 0
+    for (const [r, u] of offsets) {
+      spotTo.set(
+        spot.x + (right.x * r + up.x * u) * PIP_HALF,
+        spot.y + (right.y * r + up.y * u) * PIP_HALF,
+        spot.z + (right.z * r + up.z * u) * PIP_HALF,
+      )
+      spotFrom.copy(camera)
+      spotDir.subVectors(spotTo, spotFrom)
+      const far = spotDir.length() + PIP_HALF
+      spotRay.set(spotFrom, spotDir.normalize())
+      spotRay.near = 0
+      spotRay.far = far
+      if (spotRay.intersectObjects(meshes, false).length === 0) seen += 1
+    }
+    return seen / offsets.length
+  }
+}
 
 const damp = THREE.MathUtils.damp
 
@@ -121,6 +207,12 @@ export function Companion({
   // Scan station: PIP flies next to the part to find and peeks at it.
   const partWorld = useRef(new THREE.Vector3())
   const partTarget = useRef<THREE.Object3D | null>(null)
+  const otherParts = useRef(new Map<string, THREE.Object3D>())
+  const filmBoxKey = useRef(0)
+  const orb = useRef<THREE.Group>(null)
+  const orbLaunched = useRef(false)
+  const orbFrom = useRef(new THREE.Vector3())
+  const filmSpot = useRef(new THREE.Vector3())
 
   const quality = useGameStore((state) => state.quality)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
@@ -133,7 +225,11 @@ export function Companion({
     const player = playerRef.current
     const current = robot.current
     const shell = body.current
-    if (!player || !current || !shell || isWorldPaused()) return
+    if (!player || !current || !shell) return
+    if (isWorldPaused()) {
+      if (orb.current) orb.current.visible = false
+      return
+    }
 
     const dt = Math.min(delta, 0.05)
     const game = useGameStore.getState()
@@ -307,6 +403,11 @@ export function Companion({
     // camera, and looks at it with a curious face. After each find it moves
     // on to the next part.
     let pointingPart: THREE.Vector3 | null = null
+    // Flying into a part close-up: quick, so PIP is there for the shot.
+    let filmFlight = false
+    // Send film: PIP looks at the camera; the message leaves at launch > 0.
+    let faceCamera = false
+    let sendLaunch = -1
     const guideMode = getGuideMode()
     if (guideMode === 'walk') {
       // Guided first walk: PIP flies a few steps ahead down the lane, so
@@ -339,6 +440,77 @@ export function Companion({
       goal.current.set(rock.x - vz * 1.4 - vx * 0.4, rock.y + 0.5, rock.z + vx * 1.4 - vz * 0.4)
       pointingPart = rock
       partTarget.current = null
+    } else if (game.cinematicFocus?.kind === 'send') {
+      // Before sending the story home: PIP floats in front of the explorer
+      // with the glowing message, facing the camera.
+      const film = game.cinematicFocus
+      const frame = getSendFilmFrame(
+        (Date.now() - film.startedAt) / Math.max(1, film.until - film.startedAt),
+        getActiveExplorer(),
+        SPIRIT_SITE.position,
+        getScanStationView().direction,
+        getEarthDirection(),
+        getTerrainHeight,
+      )
+      goal.current.set(frame.pip.x, frame.pip.y, frame.pip.z)
+      sendLaunch = frame.launch
+      filmFlight = true
+      faceCamera = true
+      partTarget.current = null
+    } else if (
+      game.cinematicFocus?.kind === 'part' &&
+      game.cinematicFocus.componentId
+    ) {
+      // Part close-up: PIP flies in beside the part just found, in the
+      // camera's picture, and tells its story looking at the child.
+      const film = game.cinematicFocus
+      const aspect = (state.camera as THREE.PerspectiveCamera).aspect ?? 16 / 9
+      const name = `ScannerTarget_${film.componentId}`
+      if (partTarget.current?.name !== name || !partTarget.current.parent) {
+        let root: THREE.Object3D = current
+        while (root.parent) root = root.parent
+        partTarget.current = root.getObjectByName(name) ?? null
+      }
+      if (partTarget.current) {
+        const part = partTarget.current.getWorldPosition(partWorld.current)
+        const anchor = findScanAnchor(film.componentId!)
+        // Chosen once per close-up, from the middle of the shot: PIP floats
+        // where the camera sees all of him, never inside the machine nor
+        // behind a wheel.
+        if (filmBoxKey.current !== film.startedAt) {
+          filmBoxKey.current = film.startedAt
+          // The camera glides through the shot: PIP must stay in view
+          // from its start, middle and end.
+          const lenses = [0.1, 0.5, 0.9].map((progress) => {
+            const at = getPartShot(
+              progress,
+              part,
+              SPIRIT_SITE.position,
+              getScanStationView().direction,
+              anchor ? Math.max(...anchor.hitSize) : 0.8,
+              getTerrainHeight,
+              aspect,
+            ).position
+            return new THREE.Vector3(at.x, at.y, at.z)
+          })
+          const near = meshesNear(partTarget.current, partWorld.current)
+          const checks = lenses.map((lens) => pipInView(lens, near))
+          const spot = pickPipSpot(
+            lenses[1],
+            part,
+            (at, right, up) =>
+              // Never in the ground: his body hangs about half a metre.
+              at.y < getTerrainHeight(at.x, at.z) + 0.5
+                ? 0
+                : Math.min(...checks.map((check) => check(at, right, up))),
+            aspect,
+          )
+          filmSpot.current.set(spot.x, spot.y, spot.z)
+        }
+        goal.current.copy(filmSpot.current)
+        pointingPart = part
+        filmFlight = true
+      }
     } else if (game.scanStation) {
       const scanned =
         useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]
@@ -362,15 +534,33 @@ export function Companion({
         vz /= vl
         const sideX = -vz
         const sideZ = vx
-        // Stay on the outer side of the explorer, so PIP never hides it.
+        // Beside the part, on the side with the most room: away from the
+        // other parts (parts sit close together, and PIP must never cover
+        // the one the child should scan or its neighbours), else on the
+        // outer side of the explorer.
         const outward =
           (part.x - SPIRIT_SITE.position.x) * sideX +
           (part.z - SPIRIT_SITE.position.z) * sideZ
-        const sign = outward < -0.05 ? -1 : 1
+        let others = 0
+        for (const anchor of getScanAnchors()) {
+          if (anchor.componentId === next.componentId) continue
+          let node = otherParts.current.get(anchor.componentId)
+          if (!node?.parent) {
+            let root: THREE.Object3D = current
+            while (root.parent) root = root.parent
+            node = root.getObjectByName(`ScannerTarget_${anchor.componentId}`) ?? undefined
+            if (node) otherParts.current.set(anchor.componentId, node)
+          }
+          if (!node) continue
+          node.getWorldPosition(otherWorld)
+          // Which side of the line of sight this neighbour is on.
+          others += Math.sign((otherWorld.x - part.x) * sideX + (otherWorld.z - part.z) * sideZ)
+        }
+        const sign = others !== 0 ? -Math.sign(others) : outward < -0.05 ? -1 : 1
         goal.current.set(
-          part.x + sideX * 0.8 * sign - vx * 0.3,
-          part.y + 0.12,
-          part.z + sideZ * 0.8 * sign - vz * 0.3,
+          part.x + sideX * 1.05 * sign - vx * 0.3,
+          part.y + 0.42,
+          part.z + sideZ * 1.05 * sign - vz * 0.3,
         )
         pointingPart = part
       }
@@ -430,7 +620,7 @@ export function Companion({
     }
 
     const distance = current.position.distanceTo(goal.current)
-    const followSpeed = distance > 5 ? 7 : distance > 2 ? 5 : 3.5
+    const followSpeed = filmFlight ? 6 : distance > 5 ? 7 : distance > 2 ? 5 : 3.5
     current.position.lerp(goal.current, 1 - Math.exp(-followSpeed * dt))
     current.position.y = Math.max(
       current.position.y,
@@ -452,6 +642,39 @@ export function Companion({
     }
     lastPos.current.copy(current.position)
 
+    // The glowing message of the send film: above PIP's head while he
+    // talks, then up into the sky towards Earth.
+    const orbNode = orb.current
+    if (orbNode) {
+      if (sendLaunch < 0) {
+        orbNode.visible = false
+        orbLaunched.current = false
+      } else {
+        orbNode.visible = true
+        if (sendLaunch <= 0) {
+          orbNode.position.set(
+            current.position.x,
+            current.position.y + 0.58 + Math.sin(t * 3) * 0.04,
+            current.position.z,
+          )
+          orbLaunched.current = false
+        } else {
+          if (!orbLaunched.current) {
+            orbLaunched.current = true
+            orbFrom.current.copy(orbNode.position)
+          }
+          const sky = getEarthDirection()
+          const k = Math.pow(sendLaunch, 1.7) * 45
+          orbNode.position.set(
+            orbFrom.current.x + sky.x * k,
+            orbFrom.current.y + sky.y * k,
+            orbFrom.current.z + sky.z * k,
+          )
+        }
+        orbNode.scale.setScalar(reducedMotion ? 1 : 1 + Math.sin(t * 6) * 0.08)
+      }
+    }
+
     let targetX = player.position.x
     let targetZ = player.position.z
     // At the scan station PIP looks at the child while talking and, every
@@ -459,7 +682,10 @@ export function Companion({
     // keeps peeking at the part.
     const pointingGlance =
       pointingPart != null && (!speaking || t % 4.6 > 3.1)
-    if (pointingPart && !(reactionActive && reaction?.kind === 'celebrate')) {
+    if (faceCamera) {
+      targetX = state.camera.position.x
+      targetZ = state.camera.position.z
+    } else if (pointingPart && !(reactionActive && reaction?.kind === 'celebrate')) {
       if (pointingGlance) {
         targetX = pointingPart.x
         targetZ = pointingPart.z
@@ -680,6 +906,7 @@ export function Companion({
   })
 
   return (
+    <>
     <group
       ref={robot}
       userData={{ scannerIgnore: true }}
@@ -698,6 +925,33 @@ export function Companion({
           scale={PIP_WORLD_SCALE}
         />
       </group>
+      {talking && (
+        <Html position={[0.22, 0.62, 0]} center zIndexRange={[5, 0]} pointerEvents="none">
+          <span className="pip-talk-mark" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        </Html>
+      )}
     </group>
+    <group ref={orb} visible={false} userData={{ scannerIgnore: true }}>
+      <mesh raycast={() => {}}>
+        <sphereGeometry args={[0.085, 20, 16]} />
+        <meshBasicMaterial color="#fff6e2" toneMapped={false} />
+      </mesh>
+      <mesh raycast={() => {}}>
+        <sphereGeometry args={[0.22, 20, 16]} />
+        <meshBasicMaterial
+          color="#ffc98a"
+          transparent
+          opacity={0.32}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+    </>
   )
 }

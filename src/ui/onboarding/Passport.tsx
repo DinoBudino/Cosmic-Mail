@@ -5,6 +5,11 @@ import { getMission, type MissionId } from '../../data/missions'
 import { getPassportView, type PassportStory } from '../../data/passport'
 import type { JourneySave } from '../../store/journeySchema'
 import { emitAudio } from '../../game/audio/audioEvents'
+import { onPipVoiceEnded, speakPip, stopPipVoice } from '../../game/pipVoice'
+import type { AlbumGuideTarget } from '../../data/albumGuide'
+import { useNarrativeStore } from '../../store/narrativeStore'
+import { useAlbumGuide } from '../useAlbumGuide'
+import { watchStory } from '../sendFilm'
 import { useGameStore } from '../../store/gameStore'
 import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore, type AlbumTab } from '../../store/onboardingStore'
@@ -51,6 +56,8 @@ export function Passport({
   const save = saveOverride !== undefined ? saveOverride : storedSave
   const prepareSmartLetter = useJourneyStore((state) => state.prepareSmartLetter)
   const openArchive = useGameStore((state) => state.openArchive)
+  const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
+  const voiceEnabled = useGameStore((state) => state.voiceEnabled)
   const tab = useOnboardingStore((state) => state.albumTab)
   const setTab = useOnboardingStore((state) => state.setAlbumTab)
   const setSlot = useAlbumPipSlot((state) => state.setSlot)
@@ -59,6 +66,50 @@ export function Passport({
   const [planet, setPlanet] = useState<PlanetFilter>('all')
   const [rewardsFor, setRewardsFor] = useState<MissionId | null>(null)
   const [labPick, setLabPick] = useState<LabId | null>(null)
+  // PIP guiding a just-completed explorer (opened by the game, not the HUD).
+  const [introDone, setIntroDone] = useState(false)
+  const guide = useAlbumGuide(introDone)
+  const guideStep = guide.step
+  const guideLocked = guideStep?.locked ?? false
+  const screenRef = useRef<HTMLDivElement>(null)
+
+  // Opened for an explorer: show its card on the Explorers page.
+  useEffect(() => {
+    if (!guide.focusId) return
+    setTab('missions')
+    setPlanet('all')
+    setRewardsFor(null)
+    const frame = window.requestAnimationFrame(() => {
+      screenRef.current
+        ?.querySelector(`[data-mission="${guide.focusId}"]`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [guide.focusId, setTab])
+
+  // PIP says each step once; never over the story video on top.
+  const guideId = guideStep?.id ?? null
+  const guideText = guideStep?.text ?? null
+  useEffect(() => {
+    if (!guideId || !guideText || archiveOpen) return
+    useNarrativeStore.getState().markSpoken(guideId)
+    speakPip(guideText, voiceEnabled, 'excited')
+    return () => stopPipVoice()
+  }, [guideId, guideText, archiveOpen, voiceEnabled])
+
+  // The first-time intro hands over to the first action when PIP is done.
+  const onIntro = guideStep?.target === 'card'
+  useEffect(() => {
+    if (!onIntro || archiveOpen) return
+    const finish = () => setIntroDone(true)
+    const off = onPipVoiceEnded(finish)
+    const fallback = window.setTimeout(finish, voiceEnabled ? 9000 : 4500)
+    return () => {
+      off()
+      window.clearTimeout(fallback)
+    }
+  }, [onIntro, archiveOpen, voiceEnabled])
+
   if (!save) return null
 
   const view = getPassportView(save)
@@ -104,10 +155,11 @@ export function Passport({
         : `Hi, ${view.carrierName}! This is your Cosmic Album. Here you can see your progress and your rewards.`
 
   return (
-    <div className="ctab" role="dialog" aria-label="Cosmic Album">
+    <div className="ctab" role="dialog" aria-label="Cosmic Album" data-guided={guideStep ? 'true' : undefined}>
       <div className="ctab__bezel">
         <TabletShell />
         <div
+          ref={screenRef}
           className="ctab__screen"
           onPointerDown={(event) => {
             if (!(event.target as HTMLElement).closest?.('.xcard__rewards')) {
@@ -138,7 +190,7 @@ export function Passport({
                   className={`ctab__tab${tab === entry.id ? ' is-active' : ''}${tourClass(
                     `tab-${entry.id}`,
                   )}`}
-                  disabled={!hubElementEnabled(focus, `tab-${entry.id}`)}
+                  disabled={guideLocked || !hubElementEnabled(focus, `tab-${entry.id}`)}
                   onClick={() => goTab(entry.id)}
                 >
                   <Icon name={entry.icon} />
@@ -149,9 +201,11 @@ export function Passport({
             {onClose && (
               <button
                 type="button"
-                className={`ctab__close${tourClass('album-close')}`}
+                className={`ctab__close${tourClass('album-close')}${
+                  guideStep?.target === 'close' ? ' is-tour-target is-guide-target' : ''
+                }`}
                 aria-label="Close album"
-                disabled={!hubElementEnabled(focus, 'album-close')}
+                disabled={guideLocked || !hubElementEnabled(focus, 'album-close')}
                 onClick={onClose}
               >
                 <Icon name="close" />
@@ -159,16 +213,28 @@ export function Passport({
             )}
           </header>
 
+          {/* Phones stack PIP's corner above the cards, out of sight while
+              the child looks at the explorer: his guide line stays here. */}
+          {guideStep && (
+            <p key={guideStep.id} className="ctab__guide-strip" role="status">
+              <img className="ctab__guide-strip-img" src={PIP_PORTRAIT} alt="" />
+              <span>{guideStep.text}</span>
+            </p>
+          )}
           <div className={`ctab__body ctab__body--${tab}`}>
             <aside className="ctab__side">
               <div className={`ctab__pip${pipGuiding ? ' is-guiding' : ''}`}>
                 <img className="ctab__pip-img" src={PIP_PORTRAIT} alt="" />
                 {!pipGuiding && (
-                  <p className="ctab__speech">
+                  <p
+                    key={guideStep?.id ?? 'greeting'}
+                    className={`ctab__speech${guideStep ? ' is-guide' : ''}`}
+                    role={guideStep ? 'status' : undefined}
+                  >
                     <span className="ctab__speech-spark" aria-hidden="true">
                       ✦
                     </span>
-                    {greeting}
+                    {guideStep?.text ?? greeting}
                   </p>
                 )}
                 <div ref={setSlot} className="ctab__pip-slot" />
@@ -339,8 +405,18 @@ export function Passport({
                         onRewards={() =>
                           setRewardsFor(rewardsFor === story.missionId ? null : story.missionId)
                         }
-                        onPrepare={() => handlePrepare(story.missionId)}
-                        onDeliver={() => openArchive('smart-letter', story.missionId)}
+                        guideTarget={
+                          story.missionId === guide.focusId ? (guideStep?.target ?? null) : null
+                        }
+                        focused={story.missionId === guide.focusId}
+                        onPrepare={() => {
+                          setIntroDone(true)
+                          handlePrepare(story.missionId)
+                        }}
+                        onDeliver={() => {
+                          setRewardsFor(null)
+                          watchStory(story.missionId)
+                        }}
                         onWatch={() => {
                           setRewardsFor(null)
                           openArchive('reconstruction', story.missionId)
@@ -507,9 +583,9 @@ function statusLine(story: PassportStory): string {
     case 'ready_for_full_scan':
       return `Fragments recognized ${story.scanned}/${story.total}.`
     case 'memory_recovered':
-      return 'Memory recovered. Prepare the smart letter.'
+      return 'Memory recovered. Seal the letter!'
     case 'smart_letter_ready':
-      return 'Smart letter ready to transmit from Mailwing.'
+      return 'Letter sealed. Watch its story and send it home.'
     default:
       return 'Delivered to Earth.'
   }
@@ -517,6 +593,8 @@ function statusLine(story: PassportStory): string {
 
 function ExplorerCard({
   story,
+  guideTarget,
+  focused,
   rewardsOpen,
   onRewards,
   onPrepare,
@@ -527,6 +605,10 @@ function ExplorerCard({
   onStamp,
 }: {
   story: PassportStory
+  /** What PIP points at on this card while he guides it. */
+  guideTarget: AlbumGuideTarget | null
+  /** The explorer the album was opened for. */
+  focused: boolean
   rewardsOpen: boolean
   onRewards: () => void
   onPrepare: () => void
@@ -543,7 +625,8 @@ function ExplorerCard({
     <article
       className={`xcard${known ? '' : ' is-locked'}${done ? ' is-done' : ''}${
         rewardsOpen ? ' is-open' : ''
-      }`}
+      }${focused ? ' is-focus' : ''}`}
+      data-mission={story.missionId}
       aria-label={`${story.machineName ?? 'Explorer not yet identified'} · ${story.destination.name}`}
     >
       <div className="xcard__in">
@@ -594,12 +677,20 @@ function ExplorerCard({
 
         <div className="xcard__actions">
           {story.status === 'memory_recovered' ? (
-            <button type="button" className="xcard__btn" onClick={onPrepare}>
-              Prepare smart letter
+            <button
+              type="button"
+              className={`xcard__btn${guideTarget === 'seal' ? ' is-tour-target is-guide-target' : ''}`}
+              onClick={onPrepare}
+            >
+              Seal the letter
             </button>
           ) : story.canTransmit ? (
-            <button type="button" className="xcard__btn" onClick={onDeliver}>
-              Deliver to Earth
+            <button
+              type="button"
+              className={`xcard__btn${guideTarget === 'story' ? ' is-tour-target is-guide-target' : ''}`}
+              onClick={onDeliver}
+            >
+              <span aria-hidden="true">▶</span> Watch its story
             </button>
           ) : (
             <div className="xcard__rewards">

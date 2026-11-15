@@ -608,6 +608,34 @@
     "pitch": 1.05
   },
   {
+    "key": "album-guide-intro",
+    "text": "This is your Cosmic Album! Every explorer we help gets its own card here, like this one.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "album-guide-done",
+    "text": "Look, its card is complete and the stamp is in your album! Tap the X when you're ready to keep exploring.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "send-film-ready",
+    "text": "The letter is sealed and the message is ready! Let's send it home to Earth.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "send-film-launch",
+    "text": "Here it goes! Next stop, Earth!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
     "key": "spirit-completion-story",
     "text": "We did it! Spirit is quiet now, but its discoveries will never be forgotten.",
     "speed": 1.06,

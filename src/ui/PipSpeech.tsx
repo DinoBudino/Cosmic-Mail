@@ -255,7 +255,14 @@ export function PipSpeech() {
       <PipAvatar />
       <div className="pip-speech__copy">
         <div className="pip-speech__head">
-          <p className="pip-name">PIP</p>
+          <p className="pip-name">
+            PIP
+            <span className="pip-speech__wave" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+          </p>
           <button
             type="button"
             className="pip-speech__skip"

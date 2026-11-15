@@ -2,6 +2,7 @@ import { getActiveWorld } from '../data/spiritSite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getDestination } from '../data/destinations'
 import type { MissionDefinition } from '../data/missions'
+import { getAlbumPhotos } from '../data/albumPhotos'
 import { pipLine } from '../data/pipVoiceCatalog'
 import { audioManager } from '../game/audio/audioManager'
 import { emitAudio } from '../game/audio/audioEvents'
@@ -243,6 +244,15 @@ export function StoryTransmission({
     }
   }, [phase, reducedMotion])
 
+  // The stamp lands in the album, then gets its postmark.
+  useEffect(() => {
+    if (phase !== 'delivered') return
+    const land = window.setTimeout(() => emitAudio('stampEarned'), reducedMotion ? 0 : 1250)
+    return () => window.clearTimeout(land)
+  }, [phase, reducedMotion])
+
+  const stampPhoto = getAlbumPhotos(mission.id)[0]
+
   const confetti = useMemo(
     () =>
       Array.from({ length: 26 }, (_, index) => ({
@@ -259,6 +269,7 @@ export function StoryTransmission({
       ref={dialogRef}
       className="story-tx"
       data-phase={phase}
+      data-reduced-motion={reducedMotion}
       aria-label={`${mission.machineName}'s story`}
       onCancel={(event) => {
         event.preventDefault()
@@ -454,18 +465,42 @@ export function StoryTransmission({
           </div>
           <p className="story-tx__eyebrow">Delivered to Earth</p>
           <div
-            className="story-tx__stamp"
+            className="story-tx__album"
             role="img"
-            aria-label={`New stamp: ${mission.stampLabel}`}
+            aria-label={`New stamp in your album: ${mission.stampLabel}`}
           >
-            <span
-              className="story-tx__stamp-planet"
-              style={{ backgroundImage: `url(${planetTexture})` }}
-              aria-hidden="true"
-            />
-            <span className="story-tx__stamp-name">{mission.machineName}</span>
-            <span className="story-tx__stamp-place">{destination.name}</span>
-            <span className="story-tx__stamp-word">✦ Stamp earned ✦</span>
+            <p className="story-tx__album-head" aria-hidden="true">
+              Stamp collection
+            </p>
+            <div className="story-tx__album-slot" aria-hidden="true">
+              <span className="story-tx__album-puff" />
+              <div className={`story-tx__album-stamp is-${mission.destination}`}>
+                <div className="story-tx__album-face">
+                  <p className="story-tx__album-top">
+                    <span>Cosmic Mail</span>
+                    <span>{destination.name}</span>
+                  </p>
+                  <div className="story-tx__album-img">
+                    {stampPhoto ? (
+                      <img src={stampPhoto.src} alt="" />
+                    ) : (
+                      <span
+                        className="story-tx__stamp-planet"
+                        style={{ backgroundImage: `url(${planetTexture})` }}
+                      />
+                    )}
+                  </div>
+                  <p className="story-tx__album-name">{mission.machineName}</p>
+                  <p className="story-tx__album-year">{mission.yearLabel}</p>
+                </div>
+                <span className="story-tx__album-postmark">
+                  <span>Delivered</span>
+                  <b>Earth</b>
+                  <span>✦ ✦ ✦</span>
+                </span>
+              </div>
+            </div>
+            <p className="story-tx__stamp-word">✦ New stamp in your album ✦</p>
           </div>
           <p className="story-tx__pip-line">
             <PipAvatar />

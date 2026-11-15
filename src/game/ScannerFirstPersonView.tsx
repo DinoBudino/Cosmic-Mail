@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import * as THREE from 'three'
+import { isPartFilmOn } from '../store/gameStore'
 import { CosmicScannerDevice } from './CosmicScannerDevice'
 
 /**
@@ -18,6 +19,8 @@ export function ScannerFirstPersonView() {
     if (!group) return
     camera.getWorldPosition(group.position)
     camera.getWorldQuaternion(group.quaternion)
+    // The part close-up is a film shot: the device in hand steps out.
+    group.visible = !isPartFilmOn()
   })
 
   return (

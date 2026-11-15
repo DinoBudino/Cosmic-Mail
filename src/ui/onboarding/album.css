@@ -814,7 +814,7 @@
 .xcard__legacy { margin: 0; font-size: 0.74rem; color: var(--ink-soft); }
 
 .xcard__actions { margin-top: auto; }
-.xcard__rewards { position: relative; }
+.xcard__rewards { position: static; }
 .xcard__btn {
   width: 100%;
   padding: 8px 12px;
@@ -837,17 +837,20 @@
 }
 
 /* Rewards popover, hanging under the button like the reference */
+/* Rewards open inside the card, above its button (a 2 × 2 grid), so they
+   always fit the tablet, whatever the column the card is in. */
 .xcard__pop {
   position: absolute;
   z-index: 5;
-  top: calc(100% + 14px);
-  left: 50%;
-  translate: -50% 0;
-  display: flex;
-  gap: 10px;
-  padding: 12px 14px;
+  left: 10px;
+  right: 10px;
+  bottom: 66px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 6px;
+  padding: 12px 8px;
   border: 3px solid var(--orange);
-  border-radius: 26px;
+  border-radius: 20px;
   background: #fff8ee;
   box-shadow: 0 12px 24px rgba(43, 32, 99, 0.25);
   animation: xcard-pop 160ms ease-out both;
@@ -855,12 +858,12 @@
 .xcard__pop::before {
   content: '';
   position: absolute;
-  top: -12px;
+  bottom: -12px;
   left: 50%;
   width: 18px;
   height: 18px;
   translate: -50% 0;
-  rotate: 45deg;
+  rotate: 225deg;
   background: #fff8ee;
   border-top: 3px solid var(--orange);
   border-left: 3px solid var(--orange);
@@ -869,13 +872,13 @@
   display: grid;
   justify-items: center;
   gap: 6px;
-  width: 104px;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
 }
-.xcard__pop-art { position: relative; display: block; width: 64px; height: 48px; transition: transform 140ms ease; }
+.xcard__pop-art { position: relative; display: block; width: 54px; height: 40px; transition: transform 140ms ease; }
 .xcard__pop-item:hover:not(:disabled) .xcard__pop-art { transform: scale(1.1) rotate(-3deg); }
 .xcard__pop-art .art { width: 100%; height: 100%; }
 .xcard__pop-label {
@@ -884,9 +887,10 @@
   background: linear-gradient(180deg, var(--ink-2), var(--ink));
   color: #fff;
   font-family: var(--round);
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 800;
   white-space: nowrap;
+  padding: 3px 9px;
 }
 .xcard__pop-item:disabled { cursor: default; }
 .xcard__pop-item:disabled .art { filter: grayscale(1); opacity: 0.4; }
@@ -901,7 +905,7 @@
 .xcard__pop-lock .icon { width: 24px; height: 24px; stroke-width: 2.6; }
 
 @keyframes xcard-pop {
-  from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
   to { opacity: 1; transform: none; }
 }
 
@@ -1182,7 +1186,40 @@
   outline-offset: 3px;
 }
 
+/* PIP guiding a just-completed explorer: its card glows, the button he
+   names breathes, and his line pops in. */
+.xcard.is-focus {
+  z-index: 2;
+  translate: 0 -3px;
+  filter:
+    drop-shadow(0 0 2px #ff8a2a)
+    drop-shadow(0 0 2px #ff8a2a)
+    drop-shadow(0 0 14px rgba(255, 138, 42, 0.9));
+}
+.ctab .is-guide-target {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  animation: album-guide-pulse 1.6s ease-in-out infinite;
+}
+@keyframes album-guide-pulse {
+  0%, 100% { box-shadow: 0 3px 0 var(--orange-dk), 0 0 0 0 rgba(255, 138, 42, 0.7); }
+  50% { box-shadow: 0 3px 0 var(--orange-dk), 0 0 0 9px rgba(255, 138, 42, 0); }
+}
+.ctab__speech.is-guide {
+  border-color: var(--orange);
+  animation: album-guide-pop 320ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes album-guide-pop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.ctab__guide-strip { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
+  .ctab .is-guide-target,
+  .ctab__guide-strip,
+  .ctab__speech.is-guide,
   .xcard__pop,
   .stamp__postmark,
   .ctab__pip-img,
@@ -1245,13 +1282,32 @@
   .ctab__more,
   .ctab__scroll[data-more="true"]::after { display: none; }
   .ctab__pip { grid-template-columns: 78px 1fr; }
+  .ctab__guide-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 10px 2px;
+    padding: 8px 12px 8px 8px;
+    border: 2.5px solid var(--orange);
+    border-radius: 18px;
+    background: #fff;
+    color: var(--ink);
+    font-family: var(--round);
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.25;
+    animation: album-guide-pop 320ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  }
+  .ctab__guide-strip-img { width: 46px; flex: none; }
+  /* The strip already carries PIP's line: no second copy up top. */
+  .ctab[data-guided] .ctab__side .ctab__pip { display: none; }
   .ctab__pip-img { width: 78px; }
   .xgrid { grid-template-columns: 1fr; }
   .lab-pick { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
   .lab-pick__tile { min-width: 0; }
   .lab-pick__name { font-size: 0.72rem; line-height: 1.15; overflow-wrap: anywhere; }
   .xcard__pop { gap: 4px; padding: 10px 8px; }
-  .xcard__pop-item { width: 74px; }
+  .xcard__pop-item { width: auto; }
   .xcard__pop-label { padding: 3px 8px; font-size: 0.74rem; }
 }
 
@@ -1283,4 +1339,8 @@
 .ctab__keepsake:focus-visible {
   outline: 3px solid #5a9bff;
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctab__guide-strip { animation: none; }
 }
