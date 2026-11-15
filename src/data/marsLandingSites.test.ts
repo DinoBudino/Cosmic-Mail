@@ -9,6 +9,7 @@ import { createJourney, type JourneySave } from '../store/journeySchema'
 import { hasPriorFieldWork } from './arrivalProtocol'
 import {
   MARS_LANDING_SITES,
+  getLandingSiteProgress,
   getLandingSiteState,
   getOrbitGuidance,
   rotationToFace,
@@ -27,6 +28,17 @@ function finish(save: JourneySave, id: MarsExplorerId, send: boolean): JourneySa
 }
 
 describe('Mars orbit', () => {
+  it('shows each area as a percentage, 100 only once the story is sent', () => {
+    const fresh = createJourney('Ada', 1000)
+    expect(getLandingSiteProgress(fresh, 'opportunity')).toBe(0)
+    const found = markMissionDiscovered(fresh, 'opportunity', 1100)
+    expect(getLandingSiteProgress(found, 'opportunity')).toBe(17)
+    const sealed = finish(fresh, 'opportunity', false)
+    expect(getLandingSiteProgress(sealed, 'opportunity')).toBe(83)
+    expect(getLandingSiteProgress(finish(fresh, 'opportunity', true), 'opportunity')).toBe(100)
+    expect(getLandingSiteProgress(sealed, 'spirit')).toBe(0)
+  })
+
   it('offers two NASA landing sites, Opportunity and Spirit', () => {
     expect(MARS_LANDING_SITES.map((s) => s.explorer)).toEqual(['opportunity', 'spirit'])
     expect(MARS_LANDING_SITES.map((s) => s.place)).toEqual([

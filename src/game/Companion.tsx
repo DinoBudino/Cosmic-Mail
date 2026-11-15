@@ -23,6 +23,7 @@ import {
 } from './pipFlight'
 import { getBoulderObstacles } from './landscape'
 import { getTerrainHeight } from './terrainHeight'
+import { CALIBRATION_SAMPLE } from '../data/calibrationSample'
 import { WORLD } from './worldConfig'
 
 type Expression =
@@ -307,7 +308,22 @@ export function Companion({
     // camera, and looks at it with a curious face. After each find it moves
     // on to the next part.
     let pointingPart: THREE.Vector3 | null = null
-    if (game.scanStation) {
+    if (game.scanStation && game.scanStationTarget === 'practice') {
+      // Practice station: PIP floats beside the rock and points at it.
+      const rock = partWorld.current.set(
+        CALIBRATION_SAMPLE.position.x,
+        getTerrainHeight(CALIBRATION_SAMPLE.position.x, CALIBRATION_SAMPLE.position.z) + 0.6,
+        CALIBRATION_SAMPLE.position.z,
+      )
+      let vx = rock.x - player.position.x
+      let vz = rock.z - player.position.z
+      const vl = Math.hypot(vx, vz) || 1
+      vx /= vl
+      vz /= vl
+      goal.current.set(rock.x - vz * 1.4 - vx * 0.4, rock.y + 0.5, rock.z + vx * 1.4 - vz * 0.4)
+      pointingPart = rock
+      partTarget.current = null
+    } else if (game.scanStation) {
       const scanned =
         useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]
           ?.scannedComponentIds ?? []

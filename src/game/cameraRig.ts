@@ -46,6 +46,12 @@ export function resetOrbit(): void {
   orbit.distance = DEFAULT_ORBIT.distance
 }
 
+/** Turn the orbit camera so the player faces this world direction (x/z). */
+export function faceOrbitToward(dx: number, dz: number): void {
+  if (Math.hypot(dx, dz) < 1e-4) return
+  orbit.yaw = Math.atan2(-dx, -dz)
+}
+
 export function applyOrbitDelta(dx: number, dy: number): void {
   const store = useGameStore.getState()
   const firstPerson =

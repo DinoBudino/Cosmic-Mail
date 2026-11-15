@@ -17,6 +17,8 @@ export interface OrbitMarker {
   explorer: MarsExplorerId
   label: string
   state: LandingSiteState
+  /** 0-100: how much of this area is done. */
+  percent: number
 }
 
 interface MarsOrbitSceneProps {
@@ -32,6 +34,66 @@ interface MarsOrbitSceneProps {
    * them every frame to follow their spot on the turning planet.
    */
   labels: { current: Partial<Record<MarsExplorerId, HTMLElement | null>> }
+}
+
+/**
+ * Mouse / finger drag on the globe. While the child has spun the planet,
+ * PIP's auto-turn toward the suggested spot waits, so the planet stays
+ * where the child left it.
+ */
+interface DragState {
+  active: boolean
+  pointerId: number
+  lastX: number
+  lastY: number
+  /** Turn still to apply (radians), consumed by the globe each frame. */
+  yaw: number
+  pitch: number
+  /** Last time the child spun the planet (ms). */
+  touchedAt: number
+}
+/** Radians per dragged pixel. */
+const DRAG_SPEED = 0.006
+/** The auto-turn toward PIP's spot comes back after this long untouched. */
+const DRAG_HOLD_MS = 8000
+const PITCH_LIMIT = 1.1
+
+function newDragState(): DragState {
+  return { active: false, pointerId: -1, lastX: 0, lastY: 0, yaw: 0, pitch: 0, touchedAt: -Infinity }
+}
+function dragStart(drag: DragState, id: number, x: number, y: number): boolean {
+  if (drag.active) return false
+  drag.active = true
+  drag.pointerId = id
+  drag.lastX = x
+  drag.lastY = y
+  return true
+}
+function dragMove(drag: DragState, id: number, x: number, y: number) {
+  if (!drag.active || id !== drag.pointerId) return
+  const dx = x - drag.lastX
+  const dy = y - drag.lastY
+  drag.lastX = x
+  drag.lastY = y
+  if (dx === 0 && dy === 0) return
+  drag.yaw += dx * DRAG_SPEED
+  drag.pitch += dy * DRAG_SPEED
+  drag.touchedAt = performance.now()
+}
+function dragEnd(drag: DragState, id: number) {
+  if (id !== drag.pointerId) return
+  drag.active = false
+  drag.pointerId = -1
+}
+function isSpinning(drag: DragState): boolean {
+  return drag.active || performance.now() - drag.touchedAt < DRAG_HOLD_MS
+}
+/** The turn dragged since the last frame (then cleared). */
+function takeDragTurn(drag: DragState): { yaw: number; pitch: number } {
+  const turn = { yaw: drag.yaw, pitch: drag.pitch }
+  drag.yaw = 0
+  drag.pitch = 0
+  return turn
 }
 
 const RADIUS = 2
@@ -130,8 +192,10 @@ function Marker({
   })
 
   const color = marker.state === 'done' ? '#9be7b0' : '#ffd9a8'
-  const pick = (event: { stopPropagation: () => void }) => {
+  const pick = (event: { stopPropagation: () => void; delta: number }) => {
     event.stopPropagation()
+    // A spin of the planet that ends on a spot is not a pick.
+    if (event.delta > 6) return
     onPick(marker.explorer)
   }
   return (
@@ -173,7 +237,8 @@ function Globe({
   reducedMotion,
   onPick,
   labels,
-}: MarsOrbitSceneProps) {
+  drag,
+}: MarsOrbitSceneProps & { drag: { current: DragState } }) {
   const group = useRef<THREE.Group>(null)
   const texture = useMemo(() => {
     const t = new THREE.CanvasTexture(makeMarsCanvas())
@@ -188,7 +253,17 @@ function Globe({
     if (!g) return
     const dt = Math.min(delta, 0.05)
     const site = MARS_LANDING_SITES.find((s) => s.explorer === selected)
-    if (site) {
+    const spun = isSpinning(drag.current)
+    const turn = takeDragTurn(drag.current)
+    if (!landing && (turn.yaw !== 0 || turn.pitch !== 0)) {
+      g.rotation.y += turn.yaw
+      g.rotation.x = THREE.MathUtils.clamp(
+        g.rotation.x + turn.pitch,
+        -PITCH_LIMIT,
+        PITCH_LIMIT,
+      )
+    }
+    if (site && landing) {
       const target = rotationToFace(site)
       // While landing the site turns to the exact center, so the camera
       // dives straight down onto the landing ring.
@@ -197,6 +272,8 @@ function Globe({
       // Slightly above center: the beacon is seen rising, label on top.
       const tilt = (site.latitude * Math.PI) / 180 + (landing ? 0 : VIEW_TILT)
       g.rotation.x += (tilt - g.rotation.x) * turn
+    } else if (spun) {
+      // The child is turning the planet: leave it where they put it.
     } else {
       // PIP's suggested spot drifts into view, a little off-center, so the
       // child can see the glowing spot PIP is talking about.
@@ -243,8 +320,22 @@ function Globe({
 }
 
 export default function MarsOrbitScene(props: MarsOrbitSceneProps) {
+  const drag = useRef<DragState>(newDragState())
+  const landing = props.landing
   return (
     <Canvas
+      onPointerDown={(event) => {
+        if (landing) return
+        if (dragStart(drag.current, event.pointerId, event.clientX, event.clientY)) {
+          // Keep spinning even if the pointer leaves the canvas mid-drag.
+          event.currentTarget.setPointerCapture?.(event.pointerId)
+        }
+      }}
+      onPointerMove={(event) =>
+        dragMove(drag.current, event.pointerId, event.clientX, event.clientY)
+      }
+      onPointerUp={(event) => dragEnd(drag.current, event.pointerId)}
+      onPointerCancel={(event) => dragEnd(drag.current, event.pointerId)}
       dpr={[1, 1.5]}
       camera={{ position: [0, 0, 8.6], fov: 42, near: 0.1, far: 120 }}
       gl={{ antialias: true, powerPreference: 'low-power' }}
@@ -254,7 +345,7 @@ export default function MarsOrbitScene(props: MarsOrbitSceneProps) {
       <ambientLight intensity={0.35} />
       <directionalLight position={[4, 2.5, 5]} intensity={2.2} />
       <Stars />
-      <Globe {...props} />
+      <Globe {...props} drag={drag} />
     </Canvas>
   )
 }

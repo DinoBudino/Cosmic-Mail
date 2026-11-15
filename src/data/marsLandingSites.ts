@@ -49,6 +49,24 @@ export function getLandingSiteState(
   return 'unknown'
 }
 
+/**
+ * How much of a landing area is finished, 0-100: finding the explorer, its
+ * three parts, sealing the letter and sending the story (6 steps).
+ */
+export function getLandingSiteProgress(
+  save: JourneySave | null,
+  explorer: MarsExplorerId,
+): number {
+  const progress = save?.missions[explorer]
+  if (!progress) return 0
+  if (progress.transmittedAt != null) return 100
+  const steps =
+    (progress.discovered ? 1 : 0) +
+    Math.min(3, progress.scannedComponentIds.length) +
+    (progress.smartLetterCreatedAt != null ? 1 : 0)
+  return Math.round((steps / 6) * 100)
+}
+
 export interface OrbitGuidance {
   /** PIP's line on arrival in orbit. */
   line: string

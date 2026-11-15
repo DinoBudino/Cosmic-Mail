@@ -2211,6 +2211,10 @@
 .orbit-marker[data-glow="true"] { animation: orbit-marker-glow 1.6s ease-in-out infinite; }
 .orbit-marker[data-active="true"] { border-color: #fff; background: rgba(67,42,76,.95); }
 .orbit-marker[data-state="done"] { color: #9be7b0; border-color: rgba(155,231,176,.7); }
-.orbit-marker__mark { font-size: 12px; }
+.orbit-marker, .orbit__site { gap: 8px; }
+.orbit-progress { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; color: #ffd9a8; background: linear-gradient(90deg, rgba(255,217,168,.32) var(--pct, 0%), rgba(255,255,255,.08) var(--pct, 0%)); box-shadow: inset 0 0 0 1px rgba(255,217,168,.45); font-variant-numeric: tabular-nums; }
+.orbit-progress--done { min-width: 0; padding: 2px 6px; color: #9be7b0; background: rgba(155,231,176,.16); box-shadow: inset 0 0 0 1px rgba(155,231,176,.55); }
+.orbit__scene canvas { cursor: grab; touch-action: none; }
+.orbit__scene canvas:active { cursor: grabbing; }
 @keyframes orbit-marker-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(255,217,168,.0); } 50% { box-shadow: 0 0 16px 4px rgba(255,217,168,.55); } }
 @media (prefers-reduced-motion: reduce) { .orbit__dive, .orbit-marker[data-glow="true"] { animation: none; } }

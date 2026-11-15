@@ -4638,22 +4638,29 @@
   background: #000;
   outline: none;
 }
-.story-tx__skip {
+.story-tx__video video { cursor: pointer; }
+.story-tx__play {
   position: absolute;
-  top: calc(16px + env(safe-area-inset-top, 0px));
-  right: calc(16px + env(safe-area-inset-right, 0px));
-  min-height: 40px;
-  padding: 8px 16px;
-  border: 1px solid rgba(253, 244, 236, 0.3);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 16px 36px;
+  border: 0;
   border-radius: 999px;
-  background: rgba(13, 8, 24, 0.6);
-  color: #fdf4ec;
+  background: linear-gradient(180deg, #ffd9a8 0%, #f2b28c 100%);
+  color: #2a1a33;
   font: inherit;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 800;
   cursor: pointer;
-  opacity: 0.75;
+  box-shadow: 0 0 0 6px rgba(255, 217, 168, 0.25), 0 12px 40px rgba(0, 0, 0, 0.5);
+  animation: tx-fade-in 0.4s ease-out both;
 }
-.story-tx__skip:hover, .story-tx__skip:focus-visible { opacity: 1; }
+.story-tx__play span { font-size: 1.3rem; }
 
 /* Record saved: the panel rises over the video's last frame. */
 .story-tx[data-phase='record'] .story-tx__video video { filter: brightness(0.55); transition: filter 0.6s; }

@@ -150,6 +150,9 @@ describe('mission catalog', () => {
       expect(status).toBe(video ? 'video' : 'script-draft')
       if (video) {
         expect(existsSync(new URL(`../../public/${video}`, import.meta.url))).toBe(true)
+        // Every story also ships as H.264 MP4, so Safari / iPhone can play it.
+        const mp4 = video.replace(/\.webm$/, '.mp4')
+        expect(existsSync(new URL(`../../public/${mp4}`, import.meta.url))).toBe(true)
       }
       expect(mission.reconstruction.lines.length).toBeGreaterThanOrEqual(4)
       expect(mission.reconstruction.title.toLowerCase()).toContain(

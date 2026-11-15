@@ -1,174 +1,191 @@
-import { RoundedBox } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 
 /**
- * Provisional hand-held Cosmic Scanner. The body is deliberately a
- * compact scientific tool, not a weapon: rounded cream shell, coral grip,
- * gold trim, lavender screen and a small forward emitter.
+ * The hand-held Cosmic Scanner, from blender/Scanner/
+ * Cosmic_Mail_Scanner_Master.blend (public/models/cosmic-scanner.glb).
+ * Meshes are merged by material and lightly decimated for the web
+ * (14 meshes, ~19k triangles).
  *
- * The model is authored with +Z forward, +Y up. AstronautModel mounts it
- * on Hand_R with a basis that maps model +Z to the hand's forward axis and
- * model +Y to the hand's up axis.
+ * Device frame used by the rest of the game (unchanged): +Z forward, +Y up,
+ * origin where the old device had it, so AstronautModel's hand mount, the
+ * first-person view and the beam emitter keep working. The Blender model is
+ * +X forward / +Z up, 0.18 m tall; here it is turned to +Z forward, scaled
+ * to the astronaut's chunky hands and shifted so the grip sits in the palm
+ * and the red lens lands where the old emitter was.
  */
+const SCANNER_URL = 'models/cosmic-scanner.glb'
+const SCALE = 1.7
+const MODEL_OFFSET: [number, number, number] = [0, -0.1356, 0.0355]
+/** Front of the red lens in device space (the beam starts here). */
+const LENS_FRONT: [number, number, number] = [0, 0.114, 0.15]
+/** Button pivot travel (glTF x) when the trigger is held, from Button_Press. */
+const BUTTON_REST_X = 0.0095
+const BUTTON_PRESSED_X = 0.0083
+
+/**
+ * Light states authored in the .blend (MAT_*_READY / SCANNING /
+ * SCAN_COMPLETE): emission strength per glowing material.
+ */
+const GLOW = {
+  MAT_CyanEmission_READY: { ready: 3, scanning: 7, complete: 4.5 },
+  MAT_RedSensor_READY: { ready: 1, scanning: 2.5, complete: 0.8 },
+  MAT_OrangeEmission_READY: { ready: 2.5, scanning: 1.2, complete: 6 },
+} as const
+type GlowName = keyof typeof GLOW
+
+/** Scanning red is brighter than the resting sensor red. */
+const RED_READY = new THREE.Color(0.3163, 0.0087, 0.0177)
+const RED_SCANNING = new THREE.Color(1, 0.03, 0.051)
+
 export function CosmicScannerDevice({
   emitterName = 'ScannerEmitter',
 }: {
   emitterName?: string
 }) {
-  const screenMaterial = useRef<THREE.MeshStandardMaterial>(null)
-  const emitterMaterial = useRef<THREE.MeshStandardMaterial>(null)
-  const glow = useRef<THREE.Mesh>(null)
+  return (
+    <group name="CosmicScannerDevice">
+      {/* The emitter exists at once, even while the model is loading. */}
+      <group name={emitterName} position={LENS_FRONT} />
+      <Suspense fallback={null}>
+        <ScannerModel />
+      </Suspense>
+    </group>
+  )
+}
+
+function ScannerModel() {
+  const { scene } = useGLTF(SCANNER_URL)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const glow = useRef<THREE.Mesh>(null)
 
-  useFrame((state) => {
+  // Own copy per hand/first-person view, with its own glow materials.
+  const rig = useMemo(() => buildRig(scene), [scene])
+
+  useEffect(
+    () => () => {
+      for (const material of rig.glowing.values()) material.dispose()
+    },
+    [rig],
+  )
+
+  useFrame((state, delta) => {
     const store = useGameStore.getState()
+    const held = store.scannerEquipped && store.scannerTriggerHeld && !isWorldPaused()
     const scanning =
-      store.scannerEquipped &&
-      store.scannerTriggerHeld &&
-      Boolean(
-        store.scannerSelectedComponentId || store.scannerEnvironmentalId,
-      ) &&
-      !isWorldPaused()
+      held &&
+      Boolean(store.scannerSelectedComponentId || store.scannerEnvironmentalId)
     const progress = scanning ? store.scannerScanProgress : 0
-    const pulse = reducedMotion
-      ? 0.5
-      : 0.5 + Math.sin(state.clock.elapsedTime * 7) * 0.14
-
-    if (screenMaterial.current) {
-      screenMaterial.current.emissiveIntensity = scanning
-        ? 0.9 + progress * 1.1
-        : 0.5
-    }
-    if (emitterMaterial.current) {
-      emitterMaterial.current.emissiveIntensity = scanning
-        ? 1.2 + pulse
-        : 0.4
-    }
+    const pulse = reducedMotion ? 0 : Math.sin(state.clock.elapsedTime * 9) * 0.5 + 0.5
+    const k = 1 - Math.exp(-Math.min(delta, 0.05) * 12)
+    animateRig(rig, { held, scanning, progress, pulse, k })
     if (glow.current) {
       glow.current.visible = scanning
-      glow.current.scale.setScalar(scanning ? 1 + progress * 0.7 : 1)
+      glow.current.scale.setScalar(1 + progress * 0.7)
     }
   })
 
   return (
-    <group name="CosmicScannerDevice">
-      {/* Main cream shell */}
-      <RoundedBox
-        args={[0.34, 0.13, 0.2]}
-        radius={0.035}
-        smoothness={3}
-        position={[0, 0, 0.02]}
-        castShadow
-      >
-        <meshStandardMaterial
-          color="#F3E2CF"
-          metalness={0.18}
-          roughness={0.52}
-        />
-      </RoundedBox>
-
-      {/* Gold trim band */}
-      <mesh position={[0, 0.014, 0.02]}>
-        <boxGeometry args={[0.35, 0.024, 0.212]} />
-        <meshStandardMaterial
-          color="#C9A15E"
-          metalness={0.72}
-          roughness={0.32}
-        />
-      </mesh>
-
-      {/* Coral side panels */}
-      {[-0.115, 0.115].map((x) => (
-        <mesh key={x} position={[x, -0.012, 0.02]}>
-          <boxGeometry args={[0.055, 0.1, 0.206]} />
-          <meshStandardMaterial color="#E07A5F" roughness={0.58} />
-        </mesh>
-      ))}
-
-      {/* Rounded coral grip under the body */}
-      <RoundedBox
-        args={[0.1, 0.16, 0.09]}
-        radius={0.025}
-        smoothness={2}
-        position={[0, -0.12, 0.01]}
-        castShadow
-      >
-        <meshStandardMaterial color="#E07A5F" roughness={0.62} />
-      </RoundedBox>
-      <mesh position={[0, -0.19, 0.01]}>
-        <cylinderGeometry args={[0.05, 0.055, 0.04, 12]} />
-        <meshStandardMaterial
-          color="#C9A15E"
-          metalness={0.62}
-          roughness={0.4}
-        />
-      </mesh>
-
-      {/* Lavender screen on top */}
-      <mesh position={[0, 0.076, 0.03]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.16, 0.1]} />
-        <meshStandardMaterial
-          ref={screenMaterial}
-          color="#D8CCFF"
-          emissive="#B8A6D9"
-          emissiveIntensity={0.5}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh position={[0, 0.071, 0.03]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.19, 0.13]} />
-        <meshBasicMaterial color="#8E86C8" transparent opacity={0.22} />
-      </mesh>
-
-      {/* Gold emitter housing and lavender lens */}
-      <mesh position={[0, 0, 0.135]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.05, 0.055, 0.06, 16]} />
-        <meshStandardMaterial
-          color="#C9A15E"
-          metalness={0.72}
-          roughness={0.3}
-        />
-      </mesh>
-      <mesh
-        name={emitterName}
-        position={[0, 0, 0.17]}
-        rotation={[Math.PI / 2, 0, 0]}
-      >
-        <cylinderGeometry args={[0.035, 0.035, 0.02, 16]} />
-        <meshStandardMaterial
-          ref={emitterMaterial}
-          color="#D8CCFF"
-          emissive="#B8A6D9"
-          emissiveIntensity={0.4}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* Reading glow, only while holding the scan */}
-      <mesh ref={glow} position={[0, 0, 0.19]} visible={false}>
-        <sphereGeometry args={[0.045, 12, 8]} />
+    <>
+      <group position={MODEL_OFFSET} rotation={[0, -Math.PI / 2, 0]} scale={SCALE}>
+        <primitive object={rig.model} />
+      </group>
+      {/* Red reading glow at the lens, only while holding the scan. */}
+      <mesh ref={glow} position={LENS_FRONT} visible={false}>
+        <sphereGeometry args={[0.04, 12, 8]} />
         <meshBasicMaterial
-          color="#D8CCFF"
+          color="#ff6a5a"
           transparent
-          opacity={0.55}
+          opacity={0.5}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           toneMapped={false}
         />
       </mesh>
-
-      {/* Small gold status nub */}
-      <mesh position={[-0.09, 0.1, -0.05]}>
-        <sphereGeometry args={[0.018, 8, 6]} />
-        <meshStandardMaterial
-          color="#C9A15E"
-          metalness={0.8}
-          roughness={0.3}
-        />
-      </mesh>
-    </group>
+    </>
   )
 }
+
+type ScannerRig = {
+  source: THREE.Object3D
+  model: THREE.Object3D
+  glowing: Map<GlowName, THREE.MeshStandardMaterial>
+  button: THREE.Object3D | null
+}
+
+function buildRig(scene: THREE.Object3D): ScannerRig {
+  const model = scene.clone(true)
+  const glowing = new Map<GlowName, THREE.MeshStandardMaterial>()
+  model.traverse((child) => {
+    const mesh = child as THREE.Mesh
+    if (!mesh.isMesh) return
+    mesh.castShadow = true
+    const material = toStandard(mesh.material as THREE.MeshStandardMaterial)
+    mesh.material = material
+    if (material.name in GLOW) {
+      const own = glowing.get(material.name as GlowName) ?? material.clone()
+      glowing.set(material.name as GlowName, own)
+      mesh.material = own
+    }
+  })
+  return {
+    source: scene,
+    model,
+    glowing,
+    button: model.getObjectByName('CTRL_ActivationButton_Pivot') ?? null,
+  }
+}
+
+/**
+ * The .blend uses Blender-only niceties that glTF brings in as
+ * MeshPhysicalMaterial: lens transmission (re-renders the whole scene every
+ * frame), clearcoat and anisotropy (needs tangents/UVs this model has not,
+ * which yields NaN pixels that the bloom pass spreads into a black screen).
+ * A plain standard material looks the same at hand size and is light.
+ */
+const standardCache = new Map<THREE.Material, THREE.MeshStandardMaterial>()
+function toStandard(material: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  if (!(material as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) return material
+  const cached = standardCache.get(material)
+  if (cached) return cached
+  const glass = (material as THREE.MeshPhysicalMaterial).transmission > 0
+  const plain = new THREE.MeshStandardMaterial({
+    name: material.name,
+    color: material.color,
+    roughness: glass ? 0.12 : material.roughness,
+    metalness: glass ? 0.3 : material.metalness,
+    emissive: material.emissive,
+    emissiveIntensity: material.emissiveIntensity,
+  })
+  standardCache.set(material, plain)
+  return plain
+}
+
+/** Per-frame light and button state; lives outside the component on purpose. */
+function animateRig(
+  rig: ScannerRig,
+  frame: { held: boolean; scanning: boolean; progress: number; pulse: number; k: number },
+) {
+  const { held, scanning, progress, pulse, k } = frame
+  for (const [name, material] of rig.glowing) {
+    const level = GLOW[name]
+    const target = !scanning
+      ? level.ready
+      : progress > 0.92
+        ? level.complete
+        : level.scanning * (0.8 + pulse * 0.2)
+    material.emissiveIntensity += (target - material.emissiveIntensity) * k
+    if (name === 'MAT_RedSensor_READY') {
+      material.emissive.lerp(scanning ? RED_SCANNING : RED_READY, k)
+    }
+  }
+  if (rig.button) {
+    const x = held ? BUTTON_PRESSED_X : BUTTON_REST_X
+    rig.button.position.x += (x - rig.button.position.x) * k
+  }
+}
+
+useGLTF.preload(SCANNER_URL)

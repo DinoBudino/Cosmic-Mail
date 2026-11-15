@@ -22,7 +22,8 @@ import { PipAvatar } from './PipSpeech'
  *    planet to Earth and the explorer's stamp appears. The real, idempotent
  *    transmission is saved the moment the record leaves.
  *
- * All screens are tech screens (no paper). Replays skip the sending part.
+ * All screens are tech screens (no paper). The story can't be skipped.
+ * Replays skip the sending part.
  */
 
 type Phase = 'connecting' | 'video' | 'record' | 'sending' | 'delivered'
@@ -85,6 +86,9 @@ export function StoryTransmission({
     () => save?.missions[mission.id]?.transmittedAt != null,
   )
   const [phase, setPhase] = useState<Phase>('connecting')
+  // The browser may refuse to start a video with sound on its own (Safari):
+  // then a big Play button waits for the child's tap.
+  const [paused, setPaused] = useState(false)
   const [failed, setFailed] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -126,7 +130,8 @@ export function StoryTransmission({
     const element = videoRef.current
     element?.focus()
     void element?.play().catch(() => {
-      // Autoplay refused: the native controls let the child start it.
+      // Autoplay refused: show the big Play button.
+      setPaused(true)
     })
   }, [phase])
 
@@ -150,6 +155,16 @@ export function StoryTransmission({
     const frame = window.requestAnimationFrame(() => actionRef.current?.focus())
     return () => window.cancelAnimationFrame(frame)
   }, [phase, alreadySent, voiceName, voiceEnabled])
+
+  const togglePlay = useCallback(() => {
+    const element = videoRef.current
+    if (!element || phase !== 'video') return
+    if (element.paused) {
+      void element.play().catch(() => setPaused(true))
+    } else {
+      element.pause()
+    }
+  }, [phase])
 
   const endVideo = useCallback(() => {
     setPhase((current) => (current === 'video' ? 'record' : current))
@@ -233,8 +248,8 @@ export function StoryTransmission({
       aria-label={`${mission.machineName}'s story`}
       onCancel={(event) => {
         event.preventDefault()
-        if (phase === 'video') endVideo()
-        else if (phase === 'delivered' || alreadySent) onClose()
+        // The story itself can't be skipped; it ends on its own.
+        if (phase === 'delivered' || alreadySent) onClose()
       }}
     >
       {phase === 'connecting' && (
@@ -259,19 +274,34 @@ export function StoryTransmission({
 
       {(phase === 'video' || phase === 'record') && (
         <div className="story-tx__video">
+          {/* MP4 (H.264) first: every browser plays it, Safari included,
+              and it is hardware-decoded on modest PCs; WebM as backup. */}
           <video
             ref={videoRef}
-            src={`${import.meta.env.BASE_URL}${video}`}
-            controls={phase === 'video'}
             playsInline
             preload="auto"
-            controlsList="nodownload noplaybackrate nofullscreen"
             disablePictureInPicture
+            onClick={togglePlay}
+            onPlay={() => setPaused(false)}
+            onPause={() => setPaused(true)}
             onEnded={endVideo}
-          />
-          {phase === 'video' && (
-            <button type="button" className="story-tx__skip" onClick={endVideo}>
-              Skip ▸
+          >
+            <source src={`${import.meta.env.BASE_URL}${mp4Of(video)}`} type="video/mp4" />
+            <source
+              src={`${import.meta.env.BASE_URL}${video}`}
+              type="video/webm"
+              // Neither file plays here: never leave the child stuck.
+              onError={endVideo}
+            />
+          </video>
+          {phase === 'video' && paused && (
+            <button
+              type="button"
+              className="story-tx__play"
+              onClick={togglePlay}
+              aria-label="Play the story"
+            >
+              <span aria-hidden="true">▶</span> Play
             </button>
           )}
         </div>
@@ -443,3 +473,8 @@ export function StoryTransmission({
   )
 }
 
+
+/** The MP4 (H.264/AAC) twin of a story video, same name. */
+function mp4Of(video: string): string {
+  return video.replace(/\.webm$/, '.mp4')
+}

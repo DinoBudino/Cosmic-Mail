@@ -7,6 +7,7 @@ import {
   areFreeScansAllowed,
   hasReachedStation,
   hasWalkedEnough,
+  isCalibrationActive,
   isCalibrationSampleId,
   isOutsideCorridor,
   isRadarVisible,
@@ -53,6 +54,9 @@ import {
 import { stopPipVoice } from './pipVoice'
 import { getCurrentProtocolStep } from './protocolStep'
 import { playerPosition } from './playerPosition'
+import { faceOrbitToward } from './cameraRig'
+import { CALIBRATION_SAMPLE, PRACTICE_STATION_VIEW } from '../data/calibrationSample'
+import type { ScanStationTarget } from '../store/gameStore'
 import { PLAYER } from './worldConfig'
 import {
   createGuideTiming,
@@ -428,6 +432,7 @@ export function MissionNarrativeController() {
   // derived from the journey save plus ephemeral flags, so a reload resumes
   // at the right step. It runs even after transmission (M7 opens the world).
   const lastStepRef = useRef<ProtocolStep | null>(null)
+  const lastStationRef = useRef<ScanStationTarget | null>(null)
   useEffect(() => {
     if (!save) return
     const tick = () => {
@@ -475,12 +480,52 @@ export function MissionNarrativeController() {
         step === 'M4' &&
         Boolean(currentProgress?.discovered) &&
         !currentProgress?.memoryRecoveredAt
-      const station =
+      const explorerStation =
         huntOn &&
         game.scannerEquipped &&
         game.scannerMissionId === SPIRIT_SITE.missionId &&
-        (game.scanStation || nearExplorer)
-      if (station !== game.scanStation) game.setScanStation(station)
+        ((game.scanStation && game.scanStationTarget === 'explorer') || nearExplorer)
+
+      // Practice station: the first rock is scanned the same way, with a
+      // still view on it, and the scanner stays out until it is done.
+      const nearRock =
+        Math.hypot(
+          playerPosition.x - CALIBRATION_SAMPLE.position.x,
+          playerPosition.z - CALIBRATION_SAMPLE.position.z,
+        ) <= PRACTICE_STATION_VIEW.startRadius
+      const practiceStation =
+        isCalibrationActive(step) &&
+        game.scannerEquipped &&
+        ((game.scanStation && game.scanStationTarget === 'practice') || nearRock)
+
+      const stationTarget: ScanStationTarget | null = explorerStation
+        ? 'explorer'
+        : practiceStation
+          ? 'practice'
+          : null
+      game.setScanStation(stationTarget !== null, stationTarget ?? undefined)
+
+      // A station that ends because its task is done puts the scanner away
+      // and leaves the camera looking at what was just scanned, instead of
+      // swinging the first-person view somewhere else.
+      const endedStation = lastStationRef.current
+      lastStationRef.current = stationTarget
+      if (endedStation && !stationTarget) {
+        const finished =
+          endedStation === 'practice'
+            ? !isCalibrationActive(step)
+            : Boolean(currentProgress?.memoryRecoveredAt)
+        if (finished) {
+          const center =
+            endedStation === 'practice'
+              ? CALIBRATION_SAMPLE.position
+              : SPIRIT_SITE.position
+          faceOrbitToward(center.x - playerPosition.x, center.z - playerPosition.z)
+          if (useGameStore.getState().scannerEquipped) {
+            useGameStore.getState().unequipScanner()
+          }
+        }
+      }
 
       game.setRadarUnlocked(
         isRadarVisible(step, useNarrativeStore.getState().protocol),

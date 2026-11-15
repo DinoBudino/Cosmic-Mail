@@ -2,7 +2,12 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MARS_WORLD_SITES, REGION_INFO } from '../data/marsObjects'
-import { SCAN_STATION_VIEW, SPIRIT_SITE } from '../data/spiritSite'
+import { SPIRIT_SITE } from '../data/spiritSite'
+import {
+  getScanStationEyeHeight,
+  getScanStationLook,
+  getScanStationPoint,
+} from './scanStation'
 import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { emitFootstep } from './audio/audioEvents'
@@ -15,6 +20,7 @@ import {
 } from './missionNarrative'
 import {
   SCANNER_LOCKED_LINE,
+  PRACTICE_STAY_LINE,
   STATION_STAY_LINE,
   areFreeScansAllowed,
 } from '../data/arrivalProtocol'
@@ -119,17 +125,6 @@ function resolveObjectClearance(desired: THREE.Vector3): void {
   }
 }
 
-/** Where the astronaut stands at the scan station (world x/z). */
-function getScanStationPoint(out: THREE.Vector3): THREE.Vector3 {
-  const { direction, distance } = SCAN_STATION_VIEW
-  const length = Math.hypot(direction.x, direction.z) || 1
-  return out.set(
-    SPIRIT_SITE.position.x + (direction.x / length) * distance,
-    0,
-    SPIRIT_SITE.position.z + (direction.z / length) * distance,
-  )
-}
-
 export function Player() {
   const group = useRef<THREE.Group>(null)
 
@@ -230,7 +225,14 @@ export function Player() {
       if (store.scannerEquipped) {
         // At the scan station the scanner stays out until every part is
         // found: PIP says so, kindly, instead of letting the child wander.
-        if (store.scanStation) requestProtocolLine(STATION_STAY_LINE, 8_000)
+        if (store.scanStation) {
+          requestProtocolLine(
+            store.scanStationTarget === 'practice'
+              ? PRACTICE_STAY_LINE
+              : STATION_STAY_LINE,
+            8_000,
+          )
+        }
         else store.unequipScanner()
       } else if (store.scannerLocked) {
         requestProtocolLine(SCANNER_LOCKED_LINE)
@@ -275,7 +277,7 @@ export function Player() {
     if (store.scanStation) {
       axes.current.x = 0
       axes.current.y = 0
-      getScanStationPoint(stationPoint.current)
+      getScanStationPoint(store.scanStationTarget, stationPoint.current)
       const pull = 1 - Math.exp(-6 * dt)
       player.position.x += (stationPoint.current.x - player.position.x) * pull
       player.position.z += (stationPoint.current.z - player.position.z) * pull
@@ -449,19 +451,14 @@ export function Player() {
     if (store.scanStation) {
       // Scan station: a still, framed view of the explorer. Only the
       // reticle moves (it follows the pointer), so nothing else competes.
-      getScanStationPoint(stationPoint.current)
+      getScanStationPoint(store.scanStationTarget, stationPoint.current)
       const groundY = getTerrainHeight(stationPoint.current.x, stationPoint.current.z)
       firstPersonDesired.current.set(
         stationPoint.current.x,
-        groundY + SCAN_STATION_VIEW.eyeHeight,
+        groundY + getScanStationEyeHeight(store.scanStationTarget),
         stationPoint.current.z,
       )
-      firstPersonLook.current.set(
-        SPIRIT_SITE.position.x,
-        getTerrainHeight(SPIRIT_SITE.position.x, SPIRIT_SITE.position.z) +
-          SCAN_STATION_VIEW.lookHeight,
-        SPIRIT_SITE.position.z,
-      )
+      getScanStationLook(store.scanStationTarget, firstPersonLook.current)
       camera.position.lerp(firstPersonDesired.current, 1 - Math.exp(-3.5 * dt))
       cameraTarget.current.lerp(firstPersonLook.current, 1 - Math.exp(-5 * dt))
       camera.lookAt(cameraTarget.current)

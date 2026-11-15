@@ -11,6 +11,9 @@ import { clearInput } from '../game/input'
 import { isOnboardingActive } from './onboardingStore'
 import type { BriefingStepId } from '../data/marsBriefing'
 
+/** The scan station frames either the explorer (parts hunt) or the practice rock. */
+export type ScanStationTarget = 'explorer' | 'practice'
+
 const STORAGE_KEY = 'cosmic-mail:settings:v1'
 
 /** One archive overlay at a time. Presentation-only, never persisted. */
@@ -161,7 +164,9 @@ interface GameState {
    * until every part is found (set by MissionNarrativeController).
    */
   scanStation: boolean
-  setScanStation: (active: boolean) => void
+  /** What the station frames: the explorer's parts or the practice rock. */
+  scanStationTarget: ScanStationTarget
+  setScanStation: (active: boolean, target?: ScanStationTarget) => void
   /** 0..1 hold-to-scan progress for the current target. */
   scannerScanProgress: number
   /** Environmental target under the reticle, separate from mission parts. */
@@ -319,6 +324,7 @@ export const useGameStore = create<GameState>((set, get) => {
   scannerDistractorId: null,
   scannerEquipped: false,
   scanStation: false,
+  scanStationTarget: 'explorer',
   scannerScanProgress: 0,
   scannerEnvironmentalId: null,
   scannerTargetKind: null,
@@ -472,10 +478,16 @@ export const useGameStore = create<GameState>((set, get) => {
       travelTargetId: null,
     })
   },
-  setScanStation: (scanStation) => {
-    if (get().scanStation === scanStation) return
+  setScanStation: (scanStation, target = 'explorer') => {
+    const current = get()
+    if (
+      current.scanStation === scanStation &&
+      (!scanStation || current.scanStationTarget === target)
+    ) {
+      return
+    }
     clearInput()
-    set({ scanStation })
+    set(scanStation ? { scanStation, scanStationTarget: target } : { scanStation })
   },
   unequipScanner: () => {
     // Movement keys stay held here too; only scanner state is released.

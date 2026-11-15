@@ -594,6 +594,13 @@
     "pitch": 1.05
   },
   {
+    "key": "mars-practice-stay",
+    "text": "Almost there! Hold the scan on the practice rock, you can do it!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
     "key": "mars-ship-board-desktop",
     "text": "There's our ship! Press E to climb aboard.",
     "speed": 1.06,

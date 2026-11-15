@@ -1,6 +1,7 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   MARS_LANDING_SITES,
+  getLandingSiteProgress,
   getLandingSiteState,
   getOrbitGuidance,
 } from '../../data/marsLandingSites'
@@ -20,8 +21,9 @@ const MarsOrbitScene = lazy(() => import('../../game/MarsOrbitScene'))
 const LANDING_MS = 1900
 
 /**
- * Mailwing in orbit around Mars. The planet turns slowly; PIP points at the
- * glowing spot to visit. The child taps a spot, then "Land here!". After a
+ * Mailwing in orbit around Mars. The planet turns slowly and can be spun
+ * with a drag; PIP points at the glowing spot to visit. Tapping a spot lands
+ * there straight away. Each spot shows how much of it is done. After a
  * mission the child walks back aboard and returns here: the letter is sent
  * to Earth and the finished spot shows a check mark.
  */
@@ -51,7 +53,8 @@ export function MarsOrbit() {
         // The explorer's name stays hidden until the child finds it.
         const label =
           state === 'unknown' ? site.place : getMission(site.explorer).machineName
-        return { explorer: site.explorer, label, state }
+        const percent = getLandingSiteProgress(save, site.explorer)
+        return { explorer: site.explorer, label, state, percent }
       }),
     [save],
   )
@@ -70,33 +73,20 @@ export function MarsOrbit() {
     [],
   )
 
+  // Tapping a spot is the whole choice: the Mailwing dives right there.
   const pick = (explorer: MarsExplorerId) => {
     if (landing || guidance.pendingDelivery) return
-    emitAudio('uiClick')
-    setSelected(explorer)
-    const site = MARS_LANDING_SITES.find((s) => s.explorer === explorer)!
-    const text =
-      getLandingSiteState(save, explorer) === 'done'
-        ? pipLine('orbit-done-site')
-        : site.line
-    setReply(text)
-    speakPip(text, voiceName, voiceEnabled, 'curious')
-  }
-
-  const land = () => {
-    if (!selected || landing) return
     emitAudio('uiConfirm')
+    setSelected(explorer)
     setLanding(true)
     const text = pipLine('orbit-landing')
     setReply(text)
     speakPip(text, voiceName, voiceEnabled, 'excited')
     landTimer.current = window.setTimeout(
-      () => landAt(selected),
+      () => landAt(explorer),
       reducedMotion ? 300 : LANDING_MS,
     )
   }
-
-  const selectedMarker = markers.find((m) => m.explorer === selected) ?? null
 
   return (
     <section className="orbit" data-landing={landing} aria-label="Mars orbit: choose where to land">
@@ -125,10 +115,8 @@ export function MarsOrbit() {
             data-glow={marker.explorer === guidance.suggested && !selected}
             onClick={() => pick(marker.explorer)}
           >
-            <span className="orbit-marker__mark" aria-hidden="true">
-              {marker.state === 'done' ? '✓' : marker.state === 'unknown' ? '?' : '✦'}
-            </span>
             {marker.label}
+            <SiteProgress marker={marker} />
           </button>
         ))}
       </div>
@@ -147,10 +135,8 @@ export function MarsOrbit() {
                 disabled={landing || Boolean(guidance.pendingDelivery)}
                 onClick={() => pick(marker.explorer)}
               >
-                <span aria-hidden="true">
-                  {marker.state === 'done' ? '✓' : marker.state === 'unknown' ? '?' : '✦'}
-                </span>
                 {marker.label}
+                <SiteProgress marker={marker} />
               </button>
             </li>
           ))}
@@ -185,16 +171,7 @@ export function MarsOrbit() {
             >
               Fly home
             </button>
-          ) : (
-            <button
-              type="button"
-              className="orbit__action orbit__action--primary"
-              disabled={!selectedMarker || landing}
-              onClick={land}
-            >
-              {selectedMarker ? 'Land here!' : 'Pick a glowing spot'}
-            </button>
-          )}
+          ) : null}
           {!guidance.allDone && !landing && (
             <button type="button" className="orbit__action" onClick={leaveOrbit}>
               Back to cabin
@@ -203,5 +180,25 @@ export function MarsOrbit() {
         </div>
       </div>
     </section>
+  )
+}
+
+/** ✓ when the story is sent, otherwise how much of the area is done. */
+function SiteProgress({ marker }: { marker: OrbitMarker }) {
+  if (marker.state === 'done') {
+    return (
+      <span className="orbit-progress orbit-progress--done" aria-label="complete">
+        ✓
+      </span>
+    )
+  }
+  return (
+    <span
+      className="orbit-progress"
+      style={{ '--pct': `${marker.percent}%` } as CSSProperties}
+      aria-label={`${marker.percent}% complete`}
+    >
+      {marker.percent}%
+    </span>
   )
 }

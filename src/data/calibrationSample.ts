@@ -28,6 +28,21 @@ export const CALIBRATION_SAMPLE: CalibrationSample = {
   scanRange: 9,
 }
 
+/**
+ * Practice scan station: once the child takes the scanner out next to the
+ * rock, the view holds still on it (like the explorer's parts hunt) until
+ * the practice scan is done.
+ */
+export const PRACTICE_STATION_VIEW = {
+  /** World direction from the rock to the camera (toward the landing). */
+  direction: { x: 0.34, z: 0.94 },
+  distance: 4.2,
+  eyeHeight: 1.6,
+  lookHeight: 0.45,
+  /** The station starts when the scanner comes out this close to the rock. */
+  startRadius: 6,
+} as const
+
 /** What the reward card says after the practice scan. No unverified claims. */
 export const PRACTICE_SCAN_RESULT = {
   title: 'Practice rock',

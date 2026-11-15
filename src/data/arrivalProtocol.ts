@@ -394,6 +394,11 @@ export const OFF_TRAIL_LINE: ProtocolLine = {
   text: 'Let us stay on the signal trail.',
 }
 
+export const PRACTICE_STAY_LINE: ProtocolLine = {
+  id: 'protocol:practice-stay',
+  text: 'Almost there! Hold the scan on the practice rock, you can do it!',
+}
+
 export const LATER_LINE: ProtocolLine = {
   id: 'protocol:later',
   text: 'Later, pilot. The signal first.',

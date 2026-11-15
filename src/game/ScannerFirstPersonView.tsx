@@ -23,8 +23,8 @@ export function ScannerFirstPersonView() {
   return (
     <group ref={follow}>
       <group
-        position={[0.29, -0.27, -0.56]}
-        rotation={[0.02, Math.PI, 0.03]}
+        position={[0.27, -0.303, -0.56]}
+        rotation={[0.2, Math.PI + 0.3, 0.03]}
         scale={0.88}
       >
         <CosmicScannerDevice emitterName="FP_ScannerEmitter" />
