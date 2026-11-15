@@ -9,6 +9,9 @@ import { useGameStore } from '../../store/gameStore'
 import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore, type AlbumTab } from '../../store/onboardingStore'
 import { hubElementEnabled, useHubFocus } from '../../store/hubFocus'
+import { areAllMissionsComplete } from '../../store/journeyLogic'
+import { keepsakeDataFor } from '../keepsakeData'
+import { downloadKeepsake } from '../keepsakes'
 import { useAlbumPipSlot } from './albumPipSlot'
 import './album.css'
 
@@ -59,6 +62,9 @@ export function Passport({
   if (!save) return null
 
   const view = getPassportView(save)
+  // Every story delivered: the carrier is a Master Carrier and the
+  // finale's keepsakes stay downloadable from the album.
+  const master = areAllMissionsComplete(save)
   const tourClass = (target: string) =>
     focus.tourActive && focus.target === target ? ' is-tour-target' : ''
   // While PIP's tour explains the album, his own bubble sits in the PIP
@@ -270,14 +276,42 @@ export function Passport({
                       </div>
                     </SidePanel>
                   )}
-                  <div className={`ctab__carrier${tourClass('album-id')}`}>
+                  {master && tab === 'stamps' && (
+                    <SidePanel icon="stamp" title="My keepsakes">
+                      <div className="ctab__keepsakes">
+                        <button
+                          type="button"
+                          className="ctab__keepsake"
+                          aria-label="Download my certificate"
+                          onClick={() => {
+                            emitAudio('uiConfirm')
+                            void downloadKeepsake('certificate', keepsakeDataFor(save))
+                          }}
+                        >
+                          Certificate
+                        </button>
+                        <button
+                          type="button"
+                          className="ctab__keepsake"
+                          aria-label="Download PIP's postcard"
+                          onClick={() => {
+                            emitAudio('uiConfirm')
+                            void downloadKeepsake('postcard', keepsakeDataFor(save))
+                          }}
+                        >
+                          Postcard
+                        </button>
+                      </div>
+                    </SidePanel>
+                  )}
+                  <div className={`ctab__carrier${master ? ' is-master' : ''}${tourClass('album-id')}`}>
                     <span className="ctab__wing ctab__wing--l" aria-hidden="true" />
                     <span className="ctab__wing ctab__wing--r" aria-hidden="true" />
                     <span className="ctab__carrier-face" aria-hidden="true">
                       <Icon name="astronaut" />
                     </span>
                     <span className="ctab__carrier-text">
-                      <b>Cosmic Carrier</b>
+                      <b>{master ? 'Master Carrier' : 'Cosmic Carrier'}</b>
                       <span>
                         {view.carrierName} · ID {view.carrierId}
                       </span>

@@ -105,6 +105,66 @@ export const ALBUM_PHOTOS: Partial<Record<MissionId, readonly AlbumPhoto[]>> = {
         'Astronaut Alan Bean at Surveyor 3, with the lunar module behind. The crew took its camera back to Earth.',
     },
   ],
+  'apollo-11': [
+    {
+      src: 'album/apollo-11-1.webp',
+      title: 'Eagle on the Moon',
+      credit: 'July 1969 · NASA',
+      description:
+        'Eagle at Tranquility Base during the first moonwalk, with Buzz Aldrin standing beside it.',
+    },
+    {
+      src: 'album/apollo-11-2.webp',
+      title: 'Down the ladder',
+      credit: 'July 1969 · NASA',
+      description:
+        "Buzz Aldrin climbs down Eagle's ladder. It runs down the front leg, the same leg that carries the plaque.",
+    },
+    {
+      src: 'album/apollo-11-3.webp',
+      title: 'A message of peace',
+      credit: 'July 1969 · NASA',
+      description:
+        "The plaque on Eagle's ladder leg ends with: 'We came in peace for all mankind.'",
+    },
+    {
+      src: 'album/apollo-11-4.webp',
+      title: 'Tranquility Base from orbit',
+      credit: '2009 · NASA/GSFC/Arizona State University',
+      description:
+        "Forty years later, a spacecraft in orbit photographed the landing site, where Eagle's bottom half still stands.",
+    },
+  ],
+  'viking-1': [
+    {
+      src: 'album/viking-1-1.webp',
+      title: 'The first photo from Mars',
+      credit: 'July 1976 · NASA/JPL',
+      description:
+        'Minutes after landing, Viking 1 took the first photograph ever made on the surface of Mars, showing one of its own footpads.',
+    },
+    {
+      src: 'album/viking-1-2.webp',
+      title: 'Its first color picture',
+      credit: '1976 · NASA/JPL',
+      description:
+        "Viking 1's first color view of Chryse Planitia, a rocky plain covered in reddish dust.",
+    },
+    {
+      src: 'album/viking-1-3.webp',
+      title: 'Sunset at Chryse Planitia',
+      credit: 'NASA/JPL',
+      description:
+        'About 15 minutes before sunset, the low Sun lights up the rocks around Viking 1 and its landing leg.',
+    },
+    {
+      src: 'album/viking-1-4.webp',
+      title: 'Spotted from orbit',
+      credit: '2006 · NASA/JPL-Caltech/UArizona',
+      description:
+        'Thirty years after landing, a camera in orbit found Viking 1 still resting on the plain.',
+    },
+  ],
 }
 
 export function getAlbumPhotos(missionId: MissionId): readonly AlbumPhoto[] {

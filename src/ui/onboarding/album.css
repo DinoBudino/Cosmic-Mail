@@ -1254,3 +1254,33 @@
   .xcard__pop-item { width: 74px; }
   .xcard__pop-label { padding: 3px 8px; font-size: 0.74rem; }
 }
+
+/* Finished journey: Master Carrier badge and the finale's keepsakes. */
+.ctab__carrier.is-master {
+  background: linear-gradient(180deg, #ffc24a, #ff8a22);
+  box-shadow: 0 4px 0 #b4501a;
+  color: #2b1608;
+}
+.ctab__keepsakes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 2px 0 0;
+}
+.ctab__keepsake {
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 7px 8px;
+  white-space: nowrap;
+  border: none;
+  border-radius: 999px;
+  color: #2b1608;
+  background: linear-gradient(180deg, #ffc24a, #ff8a22);
+  box-shadow: 0 3px 0 #b4501a;
+  cursor: pointer;
+}
+.ctab__keepsake:focus-visible {
+  outline: 3px solid #5a9bff;
+  outline-offset: 2px;
+}
