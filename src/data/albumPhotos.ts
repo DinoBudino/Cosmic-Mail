@@ -102,7 +102,7 @@ export const ALBUM_PHOTOS: Partial<Record<MissionId, readonly AlbumPhoto[]>> = {
       title: 'A visit from Apollo 12',
       credit: 'November 1969 · NASA',
       description:
-        'Astronaut Alan Bean at Surveyor 3, with the lunar module behind. The crew took its camera back to Earth.',
+        'Astronaut Pete Conrad at Surveyor 3, with the lunar module behind. Alan Bean took the photo, and the crew carried its camera back to Earth.',
     },
   ],
   'apollo-11': [
