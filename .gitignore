@@ -68,3 +68,10 @@ blender/*.glb
 /blender/Earth/
 /blender/Mars/
 /blender/Moon/
+
+# Unedited Pixabay originals (not redistributable as standalone files)
+/audio-source/music/
+
+# Python caches
+__pycache__/
+*.pyc

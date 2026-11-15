@@ -38,6 +38,10 @@ npm test           # run tests
 
 React, Three.js (React Three Fiber), TypeScript, Vite and Zustand.
 
+## License
+
+The source code is released under the [MIT License](LICENSE). Music, sound effects, 3D planet models and NASA material keep their own licenses, listed below.
+
 ## Credits and sources
 
 ### Mission history and images
