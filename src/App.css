@@ -210,6 +210,39 @@
   flex: none;
 }
 
+.hud-album {
+  position: absolute;
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px 10px 12px;
+  border: 1px solid rgba(255, 138, 61, 0.55);
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--cream);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  animation: hud-rise 700ms 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hud-album:hover {
+  background: var(--glass-strong);
+  border-color: #ff8a3d;
+}
+
+.hud-album svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: #ffb36b;
+}
+
 .hud-quality {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -1118,6 +1151,12 @@
   .hud-settings {
     right: calc(12px + env(safe-area-inset-right, 0px));
     bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding: 9px 13px 9px 10px;
+  }
+
+  .hud-album {
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(62px + env(safe-area-inset-bottom, 0px));
     padding: 9px 13px 9px 10px;
   }
 }

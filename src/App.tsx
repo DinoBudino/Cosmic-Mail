@@ -20,6 +20,7 @@ import { SpiritInteraction } from './ui/SpiritInteraction'
 import { ShipInteraction } from './ui/ShipInteraction'
 import { CinematicOverlay } from './ui/CinematicOverlay'
 import { Hud } from './ui/Hud'
+import { AlbumOverlay } from './ui/AlbumOverlay'
 import { MissionPanel } from './ui/MissionPanel'
 import { ObjectiveBar } from './ui/ObjectiveBar'
 import { PipSpeech } from './ui/PipSpeech'
@@ -122,6 +123,7 @@ export default function App() {
             <MarsBriefing />
           </div>
           <SettingsMenu />
+          <AlbumOverlay />
           <SiteInteraction />
           <SpiritInteraction />
           <ShipInteraction />

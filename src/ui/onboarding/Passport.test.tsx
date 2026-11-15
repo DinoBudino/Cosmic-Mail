@@ -24,7 +24,6 @@ describe('Passport progressive disclosure', () => {
 
     expect(html).toContain('Explorer not yet identified')
     expect(html).toContain('No signal identified yet')
-    expect(html).toContain('Search pending')
     expect(html).not.toContain('Smart letter prepared')
     expect(html).not.toContain('Delivered to Earth')
   })
@@ -63,7 +62,7 @@ describe('Passport progressive disclosure', () => {
       smartLetterCreatedAt: 20,
     })
     expect(letter).toContain('Smart letter ready to transmit')
-    expect(letter).toContain('Awaiting delivery')
+    expect(letter).toContain('Smart letter')
     expect(letter).not.toContain('Delivered to Earth')
 
     const delivered = showProgress({

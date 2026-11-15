@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { EnvironmentalObjects } from './EnvironmentalObjects'
-import { LandedShip } from './LandedShip.tsx'
+import { LandedShip } from './LandedShipModel'
 import { LanderExplorer } from './LanderExplorer'
 import { LunarSky } from './LunarSky'
 import { LunarTerrain } from './LunarTerrain'

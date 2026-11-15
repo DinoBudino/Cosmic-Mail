@@ -7,6 +7,7 @@ export type MusicCueId =
   | 'intro'
   | 'cabin'
   | 'archiveFault'
+  | 'pipMemory'
   | 'hope'
   | 'launch'
   | 'mars'
@@ -38,6 +39,9 @@ export const MUSIC_CUES: Record<MusicCueId, MusicCue> = {
   intro: { assetId: 'music.menuAdventure', volume: 0.92, fadeMs: 1200 },
   cabin: { assetId: 'music.cabin', volume: 1, fadeMs: 1600 },
   archiveFault: { assetId: 'music.archiveFault', volume: 1, fadeMs: 900 },
+  // Same track, softer: PIP discovers his own missing memories. Sharing
+  // the asset only ramps the volume down, the music never restarts.
+  pipMemory: { assetId: 'music.archiveFault', volume: 0.5, fadeMs: 1600 },
   hope: { assetId: 'music.hope', volume: 1, fadeMs: 2200 },
   launch: { assetId: 'music.launchGalaxy', volume: 1, fadeMs: 1400 },
   mars: { assetId: 'music.mars', volume: 1, fadeMs: 2400 },
@@ -86,6 +90,10 @@ const HOPE_BEAT = Math.max(
   0,
   INTRO_BEATS.findIndex((beat) => beat.moment === 'hope'),
 )
+const PIP_MEMORY_BEAT = Math.max(
+  0,
+  INTRO_BEATS.findIndex((beat) => beat.subphase === 'pip-affected'),
+)
 
 /** The single source of truth for which music cue belongs to a scene. */
 export function sceneMusicFor(input: SceneMusicInput): MusicCueId {
@@ -93,6 +101,7 @@ export function sceneMusicFor(input: SceneMusicInput): MusicCueId {
 
   if (input.phase === 'intro') {
     if (input.dialogueIndex >= HOPE_BEAT) return 'hope'
+    if (input.dialogueIndex >= PIP_MEMORY_BEAT) return 'pipMemory'
     if (input.dialogueIndex >= FIRST_FAULT_BEAT) return 'archiveFault'
     return 'intro'
   }

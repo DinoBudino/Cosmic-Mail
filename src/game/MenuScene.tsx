@@ -13,13 +13,16 @@ import {
   type PlanetKind,
 } from '../data/destinations'
 import {
+  introBeatForLine,
   introCameraForLine,
   introEmotionForLine,
-  introHologramForLine,
+  introHologramTimeline,
   introMomentForLine,
+  type IntroAmbience,
   type IntroCameraShot,
   type IntroEmotion,
   type IntroMoment,
+  type IntroPipPanel,
 } from '../data/onboardingNarrative'
 import {
   getDestinationSummary,
@@ -27,10 +30,11 @@ import {
   STORY_STATUS_LABEL,
   type PassportView,
 } from '../data/passport'
-import { introHologramSvg } from '../ui/onboarding/introHologramTexture'
+import { introHologramSvg, pipPanelSvg } from '../ui/onboarding/introHologramTexture'
 import { emitAudio } from './audio/audioEvents'
-import { WindowHologram } from './WindowHologram'
+import { WindowHologram, type HologramFrame } from './WindowHologram'
 import { CabinCM01, CabinEffects, CabinMonitor } from './CabinCM01'
+import { CabinAlbumTablet } from './CabinAlbumTablet'
 import { cabinPoint } from './cabinLayout'
 import { HubPip, type HubPipExpression } from './HubPipModel'
 import { useGameStore } from '../store/gameStore'
@@ -89,6 +93,13 @@ const INTRO_CAMERA: Record<
   archive: {
     position: cabinPoint(0.1, -0.25, 0.42),
     look: cabinPoint(0, 3.4, 0.62),
+  },
+  // Solar storm sub-variation: a slight lean toward the window so the
+  // solar projection reads, with PIP (right presenter) still in frame.
+  // No turn, no shake, no aggressive zoom.
+  storm: {
+    position: cabinPoint(0.18, 0.1, 0.46),
+    look: cabinPoint(0.22, 3.4, 0.6),
   },
   pip: {
     position: cabinPoint(0.4, -0.35, 0.42),
@@ -1211,17 +1222,46 @@ const INTRO_POSES: Record<IntroMoment, PipPose> = {
   invitation: { ...cabinXYZ(-1.3, 2.15, 0.55), scale: 1.1, roll: -0.02, pitch: 0.03, yaw: 0, bob: 0.08, sway: 0.03, antenna: 0.1, lambda: 1.8 },
 }
 
+/**
+ * Acting on top of the scene pose, driven by the line's emotion so the
+ * body language changes with each line, not once per scene. Negative
+ * yaw turns PIP (right presenter) toward the window; zero faces the
+ * player.
+ */
 function poseForIntro(moment: IntroMoment, lineIndex: number): PipPose {
   const base: PipPose = { ...PIP_ANCHORS[INTRO_ANCHORS[moment]], ...INTRO_POSES[moment] }
+  const emotion = introEmotionForLine(lineIndex)
   if (moment === 'archive') {
-    return { ...base, yaw: lineIndex <= 2 ? -0.3 : -0.12 }
+    // Proud presenter: looks at the Archive, glancing back while curious.
+    return { ...base, yaw: emotion === 'curious' ? -0.16 : -0.3 }
   }
   if (moment === 'fault') {
-    return { ...base, yaw: lineIndex >= 9 ? 0 : -0.12 }
+    switch (emotion) {
+      case 'surprised':
+        // Head snaps toward the screen, a small tilt of surprise.
+        return { ...base, yaw: -0.34, roll: 0.09, pitch: 0.04, lambda: 3 }
+      case 'worried':
+        // Darting looks at the hologram, the float slightly broken.
+        return { ...base, yaw: -0.24, roll: -0.03 }
+      case 'focused':
+        // Moves a little closer to the window to read the alert.
+        return { ...base, x: base.x - 0.12, z: base.z - 0.08, yaw: -0.4, pitch: 0.02, lambda: 2.2 }
+      case 'explaining':
+        // Leans toward the projection, as if pointing at it.
+        return { ...base, x: base.x - 0.08, yaw: -0.3, roll: 0.12, pitch: 0.05 }
+      case 'sad':
+        // Looks down at himself: a small "checking my systems" gesture.
+        return { ...base, yaw: 0, pitch: -0.2, roll: 0.03 }
+      case 'thoughtful':
+        return { ...base, yaw: 0.06, pitch: 0.05, roll: -0.06 }
+      default:
+        return { ...base, yaw: -0.12 }
+    }
   }
-  if (moment === 'hope') return { ...base, yaw: 0.12 }
+  if (moment === 'hope') return { ...base, yaw: 0.12, pitch: emotion === 'excited' ? 0.08 : 0.05 }
   if (moment === 'invitation') {
-    return { ...base, pitch: lineIndex >= 12 ? 0.03 : 0.06, yaw: 0 }
+    // Looks straight at the player; the final ask is warm and open.
+    return { ...base, pitch: emotion === 'hopeful' ? 0.02 : 0.06, yaw: 0 }
   }
   return base
 }
@@ -1244,6 +1284,63 @@ function expressionForPhase(
 }
 
 /**
+ * The small hologram PIP projects just above his head (Mailwing's
+ * diagnostic, his own memory check). It lives in PIP's group, so it
+ * travels with him and faces the player with him; PIP is its emitter,
+ * nothing floats unsupported. It fades in, and cuts in reduced motion.
+ */
+function PipSidePanel({ panel }: { panel: IntroPipPanel }) {
+  const svg = useMemo(() => pipPanelSvg(panel), [panel])
+  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null)
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+
+  useEffect(() => {
+    let cancelled = false
+    let created: THREE.CanvasTexture | null = null
+    const image = new Image()
+    image.onload = () => {
+      if (cancelled) return
+      const canvas = document.createElement('canvas')
+      canvas.width = 480
+      canvas.height = 300
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      ctx.drawImage(image, 0, 0, 480, 300)
+      created = new THREE.CanvasTexture(canvas)
+      created.colorSpace = THREE.SRGBColorSpace
+      setTexture(created)
+    }
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    return () => {
+      cancelled = true
+      created?.dispose()
+    }
+  }, [svg])
+
+  useFrame((_, delta) => {
+    const material = materialRef.current
+    if (!material) return
+    material.opacity = reducedMotion ? 0.95 : THREE.MathUtils.damp(material.opacity, 0.95, 5, delta)
+  })
+
+  if (!texture) return null
+  return (
+    <group position={[0.08, 0.5, 0.02]}>
+      {/* Thin beam from PIP's antenna up to the panel. */}
+      <mesh position={[-0.08, -0.17, 0]}>
+        <planeGeometry args={[0.008, 0.16]} />
+        <meshBasicMaterial color={panel === 'diagnostic' ? '#FFA24A' : '#8FE3D8'} transparent opacity={0.55} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh renderOrder={6}>
+        <planeGeometry args={[0.6, 0.375]} />
+        <meshBasicMaterial ref={materialRef} map={texture} transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>
+    </group>
+  )
+}
+
+/**
  * PIP in the onboarding cabin, rendered from the production GLB
  * (PIP_RetroSpacePost). The cabin owns narrative staging: anchors,
  * facing the player, bob, body sway and the celebration hop. The loaded
@@ -1255,12 +1352,17 @@ function CabinPip() {
   const boardingStage = useOnboardingStore((state) => state.boardingStage)
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const pipTalking = useOnboardingStore((state) => state.pipTalking)
+  const introReplay = useOnboardingStore((state) => state.introReplay)
   const hubView = phase === 'hub' || phase === 'launching'
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const expression = expressionForPhase(phase, dialogueIndex)
   const hubExpression: HubPipExpression = expression
   const isIntro = phase === 'intro'
   const moment: IntroMoment | null = isIntro ? introMomentForLine(dialogueIndex) : null
+  const beat = isIntro ? introBeatForLine(dialogueIndex) : null
+  // A fresh token per line (and per Replay) retriggers the eye glitch.
+  const glitchToken = beat?.pipGlitch ? `${dialogueIndex}:${introReplay}` : null
+  const sidePanel = beat?.pipPanel ?? null
   // Intro poses per moment; registration stays frontal; the hub glides
   // to the diagonal control-center spot. No questions/reveal/hero poses.
   const targetPose: PipPose = isIntro && moment
@@ -1295,13 +1397,17 @@ function CabinPip() {
     // hope and welcome restore the usual energy. No teleporting: the same
     // damped pose pipeline carries every change.
     const energy =
-      expression === 'worried' || expression === 'sad' || expression === 'thoughtful'
-        ? 0.55
-        : expression === 'surprised'
-          ? 0.82
-          : expression === 'curious'
-            ? 0.9
-            : 1
+      expression === 'sad'
+        ? 0.4
+        : expression === 'worried' || expression === 'thoughtful'
+          ? 0.55
+          : expression === 'focused'
+            ? 0.7
+            : expression === 'surprised'
+              ? 0.82
+              : expression === 'curious' || expression === 'explaining'
+                ? 0.9
+                : 1
     const emotionalSink =
       expression === 'sad' || expression === 'worried'
         ? -0.07
@@ -1418,7 +1524,9 @@ function CabinPip() {
         reducedMotion={reducedMotion}
         antennaAmplitude={targetPose.antenna}
         scale={0.64}
+        glitchToken={glitchToken}
       />
+      {sidePanel && <PipSidePanel panel={sidePanel} />}
     </group>
   )
 }
@@ -2414,7 +2522,7 @@ function MissionAlbumHit({ onHover }: { onHover: (hovered: boolean) => void }) {
         document.body.style.cursor = 'auto'
       }}
     >
-      <boxGeometry args={[0.72, 0.16, 0.86]} />
+      <boxGeometry args={[0.8, 0.2, 0.62]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
   )
@@ -2425,14 +2533,33 @@ function MissionAlbumHit({ onHover }: { onHover: (hovered: boolean) => void }) {
 function MemoryWindowHolograms() {
   const phase = useOnboardingStore((state) => state.phase)
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
+  const introReplay = useOnboardingStore((state) => state.introReplay)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
 
-  const introSvg =
-    phase === 'intro'
-      ? introHologramSvg(introHologramForLine(dialogueIndex))
-      : null
+  // Every still of the line's animation (reduced motion: the settled one).
+  const frames = useMemo<HologramFrame[]>(() => {
+    if (phase !== 'intro') return []
+    return introHologramTimeline(dialogueIndex, reducedMotion).flatMap((frame) => {
+      const svg = introHologramSvg(frame.state, frame.variant)
+      return svg ? [{ svg, at: frame.at }] : []
+    })
+  }, [phase, dialogueIndex, reducedMotion])
 
-  return introSvg ? <WindowHologram svg={introSvg} /> : null
+  return frames.length > 0 ? (
+    <WindowHologram frames={frames} playKey={`${dialogueIndex}:${introReplay}`} />
+  ) : null
 }
+
+/** Strength (0..1) of the orange emergency glow for each intro mood. */
+const INTRO_ALERT_LEVEL: Record<IntroAmbience, number> = {
+  calm: 0,
+  warning: 0.45,
+  storm: 0.85,
+  soft: 0.25,
+  hope: 0,
+}
+const RIM_CALM = new THREE.Color('#8FE3D8')
+const RIM_ALERT = new THREE.Color('#FFA24A')
 
 /** Scale of the navigation screen inside the CM-01 nav recess (1.22 x 0.68). */
 const NAV_SCREEN_SCALE = 1.35
@@ -2453,6 +2580,7 @@ function CabinInterior() {
   const groupRef = useRef<THREE.Group>(null)
   const windowDarkRef = useRef<THREE.MeshBasicMaterial>(null)
   const windowRimRef = useRef<THREE.MeshBasicMaterial>(null)
+  const alertLightRef = useRef<THREE.PointLight>(null)
   const [albumHovered, setAlbumHovered] = useState(false)
   // The launch countdown happens INSIDE the cabin (seated, PIP
   // talking); from liftoff on, the wide menu shot returns.
@@ -2492,6 +2620,23 @@ function CabinInterior() {
         delta,
       )
     }
+
+    // Emergency mood of the intro: soft orange reflections grow with
+    // the solar storm and fade back to the usual cyan when hope returns.
+    // Leaving the intro (Continue, Skip) always clears them.
+    const ambience: IntroAmbience =
+      phase === 'intro' ? introBeatForLine(dialogueIndex).ambience : 'calm'
+    const alert = INTRO_ALERT_LEVEL[ambience]
+    if (alertLightRef.current) {
+      const light = alertLightRef.current
+      light.intensity = reducedMotion
+        ? alert * 3
+        : THREE.MathUtils.damp(light.intensity, alert * 3, 1.6, delta)
+    }
+    if (windowRimRef.current) {
+      const rim = windowRimRef.current.color
+      rim.lerpColors(RIM_CALM, RIM_ALERT, Math.min(1, alert * 1.4))
+    }
   })
 
   if (!cabin && phase !== 'launching') return null
@@ -2505,8 +2650,6 @@ function CabinInterior() {
         <CabinCM01
           launching={phase === 'launching'}
           reducedMotion={reducedMotion}
-          albumHovered={albumHovered}
-          albumHidden={albumHidden}
           slots={{
             NAV: (
               <group scale={NAV_SCREEN_SCALE}>
@@ -2529,9 +2672,10 @@ function CabinInterior() {
             ),
             ALBUM: albumHidden ? null : (
               <>
+                <CabinAlbumTablet hovered={albumHovered} />
                 <MissionAlbumHit onHover={setAlbumHovered} />
                 <TourHighlight element="album">
-                  <TourBeacon width={0.8} depth={0.94} arrowHeight={0.45} />
+                  <TourBeacon width={0.84} depth={0.66} arrowHeight={0.45} />
                 </TourHighlight>
               </>
             ),
@@ -2585,6 +2729,8 @@ function CabinInterior() {
       <pointLight position={[0, 1.55, -1.6]} intensity={4} distance={7} color="#FFE9D2" />
       <pointLight position={[0, 0.4, -3.9]} intensity={3.5} distance={4.5} color="#FF9A4A" />
       <pointLight position={[-0.9, -0.3, -2.4]} intensity={1.2} distance={2.2} color="#5FE0CF" />
+      {/* Intro emergency glow, off (0) unless the storm beats call it. */}
+      <pointLight ref={alertLightRef} position={[0, 0.5, -3.7]} intensity={0} distance={6} color="#FF8A3D" />
 
       <CabinPip />
     </group>

@@ -9,11 +9,7 @@ import { ScanFx } from './ScanFx'
 import { getActiveExplorer } from '../data/spiritSite'
 import { LanderExplorer } from './LanderExplorer'
 import { MerRover } from './MerRover'
-<<<<<<< Updated upstream
-import { LandedShip } from './LandedShip.tsx'
-=======
 import { LandedShip } from './LandedShipModel'
->>>>>>> Stashed changes
 import { Terrain } from './Terrain'
 
 export function MarsWorld() {

@@ -15,85 +15,127 @@
   },
   {
     "key": "intro-03",
-    "text": "Every explorer has a file in the Cosmic Archive. Look how they're all connected.",
-    "speed": 1.04,
+    "text": "Every explorer has a file in the Cosmic Archive.",
+    "speed": 1.06,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
     "key": "intro-04",
-    "text": "Oh! That file just lost its connection.",
-    "speed": 1.02,
+    "text": "Look how they're all connected!",
+    "speed": 1.04,
     "category": "onboarding",
-    "pitch": 1.06
+    "pitch": 1.05
   },
   {
     "key": "intro-05",
-    "text": "And another one, and another. They're all going dark!",
-    "speed": 1.06,
+    "text": "Oh! That file just lost its connection.",
+    "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.07
   },
   {
     "key": "intro-06",
-    "text": "Hmm, that's strange. Let me take a closer look.",
-    "speed": 0.96,
+    "text": "And another one, and another... They're all going dark!",
+    "speed": 1.0,
     "category": "onboarding",
     "pitch": 1.04
   },
   {
     "key": "intro-07",
-    "text": "The Archive is trying to fix them, but the pieces don't fit together.",
+    "text": "Wait... Mailwing just detected something unusual!",
     "speed": 0.98,
     "category": "onboarding",
     "pitch": 1.03
   },
   {
     "key": "intro-08",
-    "text": "Oh no. Now none of the files can connect.",
-    "speed": 0.94,
+    "text": "Oh! A powerful solar storm!",
+    "speed": 1.04,
     "category": "onboarding",
-    "pitch": 1.02
+    "pitch": 1.07
   },
   {
     "key": "intro-09",
+    "text": "It sent energy and particles into space, disrupting our communication network!",
+    "speed": 1.0,
+    "category": "onboarding",
+    "pitch": 1.04
+  },
+  {
+    "key": "intro-10",
+    "text": "The storm disrupted the Archive while its memories were being updated!",
+    "speed": 1.0,
+    "category": "onboarding",
+    "pitch": 1.04
+  },
+  {
+    "key": "intro-11",
+    "text": "Now some of the explorers' stories are incomplete!",
+    "speed": 1.0,
+    "category": "onboarding",
+    "pitch": 1.04
+  },
+  {
+    "key": "intro-12",
+    "text": "The Archive is trying to fix them...",
+    "speed": 1.0,
+    "category": "onboarding",
+    "pitch": 1.04
+  },
+  {
+    "key": "intro-13",
+    "text": "But the pieces don't fit together!",
+    "speed": 0.9,
+    "category": "onboarding",
+    "pitch": 1.0
+  },
+  {
+    "key": "intro-14",
     "text": "And some of my own memories are missing too.",
     "speed": 0.9,
     "category": "onboarding",
     "pitch": 1.0
   },
   {
-    "key": "intro-10",
-    "text": "I know these explorers, but I can't remember what they discovered.",
-    "speed": 0.94,
+    "key": "intro-15",
+    "text": "I know these explorers... but I can't remember what they discovered.",
+    "speed": 0.92,
     "category": "onboarding",
-    "pitch": 1.02
+    "pitch": 1.01
   },
   {
-    "key": "intro-11",
-    "text": "Wait, I still remember two places where their signals came from!",
+    "key": "intro-16",
+    "text": "Wait! I still remember two places where their signals came from!",
     "speed": 1.1,
     "category": "onboarding",
     "pitch": 1.08
   },
   {
-    "key": "intro-12",
-    "text": "If we fly there, we can find the explorers and fix their stories.",
-    "speed": 1.08,
+    "key": "intro-17",
+    "text": "If we fly there, we can find the explorers and recover their missing stories!",
+    "speed": 1.06,
     "category": "onboarding",
-    "pitch": 1.06
+    "pitch": 1.05
   },
   {
-    "key": "intro-13",
-    "text": "Lots of files are waiting, and their signals have gone quiet.",
-    "speed": 1.0,
-    "category": "onboarding",
-    "pitch": 1.04
-  },
-  {
-    "key": "intro-14",
-    "text": "So, will you help me bring their stories home?",
+    "key": "intro-18",
+    "text": "Lots of explorers' stories are still waiting to be remembered.",
     "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "intro-19",
+    "text": "We can find them, rebuild their memories, and send their stories home!",
+    "speed": 1.1,
+    "category": "onboarding",
+    "pitch": 1.08
+  },
+  {
+    "key": "intro-20",
+    "text": "So... will you help me?",
+    "speed": 1.0,
     "category": "onboarding",
     "pitch": 1.06
   },
@@ -113,56 +155,56 @@
   },
   {
     "key": "hub-tour-1",
-    "text": "That book on the console is your mission album. Tap it to open it.",
+    "text": "Your mission album is on the console. Tap it to open it.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
     "key": "hub-tour-2",
-    "text": "This first page is your Carrier ID. It shows your name and how many stories we've restored.",
+    "text": "This is your Cosmic Album! Here you see your carrier badge and how far we've come.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
     "key": "hub-tour-3",
-    "text": "The Record page shows every explorer story and what we need to do next.",
+    "text": "Each card is an explorer we're looking for. It fills up as we find it and send its story home.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
     "key": "hub-tour-4",
-    "text": "Now tap Stamps.",
-    "speed": 1.06,
-    "category": "onboarding",
-    "pitch": 1.06
-  },
-  {
-    "key": "hub-tour-5",
-    "text": "Every story we deliver to Earth earns a stamp here.",
-    "speed": 1.04,
-    "category": "onboarding",
-    "pitch": 1.05
-  },
-  {
-    "key": "hub-tour-6",
     "text": "Now tap Discoveries.",
     "speed": 1.06,
     "category": "onboarding",
     "pitch": 1.06
   },
   {
+    "key": "hub-tour-5",
+    "text": "This is the photo lab. Every part you scan opens a new photo and a new fact!",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-tour-6",
+    "text": "Now tap Stamps.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.06
+  },
+  {
     "key": "hub-tour-7",
-    "text": "Discoveries keeps the facts you find while exploring.",
+    "text": "Every story we deliver to Earth earns a stamp here.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
     "key": "hub-tour-8",
-    "text": "You can open your album any time. Tap Back to cabin to close it.",
+    "text": "You can open your album any time, even while exploring. Tap the X to close it.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05

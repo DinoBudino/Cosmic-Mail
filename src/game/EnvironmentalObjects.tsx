@@ -9,13 +9,10 @@ import {
 } from '../data/environmentalSites'
 import { useProtocol } from '../ui/useProtocol'
 import { useGameStore } from '../store/gameStore'
-<<<<<<< Updated upstream
 import { getActiveWorld } from '../data/spiritSite'
-import { buildRockGeometry, buildTintedRockGeometry } from './landscape'
+import { buildTintedRockGeometry } from './landscape'
 import { MOON_ROCK } from './lunarRocks'
-=======
 import { useMarsRockGeometries, useMarsSurface } from './marsSurface'
->>>>>>> Stashed changes
 import { getTerrainHeight } from './terrainHeight'
 import { TerrainRing } from './TerrainRing'
 import { PALETTE } from './worldConfig'
@@ -66,17 +63,15 @@ function EnvironmentalVisual({
 }) {
   const ground = getTerrainHeight(site.position.x, site.position.z)
   const glow = selected ? 0.18 + (analysis === 'detailed' ? 0.22 : 0) : 0
-<<<<<<< Updated upstream
-  // On the Moon the practice rock is a gray lunar rock.
+  // On the Moon the practice rock is a gray lunar rock; on Mars it uses the
+  // textured basalt rocks.
   const moon = getActiveWorld() === 'moon'
-  const rockGeometry = useMemo(() => (moon ? buildTintedRockGeometry(1, 3, MOON_ROCK.dust) : buildRockGeometry(1)), [moon])
-  const chipGeometry = useMemo(() => (moon ? buildTintedRockGeometry(2, 2, MOON_ROCK.dust) : buildRockGeometry(2, 2)), [moon])
-  useEffect(() => () => rockGeometry.dispose(), [rockGeometry])
-  useEffect(() => () => chipGeometry.dispose(), [chipGeometry])
-=======
   const rocks = useMarsRockGeometries()
   const surface = useMarsSurface('basalt')
->>>>>>> Stashed changes
+  const moonRock = useMemo(() => (moon ? buildTintedRockGeometry(1, 3, MOON_ROCK.dust) : null), [moon])
+  const moonChip = useMemo(() => (moon ? buildTintedRockGeometry(2, 2, MOON_ROCK.dust) : null), [moon])
+  useEffect(() => () => moonRock?.dispose(), [moonRock])
+  useEffect(() => () => moonChip?.dispose(), [moonChip])
 
   return (
     <group
@@ -92,7 +87,7 @@ function EnvironmentalVisual({
       {site.visual === 'rock' && (
         <>
           <mesh
-            geometry={rocks[0]}
+            geometry={moonRock ?? rocks[0]}
             position={[0, 0.32, 0]}
             rotation={[0.12, site.position.z * 0.13, 0.08]}
             scale={[1.35, 0.78, 1.05]}
@@ -100,26 +95,19 @@ function EnvironmentalVisual({
             receiveShadow
           >
             <meshStandardMaterial
-<<<<<<< Updated upstream
+              {...(moon ? { vertexColors: true } : surface)}
               color={moon ? MOON_ROCK.dark : PALETTE.rockDark}
-              roughness={0.95}
-              vertexColors
-=======
-              {...surface}
-              color={PALETTE.rockDark}
-              roughness={1}
->>>>>>> Stashed changes
+              roughness={moon ? 0.95 : 1}
               emissive={PALETTE.accent}
               emissiveIntensity={glow}
             />
           </mesh>
-<<<<<<< Updated upstream
-          <mesh geometry={chipGeometry} position={[1.55, 0.1, 0.85]} scale={[0.42, 0.32, 0.48]} castShadow>
-            <meshStandardMaterial color={moon ? MOON_ROCK.light : PALETTE.rockLight} roughness={0.98} vertexColors />
-=======
-          <mesh geometry={rocks[2]} position={[1.55, 0.1, 0.85]} scale={[0.42, 0.32, 0.48]} castShadow receiveShadow>
-            <meshStandardMaterial {...surface} color={PALETTE.rockLight} roughness={1} />
->>>>>>> Stashed changes
+          <mesh geometry={moonChip ?? rocks[2]} position={[1.55, 0.1, 0.85]} scale={[0.42, 0.32, 0.48]} castShadow receiveShadow>
+            <meshStandardMaterial
+              {...(moon ? { vertexColors: true } : surface)}
+              color={moon ? MOON_ROCK.light : PALETTE.rockLight}
+              roughness={moon ? 0.98 : 1}
+            />
           </mesh>
         </>
       )}

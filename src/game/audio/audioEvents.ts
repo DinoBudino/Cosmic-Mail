@@ -34,6 +34,9 @@ export type AudioEvent =
   | 'archiveQuery'
   | 'archiveClosed'
   | 'archiveFaultStarted'
+  | 'archiveFaultGlitch'
+  | 'solarAlert'
+  | 'solarStormReplay'
   | 'archiveConnectionLost'
   | 'archiveQueryFailed'
   | 'archiveClueRecovered'
@@ -133,6 +136,11 @@ export const EVENT_PLANS: Record<AudioEvent, AudioEventPlan> = {
     sfx: ['archive.glitch', 'archive.connectionLost', 'pip.worried'],
     duckMs: 900,
   },
+  // Intro solar storm: a short soft warning and a low technological
+  // swell for the solar hologram. Never an alarm or an explosion.
+  archiveFaultGlitch: { sfx: ['archive.glitchSoft'] },
+  solarAlert: { sfx: ['archive.queryFailed', 'pip.attention'], duckMs: 600 },
+  solarStormReplay: { sfx: ['archive.activate', 'ui.hologram'] },
   archiveConnectionLost: {
     sfx: ['archive.connectionLost', 'archive.glitchSoft'],
   },

@@ -130,6 +130,8 @@ interface GameState {
   voiceVolume: number
   muted: boolean
   settingsOpen: boolean
+  /** Cosmic Album tablet opened from the HUD while exploring. */
+  albumOpen: boolean
   nearbySiteId: MarsObjectId | null
   activeSiteId: MarsObjectId | null
   /** Spirit's contextual scan range (independent from the four legacy sites). */
@@ -264,6 +266,8 @@ interface GameState {
   setMuted: (muted: boolean) => void
   openSettings: () => void
   closeSettings: () => void
+  openAlbum: () => void
+  closeAlbum: () => void
 }
 
 const initialSettings = loadSettings()
@@ -299,6 +303,7 @@ export const useGameStore = create<GameState>((set, get) => {
   voiceVolume: initialSettings.voiceVolume,
   muted: initialSettings.muted,
   settingsOpen: false,
+  albumOpen: false,
   nearbySiteId: null,
   activeSiteId: null,
   nearbySpirit: false,
@@ -347,6 +352,7 @@ export const useGameStore = create<GameState>((set, get) => {
   startTravel: (id) => {
     if (
       get().settingsOpen ||
+      get().albumOpen ||
       get().activeSiteId ||
       get().scannerOpen ||
       get().scannerEquipped ||
@@ -375,6 +381,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (
       state.landmarksLocked ||
       state.settingsOpen ||
+      state.albumOpen ||
       state.activeSiteId ||
       state.scannerOpen ||
       state.scannerEquipped ||
@@ -396,6 +403,7 @@ export const useGameStore = create<GameState>((set, get) => {
     const state = get()
     if (
       state.settingsOpen ||
+      state.albumOpen ||
       state.activeSiteId ||
       state.scannerOpen ||
       state.scannerCardComponentId ||
@@ -444,6 +452,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (
       state.scannerLocked ||
       state.settingsOpen ||
+      state.albumOpen ||
       state.activeSiteId ||
       state.scannerOpen ||
       state.scannerCardComponentId ||
@@ -631,6 +640,7 @@ export const useGameStore = create<GameState>((set, get) => {
     const state = get()
     if (
       state.settingsOpen ||
+      state.albumOpen ||
       state.activeSiteId ||
       state.archiveView !== 'none' ||
       state.scannerOpen
@@ -767,6 +777,40 @@ export const useGameStore = create<GameState>((set, get) => {
     clearInput()
     set({ settingsOpen: false })
   },
+  openAlbum: () => {
+    const state = get()
+    if (
+      state.settingsOpen ||
+      state.albumOpen ||
+      state.activeSiteId ||
+      state.scannerOpen ||
+      state.marsBriefingStep !== null ||
+      state.archiveView !== 'none'
+    ) {
+      return
+    }
+    clearInput()
+    set({
+      albumOpen: true,
+      travelTargetId: null,
+      scannerEquipped: false,
+      scannerMissionId: null,
+      scannerSelectedComponentId: null,
+      scannerEnvironmentalId: null,
+      scannerTargetKind: null,
+      scannerPhysicalState: 'idle',
+      scannerAnalysis: 'idle',
+      scannerTriggerHeld: false,
+      scannerLatched: false,
+      scannerScanProgress: 0,
+      scannerCardComponentId: null,
+      scannerRecordsOpen: false,
+    })
+  },
+  closeAlbum: () => {
+    clearInput()
+    set({ albumOpen: false })
+  },
   }
 })
 
@@ -776,6 +820,7 @@ export function isWorldPaused(): boolean {
     isOnboardingActive() ||
     state.marsBriefingStep !== null ||
     state.settingsOpen ||
+    state.albumOpen ||
     state.activeSiteId !== null ||
     state.scannerOpen ||
     state.scannerCardComponentId !== null ||

@@ -139,30 +139,16 @@ export function Hub() {
 
       {passportDetailOpen && (
         <div
-          className={`passport-detail${focus.tourActive ? ' passport-detail--tour' : ''}`}
+          className="passport-detail"
           onClick={(event) => {
             if (event.target === event.currentTarget) requestClose()
           }}
         >
           <div
-            className={`passport-detail__card${
-              closing ? ' is-closing' : ''
-            }`}
+            className={`passport-detail__card${closing ? ' is-closing' : ''}`}
             onAnimationEnd={closing ? finishClose : undefined}
           >
-            <Passport pinned />
-            <button
-              type="button"
-              className={`settings-resume passport-detail__close${
-                focus.tourActive && focus.target === 'album-close'
-                  ? ' is-tour-target'
-                  : ''
-              }`}
-              disabled={!albumCloseEnabled}
-              onClick={closeDetail}
-            >
-              Back to cabin
-            </button>
+            <Passport onClose={closeDetail} />
           </div>
         </div>
       )}

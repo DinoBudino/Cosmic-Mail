@@ -35,6 +35,9 @@ interface OnboardingState {
   /** Current subtitle/hub-tour line. */
   dialogueIndex: number
   setDialogueIndex: (index: number) => void
+  /** Bumped by the intro's Replay: restarts the line's hologram animation. */
+  introReplay: number
+  replayIntroLine: () => void
   /** Navigation close-up inside the cabin. */
   routeOpen: boolean
   setRouteOpen: (open: boolean) => void
@@ -75,6 +78,7 @@ const EMPTY_PRESENTATION = {
   boardingStage: 'approach' as BoardingStage,
   pipTalking: false,
   dialogueIndex: 0,
+  introReplay: 0,
   routeOpen: false,
   selectedDestination: null,
   routeConfirmed: false,
@@ -96,6 +100,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   setBoardingStage: (boardingStage) => set({ boardingStage }),
   setPipTalking: (pipTalking) => set({ pipTalking }),
   setDialogueIndex: (dialogueIndex) => set({ dialogueIndex }),
+  replayIntroLine: () => set((state) => ({ introReplay: state.introReplay + 1 })),
   setRouteOpen: (routeOpen) => {
     if (routeOpen && get().phase !== 'hub') return
     set({ routeOpen })

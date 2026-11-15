@@ -11,6 +11,8 @@ export type EscapeAction =
 
 export interface EscapeState {
   settingsOpen: boolean
+  /** The album tablet closes itself on Escape. */
+  albumOpen?: boolean
   activeSiteId: string | null
   scannerOpen: boolean
   archiveView: 'none' | 'full-scan' | 'smart-letter' | 'reconstruction'
@@ -22,6 +24,7 @@ export interface EscapeState {
 export function getEscapeAction(state: EscapeState): EscapeAction {
   if (
     state.settingsOpen ||
+    state.albumOpen ||
     state.activeSiteId ||
     state.scannerOpen ||
     state.archiveView !== 'none'

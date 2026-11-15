@@ -527,15 +527,10 @@ export function Terrain({ quality }: TerrainProps) {
           metalness={0}
         />
       </mesh>
-<<<<<<< Updated upstream
-      <Rocks quality={quality} />
-      {/* Wheel ruts only lead to a rover: Viking 1 never drove. */}
-      {getActiveExplorer() !== 'viking-1' && <RoverTracks />}
-=======
       <Rocks quality={quality} terrain={geometry} />
       <Gravel quality={quality} terrain={geometry} />
-      <RoverTracks />
->>>>>>> Stashed changes
+      {/* Wheel ruts only lead to a rover: Viking 1 never drove. */}
+      {getActiveExplorer() !== 'viking-1' && <RoverTracks />}
       <FootprintTrail />
     </group>
   )

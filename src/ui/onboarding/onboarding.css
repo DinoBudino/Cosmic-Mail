@@ -1510,6 +1510,8 @@
 .cine__skip { margin-left: 0; }
 .cine__replay:hover, .cine__skip:hover { color: var(--cream); border-color: rgba(253,244,236,.25); }
 .cine__subtitle-text { margin: 4px 0 0; font-size: clamp(.98rem, 2.4vw, 1.12rem); line-height: 1.42; color: var(--cream); min-height: 2.2em; }
+/* Not-yet-typed text keeps its space so the bar never jumps while typing. */
+.cine__subtitle-rest { visibility: hidden; }
 .cine__actions { display: flex; justify-content: center; margin-top: 8px; }
 .cine__action { min-height: 46px; padding: 10px 24px; font-size: 1rem; box-shadow: 0 0 26px -6px rgba(143,227,216,.55); }
 .cine__action:focus-visible { outline: 2px solid #8FE3D8; outline-offset: 3px; }
@@ -2188,12 +2190,6 @@
 @media (prefers-reduced-motion: reduce) {
   .pip-bubble-wrap--docked,
   .is-tour-target { animation: none; }
-}
-
-/* While PIP explains the album, it sits a little lower so his docked
-   bubble never covers the tabs. */
-.passport-detail--tour {
-  padding-top: 118px;
 }
 
 /* ------------------------------------------------------------ Mars orbit */

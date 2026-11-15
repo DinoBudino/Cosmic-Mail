@@ -41,15 +41,12 @@ export type CabinSlot = 'NAV' | 'BUTTON' | 'ALBUM' | 'SCREEN_L' | 'SCREEN_R'
 
 type CabinProps = {
   slots: Partial<Record<CabinSlot, ReactNode>>
-  /** Hover/open state of the album prop, which lives in the GLB. */
-  albumHovered?: boolean
-  albumHidden?: boolean
   /** Launch countdown: the ring and amber lights flash with every count. */
   launching?: boolean
   reducedMotion?: boolean
 }
 
-export function CabinCM01({ slots, albumHovered = false, albumHidden = false, launching = false, reducedMotion = false }: CabinProps) {
+export function CabinCM01({ slots, launching = false, reducedMotion = false }: CabinProps) {
   const { scene } = useGLTF(CABIN_URL)
   const model = useMemo(() => {
     const root = scene.clone(true)
@@ -84,16 +81,12 @@ export function CabinCM01({ slots, albumHovered = false, albumHidden = false, la
         if (material.name === 'CM_RING_LIGHT') ringLights.push(material)
       }
     })
-    const album = root.getObjectByName('ALBUM') ?? null
-    return { root, anchors, lanterns, ringLights, album, albumScale: album?.scale.clone() }
+    // The old album book of the GLB is replaced by the tablet mounted on
+    // the ALBUM anchor (CabinAlbumTablet).
+    const album = root.getObjectByName('ALBUM')
+    if (album) album.visible = false
+    return { root, anchors, lanterns, ringLights }
   }, [scene])
-
-  useEffect(() => {
-    const { album, albumScale } = model
-    if (!album || !albumScale) return
-    album.visible = !albumHidden
-    album.scale.copy(albumScale).multiplyScalar(albumHovered ? 1.05 : 1)
-  }, [model, albumHovered, albumHidden])
 
   const lanternL = useRef<THREE.PointLight>(null)
   const lanternR = useRef<THREE.PointLight>(null)

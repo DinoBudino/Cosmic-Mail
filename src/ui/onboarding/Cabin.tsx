@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   REGISTRATION_LINE,
   type HubAwait,
@@ -11,6 +12,7 @@ import { useOnboardingStore } from '../../store/onboardingStore'
 import { PipAvatar } from '../PipSpeech'
 import { useAdvanceAnywhere } from '../useAdvanceAnywhere'
 import { isCoarsePointer } from '../../game/missionNarrative'
+import { useAlbumPipSlot } from './albumPipSlot'
 
 /** PIP's dialogue steps for the current cabin step. */
 function useDialogueSteps(): HubDialogueStep[] {
@@ -26,7 +28,7 @@ const AWAIT_HINT: Record<HubAwait, string> = {
   album: 'Tap the mission album',
   'tab-stamps': 'Tap Stamps',
   'tab-discoveries': 'Tap Discoveries',
-  'album-close': 'Tap Back to cabin',
+  'album-close': 'Tap the X to close the album',
   nav: 'Tap the navigation screen',
   destination: 'Tap a place with a signal',
   confirm: 'Tap Confirm route',
@@ -229,7 +231,10 @@ export function Cabin({ children }: { children: ReactNode }) {
   const stepPlace = step?.place ?? 'cabin'
   const bubbleHidden =
     phase === 'intro' || (phase === 'hub' && stepPlace !== place)
-  const docked = phase === 'hub' && place !== 'cabin'
+  // In the album PIP talks from the tablet's own PIP corner.
+  const albumSlot = useAlbumPipSlot((state) => state.slot)
+  const inAlbum = phase === 'hub' && place === 'album' && albumSlot !== null
+  const docked = phase === 'hub' && place !== 'cabin' && !inAlbum
 
   // A click anywhere (or Space / Enter) moves PIP's tour on, so the child
   // never has to aim at the bubble. Steps that wait for the child to open
@@ -239,73 +244,76 @@ export function Cabin({ children }: { children: ReactNode }) {
   useAdvanceAnywhere(canAdvanceAnywhere, handleBubbleClick, `${dialogueIndex}-${line}`)
   const touch = isCoarsePointer()
 
+  const bubble = (
+    <div
+      className={`pip-bubble-wrap pip-bubble-wrap--${phase}${
+        docked ? ' pip-bubble-wrap--docked' : ''
+      }${inAlbum ? ' pip-bubble-wrap--album' : ''}`}
+      ref={bubbleRef}
+      style={{
+        transform:
+          !docked && !inAlbum && liftPx > 0 ? `translateY(${-liftPx}px)` : undefined,
+      }}
+    >
+      <button
+        type="button"
+        className={`pip-bubble${awaits ? ' pip-bubble--awaits' : ''}`}
+        onClick={handleBubbleClick}
+        aria-label={
+          awaits && typingDone
+            ? AWAIT_HINT[awaits]
+            : typingDone && !isLastLine
+              ? 'Continue'
+              : 'PIP is speaking'
+        }
+      >
+        <PipAvatar />
+        <span className="pip-bubble__body">
+          <span className="pip-bubble__name">PIP</span>
+          <PipLine
+            key={`${line}-${dialogueIndex}`}
+            line={line}
+            skipNonce={skipNonce}
+            onDone={handleDone}
+          />
+          {awaits ? (
+            <span className="pip-bubble__task">
+              <span className="pip-bubble__task-dot" aria-hidden="true" />
+              {AWAIT_HINT[awaits]}
+            </span>
+          ) : (
+            typingDone &&
+            !isLastLine && (
+              <span className="pip-bubble__next" aria-hidden="true">
+                {touch ? 'Tap anywhere' : 'Click anywhere'} ▸
+              </span>
+            )
+          )}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="pip-bubble__voice"
+        aria-pressed={voiceEnabled}
+        aria-label={
+          voiceEnabled ? 'Turn PIP voice off' : 'Turn PIP voice on'
+        }
+        onClick={() => {
+          if (voiceEnabled) stopPipVoice()
+          setVoiceEnabled(!voiceEnabled)
+        }}
+      >
+        <span aria-hidden="true">{voiceEnabled ? '🔊' : '🔇'}</span>
+      </button>
+    </div>
+  )
+
   return (
     <div className="cabin">
       <div className="boarding__veil" aria-hidden="true" />
 
-      {!bubbleHidden && steps.length > 0 && (
-        <div
-          className={`pip-bubble-wrap pip-bubble-wrap--${phase}${
-            docked ? ' pip-bubble-wrap--docked' : ''
-          }`}
-          ref={bubbleRef}
-          style={{
-            transform:
-              !docked && liftPx > 0 ? `translateY(${-liftPx}px)` : undefined,
-          }}
-        >
-          <button
-            type="button"
-            className={`pip-bubble${awaits ? ' pip-bubble--awaits' : ''}`}
-            onClick={handleBubbleClick}
-            aria-label={
-              awaits && typingDone
-                ? AWAIT_HINT[awaits]
-                : typingDone && !isLastLine
-                  ? 'Continue'
-                  : 'PIP is speaking'
-            }
-          >
-            <PipAvatar />
-            <span className="pip-bubble__body">
-              <span className="pip-bubble__name">PIP</span>
-              <PipLine
-                key={`${line}-${dialogueIndex}`}
-                line={line}
-                skipNonce={skipNonce}
-                onDone={handleDone}
-              />
-              {awaits ? (
-                <span className="pip-bubble__task">
-                  <span className="pip-bubble__task-dot" aria-hidden="true" />
-                  {AWAIT_HINT[awaits]}
-                </span>
-              ) : (
-                typingDone &&
-                !isLastLine && (
-                  <span className="pip-bubble__next" aria-hidden="true">
-                    {touch ? 'Tap anywhere' : 'Click anywhere'} ▸
-                  </span>
-                )
-              )}
-            </span>
-          </button>
-          <button
-            type="button"
-            className="pip-bubble__voice"
-            aria-pressed={voiceEnabled}
-            aria-label={
-              voiceEnabled ? 'Turn PIP voice off' : 'Turn PIP voice on'
-            }
-            onClick={() => {
-              if (voiceEnabled) stopPipVoice()
-              setVoiceEnabled(!voiceEnabled)
-            }}
-          >
-            <span aria-hidden="true">{voiceEnabled ? '🔊' : '🔇'}</span>
-          </button>
-        </div>
-      )}
+      {!bubbleHidden && steps.length > 0 &&
+        (inAlbum ? createPortal(bubble, albumSlot) : bubble)}
 
       <div ref={contentRef} className="cabin__content">
         {children}

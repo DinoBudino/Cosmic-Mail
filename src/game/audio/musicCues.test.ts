@@ -42,10 +42,24 @@ describe('scene music', () => {
     ).toBe('archiveFault')
   })
 
+  it('softens the fault music when PIP finds his own memories missing', () => {
+    const memoryBeat = INTRO_BEATS.findIndex((beat) => beat.subphase === 'pip-affected')
+    expect(memoryBeat).toBeGreaterThan(faultBeat)
+    expect(
+      sceneMusicFor(scene({ phase: 'intro', dialogueIndex: memoryBeat - 1 })),
+    ).toBe('archiveFault')
+    expect(
+      sceneMusicFor(scene({ phase: 'intro', dialogueIndex: memoryBeat })),
+    ).toBe('pipMemory')
+    // Same track at a lower level: the music never restarts.
+    expect(MUSIC_CUES.pipMemory.assetId).toBe(MUSIC_CUES.archiveFault.assetId)
+    expect(MUSIC_CUES.pipMemory.volume).toBeLessThan(MUSIC_CUES.archiveFault.volume)
+  })
+
   it('moves from tension to hope without an abrupt happy cut', () => {
     expect(
       sceneMusicFor(scene({ phase: 'intro', dialogueIndex: hopeBeat - 1 })),
-    ).toBe('archiveFault')
+    ).toBe('pipMemory')
     expect(
       sceneMusicFor(scene({ phase: 'intro', dialogueIndex: hopeBeat })),
     ).toBe('hope')

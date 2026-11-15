@@ -1,124 +1,126 @@
-import { useState } from 'react'
-import { TRANSMISSION_DESTINATION } from '../../data/onboardingNarrative'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { getAlbumPhotos, unlockedPhotoCount } from '../../data/albumPhotos'
 import { getFieldNotesView } from '../../data/fieldNotes'
-import { STORY_STATUS_LABEL, getPassportView } from '../../data/passport'
-import type { MissionId } from '../../data/missions'
+import { getMission, type MissionId } from '../../data/missions'
+import { getPassportView, type PassportStory } from '../../data/passport'
 import type { JourneySave } from '../../store/journeySchema'
 import { emitAudio } from '../../game/audio/audioEvents'
 import { useGameStore } from '../../store/gameStore'
 import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore, type AlbumTab } from '../../store/onboardingStore'
 import { hubElementEnabled, useHubFocus } from '../../store/hubFocus'
+import { useAlbumPipSlot } from './albumPipSlot'
+import './album.css'
 
-const ALBUM_TABS: readonly { id: AlbumTab; label: string }[] = [
-  { id: 'missions', label: 'Record' },
-  { id: 'stamps', label: 'Stamps' },
-  { id: 'discoveries', label: 'Discoveries' },
+const ALBUM_TABS: readonly { id: AlbumTab; label: string; icon: IconName }[] = [
+  { id: 'missions', label: 'Explorers', icon: 'rover' },
+  { id: 'discoveries', label: 'Discoveries', icon: 'search' },
+  { id: 'stamps', label: 'Stamps', icon: 'stamp' },
 ]
 
+type PlanetFilter = 'all' | 'mars' | 'moon'
+type LabId = MissionId | 'notes'
+
+const PIP_PORTRAIT = 'album/pip.webp'
+
 /**
- * Álbum de misiones (formerly the Cosmic Passport; store and save keys
- * keep the historical "passport" names). An open book projected from
- * JourneySave: the carrier record on the left page and, on the right,
- * three tabs — mission record, Archive stamps and field-note
- * discoveries. It never turns a legacy B seal into a delivery.
+ * The Cosmic Album: a rugged tablet the carrier keeps in the cabin and
+ * on Mars (store and save keys keep the historical "passport" names). It
+ * is a read-only projection of JourneySave:
+ * - Explorers: progress, a stamp-edged card per explorer and its rewards.
+ * - Discoveries: the photo lab (stills from each story video) and the
+ *   Mars field notes.
+ * - Stamps: the stamp collection, one per explorer whose story reaches
+ *   Earth.
+ * Names stay hidden until the explorer is found, and a legacy B seal is
+ * never shown as a delivery.
  */
 export function Passport({
-  pinned = false,
   saveOverride,
+  onClose,
 }: {
-  pinned?: boolean
   /** Testing/embedding hook; production always reads the journey store. */
   saveOverride?: JourneySave | null
+  /** Shows the close button of the tablet. */
+  onClose?: () => void
 }) {
   const storedSave = useJourneyStore((state) => state.save)
   const save = saveOverride !== undefined ? saveOverride : storedSave
-  const prepareSmartLetter = useJourneyStore(
-    (state) => state.prepareSmartLetter,
-  )
+  const prepareSmartLetter = useJourneyStore((state) => state.prepareSmartLetter)
   const openArchive = useGameStore((state) => state.openArchive)
-  const goBack = useOnboardingStore((state) => state.goBack)
-  const [message, setMessage] = useState<string | null>(null)
   const tab = useOnboardingStore((state) => state.albumTab)
   const setTab = useOnboardingStore((state) => state.setAlbumTab)
+  const setSlot = useAlbumPipSlot((state) => state.setSlot)
   const focus = useHubFocus()
-  const tourClass = (target: string) =>
-    focus.tourActive && focus.target === target ? ' is-tour-target' : ''
+  const [message, setMessage] = useState<string | null>(null)
+  const [planet, setPlanet] = useState<PlanetFilter>('all')
+  const [rewardsFor, setRewardsFor] = useState<MissionId | null>(null)
+  const [labPick, setLabPick] = useState<LabId | null>(null)
   if (!save) return null
 
   const view = getPassportView(save)
-  const fieldNotes = getFieldNotesView(save)
+  const tourClass = (target: string) =>
+    focus.tourActive && focus.target === target ? ' is-tour-target' : ''
+  // While PIP's tour explains the album, his own bubble sits in the PIP
+  // corner (moved there by the cabin), so the greeting steps aside.
+  const pipGuiding = focus.step?.place === 'album'
+  const found = view.stories.filter((story) => story.machineName).length
+  const stamped = view.stories.filter((story) => story.stampEarned).length
+  const overall = Math.round(
+    view.stories.reduce((sum, story) => sum + story.percent, 0) /
+      Math.max(1, view.stories.length),
+  )
+  const firstOpen =
+    view.stories.find((story) => story.machineName) ??
+    view.stories.find((story) => story.destination.available)
+  const labId: LabId = labPick ?? firstOpen?.missionId ?? 'notes'
+
+  const goTab = (next: AlbumTab) => {
+    emitAudio('uiHover', { dedupeKey: 'album-tab', dedupeMs: 120 })
+    setRewardsFor(null)
+    setTab(next)
+  }
 
   const handlePrepare = (missionId: MissionId) => {
     const result = prepareSmartLetter(missionId)
-    const ok =
-      result?.status === 'created' || result?.status === 'already-created'
+    const ok = result?.status === 'created' || result?.status === 'already-created'
     emitAudio(ok ? 'smartLetterPrepared' : 'archiveQueryFailed')
     setMessage(
-      ok
-        ? null
-        : 'The memory must be recovered before the smart letter can be prepared.',
+      ok ? null : 'The memory must be recovered before the smart letter can be prepared.',
     )
   }
 
+  const greeting =
+    tab === 'discoveries'
+      ? 'Welcome to the photo lab! Look at the pictures and facts we recover from each explorer.'
+      : tab === 'stamps'
+        ? 'Every story we send home to Earth earns a stamp. Can you fill the whole page?'
+        : `Hi, ${view.carrierName}! This is your Cosmic Album. Here you can see your progress and your rewards.`
+
   return (
-    <section
-      className={`onboarding__panel onboarding__panel--wide${
-        pinned ? ' passport--pinned' : ''
-      }`}
-      aria-labelledby={pinned ? undefined : 'passport-title'}
-      aria-label={pinned ? 'Mission Album' : undefined}
-    >
-      {!pinned && (
-        <button type="button" className="onboarding__back" onClick={goBack}>
-          ← Back
-        </button>
-      )}
-      {!pinned && (
-        <>
-          <p className="onboarding__eyebrow">Mission Album</p>
-          <h1 id="passport-title" className="onboarding__title">
-            Your histories, {view.carrierName}
-          </h1>
-        </>
-      )}
-
-      <div className="passport album">
-        <div className="album__spread">
-          <div className={`album__page album__page--record${tourClass('album-id')}`}>
-            <div className="album__emblem" aria-hidden="true">
-              <span className="album__planet" />
-              <span className="album__ring" />
-            </div>
-            <p className="passport__title album__name">Mission Album</p>
-            <p className="passport__mission">
-              {view.transmittedCount}/{view.totalStories} histories
+    <div className="ctab" role="dialog" aria-label="Cosmic Album">
+      <div className="ctab__bezel">
+        <TabletShell />
+        <div
+          className="ctab__screen"
+          onPointerDown={(event) => {
+            if (!(event.target as HTMLElement).closest?.('.xcard__rewards')) {
+              setRewardsFor(null)
+            }
+          }}
+        >
+          <header className="ctab__top">
+            <p className="ctab__brand">
+              <span className="ctab__brand-planet" aria-hidden="true" />
+              <span className="ctab__brand-text">
+                Cosmic
+                <b>Mail</b>
+              </span>
             </p>
-            <dl className="passport__fields album__fields">
-              <div className="passport__field">
-                <dt>Carrier</dt>
-                <dd>{view.carrierName}</dd>
-              </div>
-              <div className="passport__field">
-                <dt>ID</dt>
-                <dd>{view.carrierId}</dd>
-              </div>
-              <div className="passport__field">
-                <dt>Service</dt>
-                <dd>Cosmic Mail · {TRANSMISSION_DESTINATION}</dd>
-              </div>
-              <div className="passport__field">
-                <dt>Histories restored</dt>
-                <dd>
-                  {view.transmittedCount}/{view.totalStories} delivered to Earth
-                </dd>
-              </div>
-            </dl>
-            <p className="album__ship">Cabin CM-01 Explorer</p>
-          </div>
-
-          <div className="album__page album__page--content">
-            <div className="album__tabs" role="tablist" aria-label="Album sections">
+            <h2 className="ctab__title">
+              <span aria-hidden="true">✦</span> Cosmic Album <span aria-hidden="true">✦</span>
+            </h2>
+            <div className="ctab__tabs" role="tablist" aria-label="Album sections">
               {ALBUM_TABS.map((entry) => (
                 <button
                   key={entry.id}
@@ -126,233 +128,897 @@ export function Passport({
                   role="tab"
                   id={`album-tab-${entry.id}`}
                   aria-selected={tab === entry.id}
-                  aria-controls={`album-panel-${entry.id}`}
-                  className={`album__tab album__tab--${entry.id}${
-                    tab === entry.id ? ' is-active' : ''
-                  }${tourClass(`tab-${entry.id}`)}`}
+                  aria-controls="album-panel"
+                  className={`ctab__tab${tab === entry.id ? ' is-active' : ''}${tourClass(
+                    `tab-${entry.id}`,
+                  )}`}
                   disabled={!hubElementEnabled(focus, `tab-${entry.id}`)}
-                  onClick={() => {
-                    emitAudio('uiHover', { dedupeKey: 'album-tab', dedupeMs: 120 })
-                    setTab(entry.id)
-                  }}
+                  onClick={() => goTab(entry.id)}
                 >
+                  <Icon name={entry.icon} />
                   {entry.label}
                 </button>
               ))}
             </div>
+            {onClose && (
+              <button
+                type="button"
+                className={`ctab__close${tourClass('album-close')}`}
+                aria-label="Close album"
+                disabled={!hubElementEnabled(focus, 'album-close')}
+                onClick={onClose}
+              >
+                <Icon name="close" />
+              </button>
+            )}
+          </header>
 
-            <div
-              role="tabpanel"
-              id={`album-panel-${tab}`}
-              aria-labelledby={`album-tab-${tab}`}
-              className="album__panel"
-            >
-              {tab === 'missions' && (
-                <>
-                  <p className="passport__slot-label">Explorer histories</p>
-                  <div className="passport__stories">
+          <div className={`ctab__body ctab__body--${tab}`}>
+            <aside className="ctab__side">
+              <div className={`ctab__pip${pipGuiding ? ' is-guiding' : ''}`}>
+                <img className="ctab__pip-img" src={PIP_PORTRAIT} alt="" />
+                {!pipGuiding && (
+                  <p className="ctab__speech">
+                    <span className="ctab__speech-spark" aria-hidden="true">
+                      ✦
+                    </span>
+                    {greeting}
+                  </p>
+                )}
+                <div ref={setSlot} className="ctab__pip-slot" />
+              </div>
+
+              {tab === 'discoveries' ? (
+                <SidePanel icon="search" title="Select an explorer">
+                  <div className="lab-pick">
                     {view.stories.map((story) => {
-                      const statusLine =
-                        story.status === 'unknown'
-                          ? 'No signal identified yet. Follow the navigation screen.'
-                          : story.status === 'discovered'
-                            ? 'Explorer identified. Inspect its parts with the Cosmic Scanner.'
-                            : story.status === 'investigating' ||
-                                story.status === 'ready_for_full_scan'
-                              ? `Fragments recognized ${story.scanned}/${story.total}.`
-                              : story.status === 'memory_recovered'
-                                ? 'Memory recovered. Prepare the smart letter.'
-                                : story.status === 'smart_letter_ready'
-                                  ? 'Smart letter ready to transmit from Mailwing.'
-                                  : 'Delivered to Earth.'
+                      const photo = getAlbumPhotos(story.missionId)[0]
                       return (
-                      <article
-                        key={story.missionId}
-                        className={`passport__story passport__story--${story.status}`}
-                        aria-label={`${story.destination.name}: ${STORY_STATUS_LABEL[story.status]}`}
-                      >
-                        <div className="passport__story-head">
-                          <span className="passport__story-glyph" aria-hidden="true">
-                            {story.destination.glyph}
+                        <button
+                          key={story.missionId}
+                          type="button"
+                          className={`lab-pick__tile${labId === story.missionId ? ' is-active' : ''}${
+                            story.machineName ? '' : ' is-locked'
+                          }`}
+                          aria-pressed={labId === story.missionId}
+                          onClick={() => setLabPick(story.missionId)}
+                        >
+                          <span className="lab-pick__img">
+                            {story.machineName && photo ? (
+                              <img src={photo.src} alt="" loading="lazy" />
+                            ) : (
+                              <Icon name="lock" />
+                            )}
                           </span>
-                          <div>
-                            <h3>{story.machineName ?? `${story.destination.name} explorer`}</h3>
-                            <p className="passport__story-clue">
-                              {story.destination.clue}
-                            </p>
-                          </div>
-                          <span className="passport__story-state">
-                            {STORY_STATUS_LABEL[story.status]}
+                          <span className="lab-pick__name">
+                            {story.machineName ?? 'Unknown'}
                           </span>
-                        </div>
-
-                        <p className="passport__story-machine">
-                          {story.machineName ? `On ${story.destination.name}` : 'Explorer not yet identified'}
-                        </p>
-
-                        <p className="passport__story-hint">{statusLine}</p>
-
-                        {story.legacySealAt != null && !story.stampEarned && (
-                          <p className="passport__story-legacy">
-                            Legacy seal found in an older save. It is preserved as
-                            history, but it is not a transmission to the Earth Cosmic
-                            Archive.
-                          </p>
-                        )}
-
-                        <div className="passport__story-actions">
-                          {story.status === 'memory_recovered' && (
-                            <button
-                              type="button"
-                              className="passport__action passport__action--primary"
-                              onClick={() => handlePrepare(story.missionId)}
-                            >
-                              Prepare smart letter
-                            </button>
-                          )}
-                          {story.hasSmartLetter && (
-                            <button
-                              type="button"
-                              className="passport__action"
-                              onClick={() => openArchive('smart-letter', story.missionId)}
-                            >
-                              {story.stampEarned
-                                ? 'Review smart letter'
-                                : 'Read smart letter'}
-                            </button>
-                          )}
-                          {story.canTransmit && (
-                            <button
-                              type="button"
-                              className="passport__action passport__action--primary"
-                              onClick={() => openArchive('smart-letter', story.missionId)}
-                            >
-                              Deliver to Earth
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="passport__story-foot">
-                          <span>
-                            {story.scanned}/{story.total} fragments
-                          </span>
-                          <span
-                            className={`passport__story-stamp${
-                              story.stampEarned ? ' is-filled' : ''
-                            }`}
-                          >
-                            {story.stampEarned
-                              ? `✦ ${story.stampLabel}`
-                              : !story.destination.available
-                                ? 'Mission in development'
-                                : story.status === 'unknown'
-                                  ? 'Search pending'
-                                  : story.status === 'discovered'
-                                    ? 'Explorer identified'
-                                    : story.status === 'investigating'
-                                      ? 'Recognition in progress'
-                                      : story.status === 'ready_for_full_scan'
-                                        ? 'Full scan ready'
-                                        : story.status === 'memory_recovered'
-                                          ? 'Memory recovered'
-                                          : 'Awaiting delivery'}
-                          </span>
-                        </div>
-                      </article>
+                        </button>
                       )
                     })}
+                    <button
+                      type="button"
+                      className={`lab-pick__tile lab-pick__tile--notes${
+                        labId === 'notes' ? ' is-active' : ''
+                      }`}
+                      aria-pressed={labId === 'notes'}
+                      onClick={() => setLabPick('notes')}
+                    >
+                      <span className="lab-pick__img">
+                        <Icon name="pin" />
+                      </span>
+                      <span className="lab-pick__name">Mars notes</span>
+                    </button>
+                  </div>
+                </SidePanel>
+              ) : (
+                <>
+                  <SidePanel icon="chart" title={tab === 'stamps' ? 'My collection' : 'Exploration progress'}>
+                    {tab === 'stamps' ? (
+                      <Meter
+                        icon="stamp"
+                        label="Stamps collected"
+                        value={
+                          <>
+                            {stamped} <small>of</small> {view.totalStories}
+                          </>
+                        }
+                        percent={(stamped / Math.max(1, view.totalStories)) * 100}
+                        tone="orange"
+                      />
+                    ) : (
+                      <Meter
+                        icon="rover"
+                        label="Explorers found"
+                        value={
+                          <>
+                            {found} <small>of</small> {view.totalStories}
+                          </>
+                        }
+                        percent={(found / Math.max(1, view.totalStories)) * 100}
+                        tone="orange"
+                      />
+                    )}
+                    <Meter
+                      icon="dish"
+                      label="Stories sent to Earth"
+                      value={`${overall}%`}
+                      percent={overall}
+                      tone="blue"
+                    />
+                  </SidePanel>
+                  {tab === 'missions' && (
+                    <SidePanel icon="rocket" title="Explore by planet">
+                      <div className="ctab__planets">
+                        {(
+                          [
+                            ['mars', 'Mars'],
+                            ['moon', 'Moon'],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            className={`ctab__planet ctab__planet--${id}`}
+                            aria-pressed={planet === id}
+                            onClick={() => setPlanet(planet === id ? 'all' : id)}
+                          >
+                            <span className="ctab__orb" aria-hidden="true" />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </SidePanel>
+                  )}
+                  <div className={`ctab__carrier${tourClass('album-id')}`}>
+                    <span className="ctab__wing ctab__wing--l" aria-hidden="true" />
+                    <span className="ctab__wing ctab__wing--r" aria-hidden="true" />
+                    <span className="ctab__carrier-face" aria-hidden="true">
+                      <Icon name="astronaut" />
+                    </span>
+                    <span className="ctab__carrier-text">
+                      <b>Cosmic Carrier</b>
+                      <span>
+                        {view.carrierName} · ID {view.carrierId}
+                      </span>
+                    </span>
                   </div>
                 </>
               )}
+            </aside>
 
-              {tab === 'stamps' && (
-                <>
-                  <p className="passport__slot-label">Archive stamps</p>
-                  <ul className="album__stamps">
-                    {view.stories.map((story) => (
-                      <li
+            <section
+              id="album-panel"
+              role="tabpanel"
+              aria-labelledby={`album-tab-${tab}`}
+              className="ctab__main"
+            >
+              {tab === 'missions' && (
+                <div className="xgrid">
+                  {view.stories
+                    .filter((story) => planet === 'all' || story.destination.id === planet)
+                    .map((story) => (
+                      <ExplorerCard
                         key={story.missionId}
-                        className={`album__stamp${story.stampEarned ? ' is-filled' : ''}`}
-                      >
-                        <span className="album__stamp-glyph" aria-hidden="true">
-                          {story.stampEarned ? story.destination.glyph : '?'}
-                        </span>
-                        <span className="album__stamp-name">
-                          {story.machineName ?? `${story.destination.name} explorer`}
-                        </span>
-                        <span className="album__stamp-label">
-                          {story.stampEarned ? story.stampLabel : 'Not yet stamped'}
-                        </span>
-                      </li>
+                        story={story}
+                        rewardsOpen={rewardsFor === story.missionId}
+                        onRewards={() =>
+                          setRewardsFor(rewardsFor === story.missionId ? null : story.missionId)
+                        }
+                        onPrepare={() => handlePrepare(story.missionId)}
+                        onDeliver={() => openArchive('smart-letter', story.missionId)}
+                        onWatch={() => {
+                          setRewardsFor(null)
+                          openArchive('reconstruction', story.missionId)
+                        }}
+                        onLetter={() => {
+                          setRewardsFor(null)
+                          openArchive('smart-letter', story.missionId)
+                        }}
+                        onPhotos={() => {
+                          setLabPick(story.missionId)
+                          goTab('discoveries')
+                        }}
+                        onStamp={() => goTab('stamps')}
+                      />
                     ))}
-                  </ul>
-                  <p className="passport__notes-intro">
-                    One stamp for each explorer whose story reaches Earth.
-                  </p>
-                </>
+                </div>
               )}
 
-              {tab === 'discoveries' && (
-                <section
-                  className="passport__notes"
-                  aria-labelledby="passport-notes-title"
-                >
-                  <p id="passport-notes-title" className="passport__slot-label">
-                    Mars field notes · {fieldNotes.unlockedCount}/{fieldNotes.totalCount}
-                  </p>
-                  <p className="passport__notes-intro">
-                    Optional context from the landscape and the memorials. These notes
-                    are not part of any smart letter.
-                  </p>
-                  <ul className="passport__notes-list">
-                    {fieldNotes.entries.map(({ note, unlocked, detail }) => (
-                      <li
-                        key={note.id}
-                        className={`passport__note${unlocked ? ' is-unlocked' : ''}`}
-                      >
-                        <h3>{unlocked ? note.title : 'Not yet observed'}</h3>
-                        {unlocked ? (
-                          <>
-                            <p>{note.body}</p>
-                            <p className="passport__note-meta">
-                              {detail ? `${detail} · ` : ''}
-                              {note.sources.map((source, index) => (
-                                <a
-                                  key={source.url}
-                                  href={source.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {source.label}
-                                  {index < note.sources.length - 1 ? ', ' : ''} ↗
-                                </a>
-                              ))}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="passport__note-meta">
-                            {note.kind === 'memorial'
-                              ? 'Visit this Mars memorial to add its note.'
-                              : `Scan a feature of this kind with the Cosmic Scanner.${
-                                  detail ? ` ${detail}.` : ''
-                                }`}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+              {tab === 'discoveries' &&
+                (labId === 'notes' ? (
+                  <FieldNotes save={save} />
+                ) : (
+                  <PhotoLab
+                    key={labId}
+                    story={view.stories.find((story) => story.missionId === labId) ?? null}
+                  />
+                ))}
+
+              {tab === 'stamps' && <StampPage stories={view.stories} />}
+
+              {message && (
+                <p className="ctab__message" role="status">
+                  {message}
+                </p>
               )}
-            </div>
+            </section>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
 
-        {message && (
-          <p className="passport__message" role="status">
-            {message}
+/** Rugged frame parts: bumpers, grilles, camera bar, clock and plate. */
+function TabletShell() {
+  return (
+    <>
+      <span className="ctab__bump ctab__bump--tl" aria-hidden="true" />
+      <span className="ctab__bump ctab__bump--tr" aria-hidden="true" />
+      <span className="ctab__bump ctab__bump--bl" aria-hidden="true" />
+      <span className="ctab__bump ctab__bump--br" aria-hidden="true" />
+      <span className="ctab__guard ctab__guard--l" aria-hidden="true" />
+      <span className="ctab__guard ctab__guard--r" aria-hidden="true" />
+      <span className="ctab__grill ctab__grill--l" aria-hidden="true" />
+      <span className="ctab__grill ctab__grill--r" aria-hidden="true" />
+      <span className="ctab__screw ctab__screw--l" aria-hidden="true" />
+      <span className="ctab__screw ctab__screw--r" aria-hidden="true" />
+      <span className="ctab__cam" aria-hidden="true">
+        <i />
+      </span>
+      <TabletClock />
+      <span className="ctab__plate" aria-hidden="true">
+        Cosmic Mail
+      </span>
+    </>
+  )
+}
+
+function clockText(): string {
+  const now = new Date()
+  return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+function TabletClock() {
+  const [time, setTime] = useState(clockText)
+  useEffect(() => {
+    const timer = window.setInterval(() => setTime(clockText()), 20000)
+    return () => window.clearInterval(timer)
+  }, [])
+  return (
+    <span className="ctab__clock" aria-hidden="true">
+      {time}
+    </span>
+  )
+}
+
+function SidePanel({
+  icon,
+  title,
+  children,
+}: {
+  icon: IconName
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="ctab__card">
+      <h3 className="ctab__bar">
+        <Icon name={icon} />
+        {title}
+      </h3>
+      <div className="ctab__card-body">{children}</div>
+    </section>
+  )
+}
+
+/** What the child does next, in one short line. */
+function statusLine(story: PassportStory): string {
+  if (!story.destination.available) return 'This trip is coming soon.'
+  switch (story.status) {
+    case 'unknown':
+      return 'No signal identified yet. Follow the navigation screen.'
+    case 'discovered':
+      return 'Explorer identified. Scan its parts.'
+    case 'investigating':
+    case 'ready_for_full_scan':
+      return `Fragments recognized ${story.scanned}/${story.total}.`
+    case 'memory_recovered':
+      return 'Memory recovered. Prepare the smart letter.'
+    case 'smart_letter_ready':
+      return 'Smart letter ready to transmit from Mailwing.'
+    default:
+      return 'Delivered to Earth.'
+  }
+}
+
+function ExplorerCard({
+  story,
+  rewardsOpen,
+  onRewards,
+  onPrepare,
+  onDeliver,
+  onWatch,
+  onLetter,
+  onPhotos,
+  onStamp,
+}: {
+  story: PassportStory
+  rewardsOpen: boolean
+  onRewards: () => void
+  onPrepare: () => void
+  onDeliver: () => void
+  onWatch: () => void
+  onLetter: () => void
+  onPhotos: () => void
+  onStamp: () => void
+}) {
+  const known = story.machineName !== null
+  const photo = getAlbumPhotos(story.missionId)[0]
+  const done = story.percent === 100
+  return (
+    <article
+      className={`xcard${known ? '' : ' is-locked'}${done ? ' is-done' : ''}${
+        rewardsOpen ? ' is-open' : ''
+      }`}
+      aria-label={`${story.machineName ?? 'Explorer not yet identified'} · ${story.destination.name}`}
+    >
+      <div className="xcard__in">
+        <header className="xcard__head">
+          <h3>{story.machineName ?? 'Unknown explorer'}</h3>
+          <PlanetChip story={story} />
+        </header>
+
+        <div className="xcard__img">
+          {photo && <img src={photo.src} alt="" loading="lazy" />}
+          {!known && (
+            <span className="xcard__lock">
+              <Icon name="lock" />
+              {story.destination.available ? '???' : 'Coming soon'}
+            </span>
+          )}
+        </div>
+
+        <div
+          className="xcard__bar"
+          role="progressbar"
+          aria-label="Story progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={story.percent}
+        >
+          {story.percent > 0 && <span style={{ width: `${story.percent}%` }} />}
+          <b>{story.percent}%</b>
+        </div>
+
+        <p className="xcard__status">{statusLine(story)}</p>
+
+        <span
+          className="xcard__stars"
+          aria-label={`${Math.min(story.scanned, story.total)} of ${story.total} parts scanned`}
+        >
+          {Array.from({ length: story.total }, (_, index) => (
+            <Icon key={index} name={index < story.scanned ? 'star' : 'star-empty'} />
+          ))}
+        </span>
+
+        {story.legacySealAt != null && !story.stampEarned && (
+          <p className="xcard__legacy">
+            Legacy seal found in an older save. It is kept as history, but it is not a
+            delivery to Earth.
           </p>
         )}
+
+        <div className="xcard__actions">
+          {story.status === 'memory_recovered' ? (
+            <button type="button" className="xcard__btn" onClick={onPrepare}>
+              Prepare smart letter
+            </button>
+          ) : story.canTransmit ? (
+            <button type="button" className="xcard__btn" onClick={onDeliver}>
+              Deliver to Earth
+            </button>
+          ) : (
+            <div className="xcard__rewards">
+              <button
+                type="button"
+                className="xcard__btn"
+                aria-expanded={rewardsOpen}
+                disabled={!known}
+                onClick={onRewards}
+              >
+                See rewards
+              </button>
+              {rewardsOpen && (
+                <div className="xcard__pop" role="menu" aria-label="Rewards">
+                  <PopItem art="clapper" disabled={!story.reconstructionAvailable} onClick={onWatch}>
+                    Watch story
+                  </PopItem>
+                  <PopItem art="lens" onClick={onPhotos}>
+                    Discoveries
+                  </PopItem>
+                  <PopItem art="stamp" disabled={!story.stampEarned} onClick={onStamp}>
+                    Stamp
+                  </PopItem>
+                  {story.hasSmartLetter && (
+                    <PopItem art="letter" onClick={onLetter}>
+                      Letter
+                    </PopItem>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function PlanetChip({ story }: { story: PassportStory }) {
+  return (
+    <span className={`xcard__chip xcard__chip--${story.destination.id}`}>
+      <span className="ctab__orb" aria-hidden="true" />
+      {story.destination.name}
+    </span>
+  )
+}
+
+function PopItem({
+  art,
+  disabled = false,
+  onClick,
+  children,
+}: {
+  art: ArtName
+  disabled?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className="xcard__pop-item"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="xcard__pop-art">
+        <Art name={art} />
+        {disabled && (
+          <span className="xcard__pop-lock">
+            <Icon name="lock" />
+          </span>
+        )}
+      </span>
+      <span className="xcard__pop-label">{children}</span>
+    </button>
+  )
+}
+
+/** The stamp page: one big stamp per explorer, cancelled once delivered. */
+function StampPage({ stories }: { stories: PassportStory[] }) {
+  return (
+    <div className="stamps">
+      <header className="stamps__head">
+        <h3>Stamp collection</h3>
+        <p>One stamp for each explorer whose story reaches Earth.</p>
+      </header>
+      <ul className="stamps__sheet">
+        {stories.map((story) => {
+          const photo = getAlbumPhotos(story.missionId)[0]
+          const mission = getMission(story.missionId)
+          return (
+            <li
+              key={story.missionId}
+              className={`stamp stamp--${story.destination.id}${story.stampEarned ? ' is-earned' : ''}`}
+            >
+              {story.stampEarned ? (
+                <div className="stamp__paper">
+                  <div className="stamp__face">
+                    <p className="stamp__top">
+                      <span>Cosmic Mail</span>
+                      <span>{story.destination.name}</span>
+                    </p>
+                    <div className="stamp__img">{photo && <img src={photo.src} alt="" />}</div>
+                    <p className="stamp__name">{story.machineName}</p>
+                    <p className="stamp__year">{mission.yearLabel}</p>
+                  </div>
+                  <span className="stamp__postmark" aria-hidden="true">
+                    <span>Delivered</span>
+                    <b>Earth</b>
+                    <span>✦ ✦ ✦</span>
+                  </span>
+                  <span className="sr-only">{story.stampLabel}: delivered to Earth</span>
+                </div>
+              ) : (
+                <div className="stamp__slot">
+                  <span className="stamp__slot-icon">
+                    <Icon name={story.machineName ? 'stamp' : 'lock'} />
+                  </span>
+                  <p className="stamp__name">
+                    {story.machineName ?? `${story.destination.name} explorer`}
+                  </p>
+                  <p className="stamp__hint">
+                    {!story.destination.available
+                      ? 'Coming soon'
+                      : story.machineName
+                        ? 'Send its story to Earth'
+                        : 'Not yet stamped'}
+                  </p>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function PhotoLab({ story }: { story: PassportStory | null }) {
+  const [index, setIndex] = useState(0)
+  if (!story) return null
+  const photos = getAlbumPhotos(story.missionId)
+  if (photos.length === 0) return null
+  const open = unlockedPhotoCount(photos.length, story)
+  const photo = photos[index]
+  const unlocked = index < open
+  const found = story.machineName !== null
+  const mission = getMission(story.missionId)
+  const step = (delta: number) =>
+    setIndex((current) => (current + delta + photos.length) % photos.length)
+
+  return (
+    <div className="lab">
+      <section className="lab__viewer ctab__card" aria-labelledby="lab-title">
+        <h3 className="ctab__bar">
+          <Icon name="camera" />
+          Photo lab
+        </h3>
+        <div className="ctab__card-body">
+          <p id="lab-title" className="lab__name">
+            {story.machineName ?? 'Unknown explorer'}
+            <PlanetChip story={story} />
+          </p>
+          <div className="lab__frame">
+            {unlocked ? (
+              <img src={photo.src} alt={photo.title} />
+            ) : (
+              <span className="lab__hidden">
+                <Icon name="lock" />
+                {!story.destination.available
+                  ? 'This trip is coming soon.'
+                  : found
+                    ? 'Scan another part to open this photo.'
+                    : 'Find this explorer to open its photos.'}
+              </span>
+            )}
+            <button type="button" className="lab__arrow lab__arrow--prev" aria-label="Previous photo" onClick={() => step(-1)}>
+              <Icon name="chevron-left" />
+            </button>
+            <button type="button" className="lab__arrow lab__arrow--next" aria-label="Next photo" onClick={() => step(1)}>
+              <Icon name="chevron-right" />
+            </button>
+          </div>
+          <p className="lab__count">
+            <b>
+              {index + 1} of {photos.length}
+            </b>
+            <span className="lab__dots" aria-hidden="true">
+              {photos.map((entry, at) => (
+                <i key={entry.src} className={at === index ? 'is-on' : ''} />
+              ))}
+            </span>
+          </p>
+          <div className="lab__thumbs">
+            {photos.map((entry, at) => (
+              <button
+                key={entry.src}
+                type="button"
+                className={`lab__thumb${at === index ? ' is-active' : ''}${at < open ? '' : ' is-locked'}`}
+                aria-label={at < open ? entry.title : 'Locked photo'}
+                aria-pressed={at === index}
+                onClick={() => setIndex(at)}
+              >
+                {at < open ? <img src={entry.src} alt="" loading="lazy" /> : <Icon name="lock" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="lab__info">
+        <SidePanel icon="info" title="About this photo">
+          {unlocked ? (
+            <>
+              <p className="lab__title">{photo.title}</p>
+              <p className="lab__text">{photo.description}</p>
+              <p className="lab__credit">{photo.credit}</p>
+            </>
+          ) : (
+            <p className="lab__text">
+              {found
+                ? 'Each part you scan opens one more photo.'
+                : 'Find the explorer first. Then each part you scan opens one more photo.'}
+            </p>
+          )}
+        </SidePanel>
+        <SidePanel icon="star" title="Key findings">
+          <ul className="lab__finds">
+            {mission.components.map((component) => {
+              const seen = story.scannedIds.includes(component.id) || story.stampEarned
+              return (
+                <li key={component.id} className={seen ? 'is-seen' : 'is-locked'}>
+                  <span className="lab__find-icon">
+                    <Icon
+                      name={
+                        !seen
+                          ? 'lock'
+                          : component.howItWorks?.verb === 'Touches'
+                            ? 'hand'
+                            : component.howItWorks?.verb === 'Senses heat'
+                              ? 'heat'
+                              : 'eye'
+                      }
+                    />
+                  </span>
+                  <span>
+                    <b>{seen ? component.shortName : 'Part not scanned yet'}</b>
+                    {seen && (component.howItWorks?.detail ?? firstSentence(component.historicalRecord))}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </SidePanel>
+      </section>
+    </div>
+  )
+}
+
+function firstSentence(text: string): string {
+  const end = text.indexOf('. ')
+  return end > 0 ? text.slice(0, end + 1) : text
+}
+
+function FieldNotes({ save }: { save: JourneySave }) {
+  const fieldNotes = getFieldNotesView(save)
+  return (
+    <section className="notes ctab__card" aria-labelledby="album-notes-title">
+      <h3 id="album-notes-title" className="ctab__bar">
+        <Icon name="pin" />
+        Mars field notes · {fieldNotes.unlockedCount}/{fieldNotes.totalCount}
+      </h3>
+      <div className="ctab__card-body">
+        <p className="ctab__note">
+          Facts from the landscape and the memorials. They are not part of any smart letter.
+        </p>
+        <ul className="notes__list">
+          {fieldNotes.entries.map(({ note, unlocked, detail }) => (
+            <li key={note.id} className={`notes__item${unlocked ? ' is-unlocked' : ''}`}>
+              <h4>{unlocked ? note.title : 'Not yet observed'}</h4>
+              {unlocked ? (
+                <>
+                  <p>{note.body}</p>
+                  <p className="notes__meta">
+                    {detail ? `${detail} · ` : ''}
+                    {note.sources.map((source, at) => (
+                      <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer">
+                        {source.label}
+                        {at < note.sources.length - 1 ? ', ' : ''} ↗
+                      </a>
+                    ))}
+                  </p>
+                </>
+              ) : (
+                <p className="notes__meta">
+                  {note.kind === 'memorial'
+                    ? 'Visit this Mars memorial to add its note.'
+                    : `Scan a feature of this kind with the Cosmic Scanner.${detail ? ` ${detail}.` : ''}`}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
+  )
+}
+
+function Meter({
+  icon,
+  label,
+  value,
+  percent,
+  tone,
+}: {
+  icon: IconName
+  label: string
+  value: ReactNode
+  percent: number
+  tone: 'orange' | 'blue'
+}) {
+  return (
+    <div className={`meter meter--${tone}`}>
+      <span className="meter__icon">
+        <Icon name={icon} />
+      </span>
+      <div className="meter__main">
+        <p className="meter__row">
+          <span>{label}</span>
+          <b>{value}</b>
+        </p>
+        <span className="meter__track" style={{ '--pct': `${Math.round(percent)}%` } as CSSProperties}>
+          {percent > 0 && <span />}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------ Icons */
+
+type IconName =
+  | 'rover'
+  | 'search'
+  | 'stamp'
+  | 'close'
+  | 'lock'
+  | 'star'
+  | 'star-empty'
+  | 'pin'
+  | 'chevron-left'
+  | 'chevron-right'
+  | 'eye'
+  | 'hand'
+  | 'heat'
+  | 'chart'
+  | 'rocket'
+  | 'dish'
+  | 'astronaut'
+  | 'camera'
+  | 'info'
+
+const ICON_PATHS: Record<IconName, ReactNode> = {
+  rover: (
+    <>
+      <rect x="5" y="9" width="14" height="5" rx="1.5" />
+      <path d="M12 9V5m-2 0h4" />
+      <circle cx="7" cy="17" r="2" />
+      <circle cx="12" cy="17" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6" />
+      <path d="m15 15 5 5" />
+    </>
+  ),
+  stamp: (
+    <>
+      <path d="M4 4h16v16H4z" strokeDasharray="2 2" />
+      <path d="M8 15l3-4 2 2.5 1.5-1.5L17 15Z" />
+      <circle cx="9.5" cy="8.5" r="1.3" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  star: <path className="icon-fill" d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z" />,
+  'star-empty': <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z" />,
+  pin: (
+    <>
+      <path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11Z" />
+      <circle cx="12" cy="10" r="2.2" />
+    </>
+  ),
+  'chevron-left': <path d="m14.5 5-7 7 7 7" />,
+  'chevron-right': <path d="m9.5 5 7 7-7 7" />,
+  eye: (
+    <>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  hand: (
+    <>
+      <circle cx="12" cy="12" r="6.5" />
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M9.5 9.5l5 5M14.5 9.5l-5 5" />
+    </>
+  ),
+  heat: (
+    <>
+      <path d="M12 3c3 3.5 5 6.2 5 9.5a5 5 0 0 1-10 0C7 9.6 9.2 7.5 12 3Z" />
+      <path d="M12 12c1.2 1.4 2 2.4 2 3.6a2 2 0 0 1-4 0c0-1.2.8-2.2 2-3.6Z" />
+    </>
+  ),
+  chart: <path className="icon-fill" d="M4 15h3v5H4zM10.5 11h3v9h-3zM17 6h3v14h-3z" />,
+  rocket: (
+    <>
+      <path d="M14 4c3-1 6-1 6-1s0 3-1 6l-6 6-5-5Z" />
+      <path d="M8 10 5 10l-2 3 4 1M14 16l0 3-3 2-1-4" />
+      <circle cx="15.5" cy="8.5" r="1.4" />
+    </>
+  ),
+  dish: (
+    <>
+      <path d="M5 8a8 8 0 0 0 11 11Z" />
+      <path d="M10.5 13.5 15 9M8 21h7M11 16l-1 5" />
+      <path d="M16 4a4 4 0 0 1 4 4M16 1.5a6.5 6.5 0 0 1 6.5 6.5" />
+    </>
+  ),
+  astronaut: (
+    <>
+      <circle cx="12" cy="9" r="6" />
+      <path d="M8.5 9a3.5 2.8 0 0 1 7 0v.6a3.5 2.8 0 0 1-7 0Z" className="icon-fill" />
+      <path d="M5.5 21c.5-3.5 3-5.5 6.5-5.5s6 2 6.5 5.5" />
+    </>
+  ),
+  camera: (
+    <>
+      <path d="M4 8h3l2-2.5h6L17 8h3v11H4Z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6M12 7.5v.5" />
+    </>
+  ),
+}
+
+function Icon({ name }: { name: IconName }) {
+  return (
+    <svg className={`icon icon--${name}`} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {ICON_PATHS[name]}
+    </svg>
+  )
+}
+
+type ArtName = 'clapper' | 'lens' | 'stamp' | 'letter'
+
+/** Colourful pictures for the rewards menu. */
+function Art({ name }: { name: ArtName }) {
+  return (
+    <svg className="art" viewBox="0 0 64 48" aria-hidden="true" focusable="false">
+      {name === 'clapper' && (
+        <>
+          <rect x="10" y="18" width="44" height="26" rx="3" fill="#5b3fc4" />
+          <path d="M10 10 52 4l2 9-42 6Z" fill="#2b2063" />
+          <path d="m16 9 6 9M27 7l6 9M38 6l6 9" stroke="#fff" strokeWidth="3" />
+          <path d="M28 24v14l12-7Z" fill="#fff" />
+        </>
+      )}
+      {name === 'lens' && (
+        <>
+          <circle cx="26" cy="21" r="14" fill="#bfe6ff" stroke="#e8902a" strokeWidth="5" />
+          <path d="M20 15a8 8 0 0 1 8-3" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" />
+          <path d="m36 31 14 13" stroke="#6b3d1a" strokeWidth="7" strokeLinecap="round" />
+        </>
+      )}
+      {name === 'stamp' && (
+        <>
+          <rect x="8" y="6" width="40" height="34" rx="2" fill="#fff3e2" stroke="#e8902a" strokeWidth="2.5" strokeDasharray="3 2.5" />
+          <rect x="13" y="11" width="30" height="24" fill="#ffb27a" />
+          <path d="M13 35 24 22l7 8 5-5 7 10Z" fill="#c44a1f" />
+          <circle cx="36" cy="17" r="3.5" fill="#fff6c8" />
+          <rect x="34" y="30" width="26" height="12" rx="3" fill="#2b2063" transform="rotate(-10 47 36)" />
+        </>
+      )}
+      {name === 'letter' && (
+        <>
+          <rect x="8" y="10" width="48" height="32" rx="4" fill="#fff" stroke="#2b2063" strokeWidth="3" />
+          <path d="m10 13 22 16 22-16" stroke="#e8902a" strokeWidth="3.5" fill="none" />
+        </>
+      )}
+    </svg>
   )
 }

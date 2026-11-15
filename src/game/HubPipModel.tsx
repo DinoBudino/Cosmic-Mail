@@ -31,6 +31,9 @@ export type HubPipExpression =
   | 'confused'
   | 'worried'
   | 'thoughtful'
+  | 'focused'
+  | 'explaining'
+  | 'hopeful'
 
 interface HubPipModelProps {
   expression: HubPipExpression
@@ -40,6 +43,12 @@ interface HubPipModelProps {
   antennaAmplitude?: number
   /** Scales the 1.0-unit body down to the cabin PIP size. */
   scale?: number
+  /**
+   * Each new non-null token plays one short interference on PIP's right
+   * eye (~0.7 s: dims and jitters, then recovers). Nothing is changed
+   * permanently; reduced motion skips it.
+   */
+  glitchToken?: string | null
 }
 
 /**
@@ -107,6 +116,11 @@ const FACE_STYLE: Record<HubPipExpression, FaceStyle> = {
   // "Huh? That's strange": PIP scans the problem with the target reticle.
   confused: { group: 'EXP_06_ANALIZANDO' },
   thoughtful: { group: 'EXP_09_PENSATIVO' },
+  // Intro solar storm: reading the alert with the analysis reticle,
+  // explaining with bright curious eyes, and the hopeful final ask.
+  focused: { group: 'EXP_06_ANALIZANDO' },
+  explaining: { group: 'EXP_05_CURIOSO' },
+  hopeful: { group: 'EXP_10_ALEGRE_VISTA_PRINCIPAL' },
   // Brows raised at the inner ends are what make these two read at a
   // glance (a child should see "PIP is worried" without the text).
   worried: { group: 'EXP_01_NEUTRAL', eyeScaleY: 0.85, frown: [1, 1], brows: 0.42 },
@@ -329,6 +343,7 @@ export function HubPipModel({
   reducedMotion = false,
   antennaAmplitude = 0.06,
   scale = 0.64,
+  glitchToken = null,
 }: HubPipModelProps) {
   const { scene } = useGLTF(PIP_URL)
   const cloned = useMemo(() => clonePip(scene as THREE.Group), [scene])
@@ -337,6 +352,17 @@ export function HubPipModel({
   const activeRef = useRef<V2Group>(FACE_STYLE[expression].group)
 
   const styleRef = useRef<FaceStyle>(FACE_STYLE[expression])
+  // Eye interference: start time (-1 idle) and the token that armed it.
+  const glitchStartRef = useRef(-1)
+  const glitchArmedRef = useRef<string | null>(null)
+  const glitchPendingRef = useRef(false)
+  useEffect(() => {
+    if (glitchToken && glitchToken !== glitchArmedRef.current) {
+      glitchArmedRef.current = glitchToken
+      glitchPendingRef.current = true
+    }
+    if (!glitchToken) glitchArmedRef.current = null
+  }, [glitchToken])
 
   // Exactly one visor expression visible at a time (plus the borrowed
   // frown for composed faces). While speaking, a face without its own
@@ -358,6 +384,8 @@ export function HubPipModel({
       for (const eye of face.eyes) {
         eye.visible = true
         eye.scale.set(1, id === active ? (style.eyeScaleY ?? 1) : 1, 1)
+        // Undo any eye interference left by a line the player skipped.
+        if (typeof eye.userData.baseX === 'number') eye.position.x = eye.userData.baseX
         const tilt = id === active ? (style.eyeTilt ?? 0) : 0
         // Inner corners up (sad/worried); the opposite slant read as angry.
         eye.rotation.z = /EyeL$/.test(eye.name) ? tilt : -tilt
@@ -422,6 +450,29 @@ export function HubPipModel({
     const blinking =
       (blinkCycle > 4.38 && blinkCycle < 4.5) || (blinkCycle > 4.56 && blinkCycle < 4.66)
     if (active) for (const eye of active.eyes) eye.scale.y = blinking ? 0.12 : eyeBase
+
+    // One brief interference on the right eye: it dims (shrinks), skips
+    // sideways twice and recovers. Starts ~0.6 s into the line.
+    if (glitchPendingRef.current) {
+      glitchPendingRef.current = false
+      glitchStartRef.current = time + 0.6
+    }
+    if (active && glitchStartRef.current >= 0 && time >= glitchStartRef.current) {
+      const t = time - glitchStartRef.current
+      const eye = active.eyes.find((mesh) => /EyeR$/.test(mesh.name))
+      if (eye) {
+        if (t < 0.7) {
+          const flicker = Math.sin(t * 46) > 0 ? 0.35 : 0.75
+          eye.scale.x = flicker
+          eye.scale.y = eyeBase * flicker
+          eye.position.x = (eye.userData.baseX ??= eye.position.x) + (t < 0.35 ? 0.012 : -0.008)
+        } else {
+          eye.scale.x = 1
+          eye.position.x = eye.userData.baseX ?? eye.position.x
+          glitchStartRef.current = -1
+        }
+      }
+    }
 
     // Talking: the visible mouth opens and closes in syllables.
     const syllable = talkingRef.current

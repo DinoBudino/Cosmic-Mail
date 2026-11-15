@@ -14,13 +14,18 @@ import {
   hubDialogueSteps,
   HUB_TOUR_STEPS,
   isHubTourActive,
+  INTRO_HOLOGRAM_LABELS,
   introBeatForLine,
   introCameraForLine,
   introEmotionForLine,
   introHologramForLine,
+  introHologramTimeline,
   introMomentForLine,
   registrationWelcomeLine,
+  type IntroBeat,
+  type IntroMoment,
 } from './onboardingNarrative'
+import PIP_VOICE_LINES from './pipVoiceLines.json'
 
 const ALL_TEXT = [
   ...INTRO_BEATS.map((beat) => beat.line),
@@ -33,103 +38,222 @@ const ALL_TEXT = [
 ].join(' ')
 
 describe('Proposal A onboarding beat sheet', () => {
-  it('uses the five cinematic scenes in canonical order', () => {
-    expect(new Set(INTRO_BEATS.map((beat) => beat.moment))).toEqual(
-      new Set(['arrival', 'archive', 'fault', 'hope', 'invitation']),
-    )
+  const indexOf = (predicate: (beat: IntroBeat) => boolean) =>
+    INTRO_BEATS.findIndex(predicate)
+  const byLine = (pattern: RegExp) => {
+    const index = indexOf((beat) => pattern.test(beat.line))
+    expect(index, String(pattern)).toBeGreaterThanOrEqual(0)
+    return INTRO_BEATS[index]!
+  }
+
+  it('uses the five cinematic scenes in canonical, contiguous order', () => {
+    const order: IntroMoment[] = ['arrival', 'archive', 'fault', 'hope', 'invitation']
+    const moments = INTRO_BEATS.map((beat) => beat.moment)
+    // Each scene is one contiguous block, in canonical order.
+    const blocks = moments.filter((moment, i) => moment !== moments[i - 1])
+    expect(blocks).toEqual(order)
     expect(introMomentForLine(0)).toBe('arrival')
-    expect(introMomentForLine(2)).toBe('archive')
-    expect(introMomentForLine(5)).toBe('fault')
-    expect(introMomentForLine(10)).toBe('hope')
     expect(introMomentForLine(INTRO_BEATS.length - 1)).toBe('invitation')
-
-    const order = INTRO_BEATS.map((beat) => beat.moment)
-    const first = Object.fromEntries(
-      [...new Set(order)].map((moment) => [moment, order.indexOf(moment)]),
-    )
-    expect(first.arrival).toBeLessThan(first.archive)
-    expect(first.archive).toBeLessThan(first.fault)
-    expect(first.fault).toBeLessThan(first.hope)
-    expect(first.hope).toBeLessThan(first.invitation)
   })
 
-  it('shows the failure before PIP explains it', () => {
-    const firstLoss = INTRO_BEATS.findIndex((beat) =>
-      /lost its connection/i.test(beat.line),
-    )
-    const explanation = INTRO_BEATS.findIndex((beat) =>
-      /trying to fix them/i.test(beat.line),
-    )
-
-    expect(firstLoss).toBeGreaterThan(0)
-    expect(explanation).toBeGreaterThan(firstLoss)
-    expect(introHologramForLine(firstLoss)).toBe('losing1')
-    expect(introHologramForLine(explanation)).toBe('recovering')
+  it('splits the Solar Storm scene into its phases, in order', () => {
+    const fault = INTRO_BEATS.filter((beat) => beat.moment === 'fault')
+    const phases = fault
+      .map((beat) => beat.subphase)
+      .filter((phase, i, all) => phase !== all[i - 1])
+    expect(phases).toEqual([
+      'first-anomaly',
+      'fault-spreads',
+      'solar-alert',
+      'storm-reveal',
+      'archive-damage',
+      'failed-recovery',
+      'pip-affected',
+    ])
   })
 
-  it('syncs every beat with an expression, hologram and camera shot', () => {
+  it('shows the anomaly first, detects the storm next and explains it last', () => {
+    const lastCalm = indexOf((beat) => /all connected/.test(beat.line))
+    const firstLoss = indexOf((beat) => beat.hologram === 'losing1')
+    const spread = indexOf((beat) => beat.hologram === 'losing3')
+    const alert = indexOf((beat) => beat.hologram === 'solarAlert')
+    const storm = indexOf((beat) => beat.hologram === 'solarStorm')
+    const explanation = indexOf((beat) => /communication network/.test(beat.line))
+    const damage = indexOf((beat) => /while its memories were being updated/.test(beat.line))
+    const pip = indexOf((beat) => /my own memories are missing/.test(beat.line))
+
+    expect(introHologramForLine(lastCalm)).toBe('stable')
+    expect([lastCalm, firstLoss, spread, alert, storm, explanation, damage, pip]).toEqual(
+      [...[lastCalm, firstLoss, spread, alert, storm, explanation, damage, pip]].sort((a, b) => a - b),
+    )
+    // Nothing names the storm before Mailwing detects it.
+    for (const beat of INTRO_BEATS.slice(0, alert)) {
+      expect(beat.line).not.toMatch(/solar|storm|Sun/i)
+    }
+    expect(introBeatForLine(alert).line).toMatch(/detected something unusual/)
+    expect(introBeatForLine(storm).line).toMatch(/solar storm/)
+  })
+
+  it('keeps the original fault states and adds the solar ones in between', () => {
+    const states = INTRO_BEATS.map((beat) => beat.hologram)
+    const at = (state: string) => states.indexOf(state as never)
+    for (const state of [
+      'mail', 'stable', 'losing1', 'losing3', 'solarAlert', 'solarStorm', 'stormImpact',
+      'fragmented', 'recovering', 'offline', 'memory', 'forgotten',
+      'locations', 'route', 'dossier', 'letter',
+    ]) {
+      expect(at(state), state).toBeGreaterThanOrEqual(0)
+    }
+    expect(at('fragmented')).toBeLessThan(at('recovering'))
+    expect(at('recovering')).toBeLessThan(at('offline'))
+    expect(at('offline')).toBeLessThan(at('memory'))
+    // The solar projection never leaks outside the Solar Storm scene.
+    for (const beat of INTRO_BEATS) {
+      if (['solarAlert', 'solarStorm', 'stormImpact', 'syncError'].includes(beat.hologram)) {
+        expect(beat.moment).toBe('fault')
+      }
+    }
+  })
+
+  it('syncs every beat with an expression, hologram, camera shot and mood', () => {
     expect(introEmotionForLine(0)).toBe('welcome')
-    expect(introEmotionForLine(3)).toBe('surprised')
-    expect(introEmotionForLine(5)).toBe('worried')
-    expect(introEmotionForLine(7)).toBe('worried')
-    expect(introEmotionForLine(9)).toBe('thoughtful')
-    expect(introEmotionForLine(11)).toBe('happy')
+    expect(byLine(/lost its connection/).emotion).toBe('surprised')
+    expect(byLine(/going dark/).emotion).toBe('worried')
+    expect(byLine(/detected something unusual/).emotion).toBe('focused')
+    expect(byLine(/communication network/).emotion).toBe('explaining')
+    expect(byLine(/my own memories are missing/).emotion).toBe('sad')
+    expect(byLine(/two places/).emotion).toBe('excited')
+    expect(byLine(/will you help me/).emotion).toBe('hopeful')
 
     expect(introHologramForLine(0)).toBe('none')
-    expect(introHologramForLine(2)).toBe('stable')
-    expect(introHologramForLine(3)).toBe('losing1')
-    expect(introHologramForLine(4)).toBe('losing3')
-    expect(introHologramForLine(5)).toBe('fragmented')
-    expect(introHologramForLine(6)).toBe('recovering')
-    expect(introHologramForLine(10)).toBe('locations')
-    expect(introHologramForLine(12)).toBe('dossier')
-    expect(introHologramForLine(13)).toBe('letter')
-
     expect(introCameraForLine(0)).toBe('welcome')
-    expect(introCameraForLine(2)).toBe('archive')
-    expect(introCameraForLine(5)).toBe('pip')
-    expect(introCameraForLine(12)).toBe('invitation')
+    expect(byLine(/Cosmic Archive/).camera).toBe('archive')
+    expect(byLine(/my own memories are missing/).camera).toBe('pip')
+    expect(byLine(/will you help me/).camera).toBe('invitation')
+    // The storm sub-variation only frames the solar projection.
+    for (const beat of INTRO_BEATS) {
+      if (beat.camera === 'storm') expect(beat.subphase).toMatch(/solar-alert|storm-reveal|archive-damage/)
+    }
     // Reduced motion keeps one stable frontal frame.
-    expect(introCameraForLine(5, true)).toBe('welcome')
-    expect(introCameraForLine(12, true)).toBe('welcome')
+    INTRO_BEATS.forEach((_, i) => expect(introCameraForLine(i, true)).toBe('welcome'))
+
+    // Emergency light: none at first, grows with the storm, gone with hope.
+    expect(introBeatForLine(0).ambience).toBe('calm')
+    expect(byLine(/solar storm/).ambience).toBe('storm')
+    expect(byLine(/my own memories are missing/).ambience).toBe('soft')
+    for (const beat of INTRO_BEATS) {
+      if (beat.moment === 'hope' || beat.moment === 'invitation') {
+        expect(beat.ambience).toBe('hope')
+      }
+    }
+  })
+
+  it('animates holograms toward a settled frame that Replay can restart', () => {
+    for (const [i, beat] of INTRO_BEATS.entries()) {
+      const timeline = introHologramTimeline(i)
+      expect(timeline.length).toBeGreaterThan(0)
+      expect(timeline[0]!.at).toBe(0)
+      for (let k = 1; k < timeline.length; k += 1) {
+        expect(timeline[k]!.at).toBeGreaterThan(timeline[k - 1]!.at)
+      }
+      // The settled frame is the beat's own state.
+      expect(timeline[timeline.length - 1]!.state).toBe(beat.hologram)
+      // Reduced motion: only the settled frame, shown at once.
+      const reduced = introHologramTimeline(i, true)
+      expect(reduced).toHaveLength(1)
+      expect(reduced[0]).toEqual({ ...timeline[timeline.length - 1], at: 0 })
+    }
+    // Replaying the first disconnection starts from the connected node.
+    const firstLoss = introHologramTimeline(indexOf((beat) => beat.hologram === 'losing1'))
+    expect(firstLoss.length).toBeGreaterThanOrEqual(3)
+    expect(firstLoss[0]!.variant).not.toBe(firstLoss[firstLoss.length - 1]!.variant)
+    // The last calm line hides a single, discreet blink of one link.
+    const calm = introHologramTimeline(indexOf((beat) => /all connected/.test(beat.line)))
+    expect(calm[0]!.variant).toBe(calm[calm.length - 1]!.variant)
+    expect(new Set(calm.map((frame) => frame.variant)).size).toBe(2)
   })
 
   it('is fully player-paced and ends on the invitation', () => {
     for (const beat of INTRO_BEATS) {
       expect(beat).not.toHaveProperty('autoAdvance')
     }
-    expect(introBeatForLine(INTRO_BEATS.length - 1).line).toMatch(
-      /will you help me bring their stories home\?/,
-    )
+    expect(introBeatForLine(INTRO_BEATS.length - 1).line).toBe('So... will you help me?')
   })
 
   it('pairs each line with a projection that shows what it says', () => {
-    const byLine = (pattern: RegExp) =>
-      introBeatForLine(INTRO_BEATS.findIndex((beat) => pattern.test(beat.line)))
     expect(byLine(/Cosmic Mail/).hologram).toBe('mail')
+    expect(byLine(/file in the Cosmic Archive/).hologram).toBe('stable')
+    expect(byLine(/solar storm/).hologram).toBe('solarStorm')
+    expect(byLine(/communication network/).hologram).toBe('stormImpact')
+    expect(byLine(/memories were being updated/).hologram).toBe('syncError')
+    expect(byLine(/stories are incomplete/).hologram).toBe('fragmented')
+    expect(byLine(/trying to fix them/).hologram).toBe('recovering')
+    expect(byLine(/pieces don't fit/).hologram).toBe('offline')
     expect(byLine(/my own memories are missing/).hologram).toBe('memory')
-    expect(byLine(/my own memories are missing/).emotion).toBe('sad')
     expect(byLine(/I can't remember/).hologram).toBe('forgotten')
     expect(byLine(/two places/).hologram).toBe('locations')
-    expect(byLine(/two places/).emotion).toBe('excited')
-    expect(byLine(/fix their stories/).hologram).toBe('route')
-    expect(byLine(/signals have gone quiet/).hologram).toBe('dossier')
-    // Consecutive beats never repeat the same projection.
+    expect(byLine(/recover their missing stories/).hologram).toBe('route')
+    expect(byLine(/waiting to be remembered/).hologram).toBe('dossier')
+    expect(byLine(/rebuild their memories/).hologram).toBe('letter')
+    // Consecutive beats never settle on the same picture.
     for (let i = 1; i < INTRO_BEATS.length; i += 1) {
-      expect(INTRO_BEATS[i]!.hologram).not.toBe(INTRO_BEATS[i - 1]!.hologram)
+      const a = introHologramTimeline(i - 1).at(-1)!
+      const b = introHologramTimeline(i).at(-1)!
+      expect(`${b.state}:${b.variant}`).not.toBe(`${a.state}:${a.variant}`)
     }
   })
 
-  it('establishes the Archive fault and PIP fragmentation', () => {
+  it('shows PIP checking himself only when his own memories fail', () => {
+    const glitches = INTRO_BEATS.filter((beat) => beat.pipGlitch)
+    expect(glitches).toHaveLength(1)
+    expect(glitches[0]!.line).toMatch(/my own memories are missing/)
+    for (const beat of INTRO_BEATS) {
+      if (beat.pipPanel === 'memoryCheck') expect(beat.subphase).toBe('pip-affected')
+      if (beat.pipPanel === 'diagnostic') expect(beat.subphase).toBe('solar-alert')
+    }
+    expect(byLine(/detected something unusual/).pipPanel).toBe('diagnostic')
+  })
+
+  it('leaves the cue changes to AudioDirector so no sound fires twice', () => {
+    for (const beat of INTRO_BEATS) {
+      expect(beat.sound).not.toBe('archiveFaultStarted')
+      expect(beat.sound).not.toBe('archiveClueRecovered')
+      expect(beat.sound).not.toBe('introStarted')
+    }
+    expect(byLine(/lost its connection/).sound).toBeUndefined()
+    expect(byLine(/two places/).sound).toBeUndefined()
+    expect(byLine(/detected something unusual/).sound).toBe('solarAlert')
+  })
+
+  it('records every intro line with its own key', () => {
+    const ids = INTRO_BEATS.map((beat) => beat.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const beat of INTRO_BEATS) {
+      const recording = PIP_VOICE_LINES.find((line) => line.key === beat.id)
+      expect(recording?.text, beat.id).toBe(beat.line)
+    }
+  })
+
+  it('establishes the storm, the damaged Archive and PIP fragmentation', () => {
     expect(ALL_TEXT).toMatch(/Cosmic Archive/i)
-    expect(ALL_TEXT).toMatch(/connection/i)
+    expect(ALL_TEXT).toMatch(/lost its connection/i)
+    expect(ALL_TEXT).toMatch(/solar storm/i)
+    expect(ALL_TEXT).toMatch(/energy and particles/i)
+    expect(ALL_TEXT).toMatch(/communication network/i)
+    expect(ALL_TEXT).toMatch(/stories are incomplete/i)
     expect(ALL_TEXT).toMatch(/pieces don't fit/i)
     expect(ALL_TEXT).toMatch(/my own memories are missing/i)
     expect(ALL_TEXT).toMatch(/I can't remember/i)
     expect(ALL_TEXT).toMatch(/two places/i)
-    expect(ALL_TEXT).toMatch(/fix their stories/i)
+    expect(ALL_TEXT).toMatch(/recover their missing stories/i)
     expect(ALL_TEXT).toMatch(/Carrier ID/i)
     expect(ALL_TEXT).toMatch(/Earth/i)
+  })
+
+  it('never claims the Archive was wiped out completely', () => {
+    expect(ALL_TEXT).not.toMatch(/none of the files|all .* destroyed|everything is gone/i)
+    expect(INTRO_HOLOGRAM_LABELS.offline).toMatch(/backup signals/i)
+    expect(INTRO_HOLOGRAM_LABELS.solarStorm).toMatch(/recorded/i)
   })
 
   it('does not reveal Surveyor 3, Opportunity, Spirit or Pioneer 10 before discovery', () => {
@@ -142,7 +266,6 @@ describe('Proposal A onboarding beat sheet', () => {
       'found their way home',
       'unfinished stories',
       'hero',
-      'power',
       'trait',
       'personality',
       'routine check',
@@ -151,6 +274,8 @@ describe('Proposal A onboarding beat sheet', () => {
     ]) {
       expect(ALL_TEXT.toLowerCase()).not.toContain(retired)
     }
+    // "Power" as a hero ability is retired; a "powerful solar storm" is science.
+    expect(ALL_TEXT).not.toMatch(/\b(super)?powers?\b/i)
   })
 
   it('defines the Earth Archive transmission labels', () => {

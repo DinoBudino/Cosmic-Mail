@@ -1,6 +1,7 @@
 import type { JourneySave } from '../store/journeySchema'
 import type { ExplorerId, WorldId } from './spiritSite'
 import { pipLine } from './pipVoiceCatalog'
+import { storyProgressPercent } from './passport'
 
 /**
  * The explorers seen from orbit, two per world. Coordinates are the NASA
@@ -93,14 +94,7 @@ export function getLandingSiteProgress(
   save: JourneySave | null,
   explorer: ExplorerId,
 ): number {
-  const progress = save?.missions[explorer]
-  if (!progress) return 0
-  if (progress.transmittedAt != null) return 100
-  const steps =
-    (progress.discovered ? 1 : 0) +
-    Math.min(3, progress.scannedComponentIds.length) +
-    (progress.smartLetterCreatedAt != null ? 1 : 0)
-  return Math.round((steps / 6) * 100)
+  return storyProgressPercent(save?.missions[explorer])
 }
 
 export interface OrbitGuidance {

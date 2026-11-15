@@ -24,6 +24,8 @@ export interface PassportStory {
   status: StoryStatus
   statusLabel: string
   scanned: number
+  /** Parts already recognized (component ids). */
+  scannedIds: readonly string[]
   total: number
   memoryRecovered: boolean
   hasSmartLetter: boolean
@@ -33,6 +35,8 @@ export interface PassportStory {
   stampLabel: string | null
   /** Proposal B seal preserved as history. Never an Archive delivery. */
   legacySealAt: number | null
+  /** 0–100: found, parts scanned, letter ready; 100 once delivered. */
+  percent: number
 }
 
 export interface PassportView {
@@ -53,13 +57,30 @@ function carrierIdFor(save: JourneySave | null): string {
   return `CM-${String(seed).padStart(5, '0')}`
 }
 
+/**
+ * How much of an explorer's story is done, 0–100: finding it, its three
+ * parts and the smart letter are one step each; delivery completes it.
+ */
+export function storyProgressPercent(
+  progress: MissionProgress | null | undefined,
+): number {
+  if (!progress) return 0
+  if (progress.transmittedAt != null) return 100
+  const steps =
+    (progress.discovered ? 1 : 0) +
+    Math.min(3, progress.scannedComponentIds.length) +
+    (progress.smartLetterCreatedAt != null ? 1 : 0)
+  return Math.round((steps / 6) * 100)
+}
+
 function storyFor(
   destination: Destination,
   missionId: MissionId,
   progress: MissionProgress | null,
 ): PassportStory {
   const mission = findMission(missionId)
-  const scanned = new Set(progress?.scannedComponentIds ?? []).size
+  const scannedIds = [...new Set(progress?.scannedComponentIds ?? [])]
+  const scanned = scannedIds.length
   const total = mission?.components.length ?? 3
   const status = getMissionStage(progress)
   const discovered = Boolean(progress?.discovered || scanned > 0)
@@ -73,6 +94,7 @@ function storyFor(
     status,
     statusLabel: STORY_STATUS_LABEL[status],
     scanned,
+    scannedIds,
     total,
     memoryRecovered: progress?.memoryRecoveredAt != null,
     hasSmartLetter,
@@ -81,6 +103,7 @@ function storyFor(
     stampEarned: transmitted,
     stampLabel: transmitted && mission ? mission.stampLabel : null,
     legacySealAt: progress?.legacySealAt ?? null,
+    percent: storyProgressPercent(progress),
   }
 }
 

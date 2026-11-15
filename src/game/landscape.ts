@@ -328,15 +328,10 @@ const boulderCaches = new Map<string, BoulderObstacle[]>()
  * The cache is keyed by count: High and Low quality each keep a stable list
  * without rebuilding every frame when the two systems alternate calls.
  */
-<<<<<<< Updated upstream
-export function getBoulderObstacles(count = 150): BoulderObstacle[] {
+export function getBoulderObstacles(count = QUALITY_PRESETS.high.rockCount): BoulderObstacle[] {
   // Keyed by landing too: each world (and each Moon site) has its own rocks.
   const key = `${getActiveExplorer()}:${count}`
   const cached = boulderCaches.get(key)
-=======
-export function getBoulderObstacles(count = QUALITY_PRESETS.high.rockCount): BoulderObstacle[] {
-  const cached = boulderCaches.get(count)
->>>>>>> Stashed changes
   if (cached) return cached
   const list = createRocks(count)
     .filter((rock) => rock.scale >= 0.8)

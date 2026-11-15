@@ -22,8 +22,19 @@ function GearIcon() {
   )
 }
 
+function AlbumIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="4.5" y="3" width="15" height="18" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="7" y="6" width="10" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 16.5h8M10.5 19h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function Hud() {
   const openSettings = useGameStore((state) => state.openSettings)
+  const openAlbum = useGameStore((state) => state.openAlbum)
   const quality = useGameStore((state) => state.quality)
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
   const cinematicFocus = useGameStore((state) => state.cinematicFocus)
@@ -66,6 +77,17 @@ export function Hud() {
           </div>
         </details>
       )}
+
+      <button
+        type="button"
+        className="hud-album"
+        onClick={openAlbum}
+        aria-label="Open the Cosmic Album"
+        aria-haspopup="dialog"
+      >
+        <AlbumIcon />
+        <span>Album</span>
+      </button>
 
       <button
         type="button"
