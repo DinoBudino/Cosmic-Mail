@@ -377,7 +377,14 @@ interface Footprint {
  * changes, so player, rocks and camera stay in sync. Ring-buffer pool with
  * no per-frame allocation.
  */
-function FootprintTrail() {
+export function FootprintTrail({
+  color = PALETTE.terrainDark,
+  lifetime = FOOTPRINT_LIFETIME,
+}: {
+  color?: string
+  /** Seconds a print stays (long on the Moon: there is no wind). */
+  lifetime?: number
+} = {}) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const geometry = useMemo(() => {
     const circle = new THREE.CircleGeometry(0.5, 10)
@@ -399,9 +406,9 @@ function FootprintTrail() {
   useLayoutEffect(() => {
     const mesh = meshRef.current
     if (!mesh) return
-    const color = new THREE.Color(PALETTE.terrainDark)
+    const tint = new THREE.Color(color)
     for (let index = 0; index < FOOTPRINT_POOL; index += 1) {
-      mesh.setColorAt(index, color)
+      mesh.setColorAt(index, tint)
     }
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     const dummy = new THREE.Object3D()
@@ -411,7 +418,7 @@ function FootprintTrail() {
       mesh.setMatrixAt(index, dummy.matrix)
     }
     mesh.instanceMatrix.needsUpdate = true
-  }, [])
+  }, [color])
 
   useFrame((_, delta) => {
     const mesh = meshRef.current
@@ -452,8 +459,8 @@ function FootprintTrail() {
     for (let index = 0; index < current.footprints.length; index += 1) {
       const footprint = current.footprints[index]!
       footprint.age += delta
-      if (footprint.age >= FOOTPRINT_LIFETIME) continue
-      const life = 1 - footprint.age / FOOTPRINT_LIFETIME
+      if (footprint.age >= lifetime) continue
+      const life = 1 - footprint.age / lifetime
       dummy.position.set(footprint.x, footprint.y, footprint.z)
       dummy.rotation.set(0, footprint.heading, 0)
       dummy.scale.set(0.2 * life, 1, 0.34 * life)

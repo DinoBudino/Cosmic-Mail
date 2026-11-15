@@ -13,9 +13,9 @@ describe('destinations', () => {
     ])
   })
 
-  it('only enables Mars in this block', () => {
+  it('enables both the Moon and Mars', () => {
     expect(getDestination('mars').available).toBe(true)
-    expect(getDestination('moon').available).toBe(false)
+    expect(getDestination('moon').available).toBe(true)
   })
 
   it('keeps machine identities out of navigation clues', () => {

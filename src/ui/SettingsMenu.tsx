@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AUDIO_ASSETS } from '../game/audio/audioManifest'
-import { PIP_VOICES, resolveVoiceId, speakPip } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
 
 const MUSIC_CREDITS = Object.values(AUDIO_ASSETS).filter(
@@ -58,8 +57,6 @@ export function SettingsMenu() {
   )
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
   const setVoiceEnabled = useGameStore((state) => state.setVoiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
-  const setVoiceName = useGameStore((state) => state.setVoiceName)
   const masterVolume = useGameStore((state) => state.masterVolume)
   const setMasterVolume = useGameStore((state) => state.setMasterVolume)
   const musicVolume = useGameStore((state) => state.musicVolume)
@@ -73,7 +70,6 @@ export function SettingsMenu() {
   const muted = useGameStore((state) => state.muted)
   const setMuted = useGameStore((state) => state.setMuted)
 
-  const effectiveVoice = resolveVoiceId(voiceName)
   const [activeTab, setActiveTab] = useState<SettingsTab>('game')
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -239,28 +235,6 @@ export function SettingsMenu() {
                 <SettingRow label="PIP talks" hint="PIP reads its lines out loud.">
                   <Switch checked={voiceEnabled} onChange={setVoiceEnabled} label="PIP talks" />
                 </SettingRow>
-                <div className="set-row set-row--stack">
-                  <span className="set-row__label" id="voice-picker-label">PIP voice</span>
-                  <div className="set-voices" role="radiogroup" aria-labelledby="voice-picker-label">
-                    {PIP_VOICES.map((voice) => (
-                      <button
-                        key={voice.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={effectiveVoice === voice.id}
-                        disabled={!voiceEnabled}
-                        className={effectiveVoice === voice.id ? 'is-active' : ''}
-                        onClick={() => {
-                          setVoiceName(voice.id)
-                          speakPip('Hi! I am PIP, your mail companion.', voice.id, true)
-                        }}
-                      >
-                        {voice.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="set-row__hint">Tap a voice to hear it.</p>
-                </div>
               </div>
             )}
 

@@ -7,7 +7,7 @@ import { ScannerBeam } from './ScannerBeam'
 import { ScannerController } from './ScannerController'
 import { ScanFx } from './ScanFx'
 import { MerRover } from './MerRover'
-import { LandedShip } from './LandedShip'
+import { LandedShip } from './LandedShip.tsx'
 import { Terrain } from './Terrain'
 
 export function MarsWorld() {

@@ -63,11 +63,10 @@ export function MarsBriefing() {
   useEffect(() => () => useGameStore.getState().setMarsBriefingStep(null), [])
 
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   useEffect(() => {
     if (!active) return
-    speakPip(step.line, voiceName, voiceEnabled, step.expression)
-  }, [active, step, voiceName, voiceEnabled])
+    speakPip(step.line, voiceEnabled, step.expression)
+  }, [active, step, voiceEnabled])
   useEffect(() => () => stopPipVoice(), [])
 
   const advance = (action: Parameters<typeof nextBriefingIndex>[1]) => {

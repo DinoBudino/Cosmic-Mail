@@ -10,7 +10,9 @@ import {
 } from '../data/environmentalSites'
 import { useProtocol } from '../ui/useProtocol'
 import { useGameStore } from '../store/gameStore'
-import { buildRockGeometry } from './landscape'
+import { getActiveWorld } from '../data/spiritSite'
+import { buildRockGeometry, buildTintedRockGeometry } from './landscape'
+import { MOON_ROCK } from './lunarRocks'
 import { getTerrainHeight } from './terrainHeight'
 import { PALETTE } from './worldConfig'
 import { getGuideLane, getGuideMode } from './practiceGuide'
@@ -78,8 +80,10 @@ function EnvironmentalVisual({
 }) {
   const ground = getTerrainHeight(site.position.x, site.position.z)
   const glow = selected ? 0.18 + (analysis === 'detailed' ? 0.22 : 0) : 0
-  const rockGeometry = useMemo(() => buildRockGeometry(1), [])
-  const chipGeometry = useMemo(() => buildRockGeometry(2, 2), [])
+  // On the Moon the practice rock is a gray lunar rock.
+  const moon = getActiveWorld() === 'moon'
+  const rockGeometry = useMemo(() => (moon ? buildTintedRockGeometry(1, 3, MOON_ROCK.dust) : buildRockGeometry(1)), [moon])
+  const chipGeometry = useMemo(() => (moon ? buildTintedRockGeometry(2, 2, MOON_ROCK.dust) : buildRockGeometry(2, 2)), [moon])
   useEffect(() => () => rockGeometry.dispose(), [rockGeometry])
   useEffect(() => () => chipGeometry.dispose(), [chipGeometry])
 
@@ -105,7 +109,7 @@ function EnvironmentalVisual({
             receiveShadow
           >
             <meshStandardMaterial
-              color={PALETTE.rockDark}
+              color={moon ? MOON_ROCK.dark : PALETTE.rockDark}
               roughness={0.95}
               vertexColors
               emissive={PALETTE.accent}
@@ -113,7 +117,7 @@ function EnvironmentalVisual({
             />
           </mesh>
           <mesh geometry={chipGeometry} position={[1.55, 0.1, 0.85]} scale={[0.42, 0.32, 0.48]} castShadow>
-            <meshStandardMaterial color={PALETTE.rockLight} roughness={0.98} vertexColors />
+            <meshStandardMaterial color={moon ? MOON_ROCK.light : PALETTE.rockLight} roughness={0.98} vertexColors />
           </mesh>
         </>
       )}
@@ -123,13 +127,14 @@ function EnvironmentalVisual({
   )
 }
 
-export function EnvironmentalObjects() {
+export function EnvironmentalObjects({ practiceOnly = false }: { practiceOnly?: boolean } = {}) {
   const selectedId = useGameStore((state) => state.scannerEnvironmentalId)
   const analysis = useGameStore((state) => state.scannerAnalysis)
 
   return (
     <group name="EnvironmentalObjects" userData={{ scannerRoot: true }}>
-      {WORLD_ENVIRONMENTAL_SITES.map((site) => (
+      {/* The Mars field features only exist on Mars; the practice rock goes everywhere. */}
+      {!practiceOnly && WORLD_ENVIRONMENTAL_SITES.map((site) => (
         <EnvironmentalVisual
           key={site.id}
           site={site}

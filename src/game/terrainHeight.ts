@@ -1,5 +1,6 @@
 import { MARS_OBJECTS } from '../data/marsObjects'
-import { SPIRIT_SITE } from '../data/spiritSite'
+import { getActiveExplorer, getActiveWorld, SPIRIT_SITE, type MoonExplorerId } from '../data/spiritSite'
+import { getLunarHeight } from './lunarGround'
 import { PATH_WAYPOINTS, SURVEY_ROUTE, WORLD } from './worldConfig'
 
 const SPAWN_FLAT_RADIUS = 8
@@ -204,6 +205,10 @@ const FLATTEN_ZONES: readonly FlattenZone[] = [
  * player, rocks and every object so nothing floats or sinks.
  */
 export function getTerrainHeight(x: number, z: number): number {
+  // On the Moon the ground follows the lunar site of the chosen landing.
+  if (getActiveWorld() === 'moon') {
+    return getLunarHeight(getActiveExplorer() as MoonExplorerId, x, z)
+  }
   let height = rawHeight(x, z)
 
   for (const zone of FLATTEN_ZONES) {

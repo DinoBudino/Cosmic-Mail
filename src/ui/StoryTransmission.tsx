@@ -1,3 +1,4 @@
+import { getActiveWorld } from '../data/spiritSite'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getDestination } from '../data/destinations'
 import type { MissionDefinition } from '../data/missions'
@@ -75,7 +76,6 @@ export function StoryTransmission({
   const transmit = useJourneyStore((state) => state.transmit)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const masterVolume = useGameStore((state) => state.masterVolume)
   const muted = useGameStore((state) => state.muted)
   const phaseOnboarding = useOnboardingStore((state) => state.phase)
@@ -151,10 +151,10 @@ export function StoryTransmission({
           ? 'story-delivered'
           : null
     if (!key) return
-    speakPip(pipLine(key), voiceName, voiceEnabled, 'excited')
+    speakPip(pipLine(key), voiceEnabled, 'excited')
     const frame = window.requestAnimationFrame(() => actionRef.current?.focus())
     return () => window.cancelAnimationFrame(frame)
-  }, [phase, alreadySent, voiceName, voiceEnabled])
+  }, [phase, alreadySent, voiceEnabled])
 
   const togglePlay = useCallback(() => {
     const element = videoRef.current
@@ -332,7 +332,7 @@ export function StoryTransmission({
                   className="story-tx__btn story-tx__btn--main"
                   onClick={onClose}
                 >
-                  {onMars ? 'Back to Mars' : 'Done'}
+                  {onMars ? `Back to ${getActiveWorld() === 'moon' ? 'the Moon' : 'Mars'}` : 'Done'}
                 </button>
                 <button
                   type="button"
@@ -465,7 +465,7 @@ export function StoryTransmission({
             className="story-tx__btn story-tx__btn--main"
             onClick={onClose}
           >
-            {onMars ? 'Back to Mars' : 'Done'}
+            {onMars ? `Back to ${getActiveWorld() === 'moon' ? 'the Moon' : 'Mars'}` : 'Done'}
           </button>
         </div>
       )}

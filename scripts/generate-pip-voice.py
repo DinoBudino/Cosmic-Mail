@@ -48,7 +48,7 @@ ONBOARDING_PITCHES = {line["key"]: float(line.get("pitch", 1.0)) for line in ONB
 PHRASES = LANDMARK_PHRASES + ONBOARDING_PHRASES
 
 # Voice id -> folder name used by the game (see src/game/pipVoice.ts).
-VOICES = [("af_heart", "heart"), ("af_sky", "sky"), ("bf_lily", "lily"), ("am_michael", "michael")]
+VOICES = [("af_heart", "heart")]  # PIP has one voice
 
 TMP = os.path.join(KOKORO_DIR, "tmp.wav")
 

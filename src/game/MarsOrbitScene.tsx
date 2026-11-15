@@ -2,12 +2,12 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import {
-  MARS_LANDING_SITES,
+  landingSitesFor,
   rotationToFace,
   siteDirection,
   type LandingSiteState,
 } from '../data/marsLandingSites'
-import type { MarsExplorerId } from '../data/spiritSite'
+import type { ExplorerId as MarsExplorerId, WorldId } from '../data/spiritSite'
 import { makeMarsCanvas } from './marsTexture'
 import { RockySurface } from './PlanetGlobe'
 import { PauseWhenCovered } from './PauseWhenCovered'
@@ -22,6 +22,8 @@ export interface OrbitMarker {
 }
 
 interface MarsOrbitSceneProps {
+  /** The planet in orbit (Mars or the Moon). */
+  world?: WorldId
   markers: readonly OrbitMarker[]
   selected: MarsExplorerId | null
   suggested: MarsExplorerId | null
@@ -132,19 +134,21 @@ function Stars() {
 }
 
 function Marker({
+  world: planet,
   marker,
   active,
   glow,
   onPick,
   labels,
 }: {
+  world: WorldId
   marker: OrbitMarker
   active: boolean
   glow: boolean
   onPick: (explorer: MarsExplorerId) => void
   labels: MarsOrbitSceneProps['labels']
 }) {
-  const site = MARS_LANDING_SITES.find((s) => s.explorer === marker.explorer)!
+  const site = landingSitesFor(planet).find((s) => s.explorer === marker.explorer)!
   const dir = siteDirection(site)
   // Local +Z of the marker group = the surface normal at the site, so the
   // rings lie flat on the ground and the beacon points straight up.
@@ -230,6 +234,7 @@ function Marker({
 }
 
 function Globe({
+  world = 'mars',
   markers,
   selected,
   suggested,
@@ -241,18 +246,28 @@ function Globe({
 }: MarsOrbitSceneProps & { drag: { current: DragState } }) {
   const group = useRef<THREE.Group>(null)
   const texture = useMemo(() => {
-    const t = new THREE.CanvasTexture(makeMarsCanvas())
+    const canvas = makeMarsCanvas()
+    if (world === 'moon') {
+      // Neutral gray stand-in while the Moon texture loads.
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = '#8d8a86'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      }
+    }
+    const t = new THREE.CanvasTexture(canvas)
     t.colorSpace = THREE.SRGBColorSpace
     t.anisotropy = 4
     return t
-  }, [])
+  }, [world])
   useEffect(() => () => texture.dispose(), [texture])
+  const sites = landingSitesFor(world)
 
   useFrame((state, delta) => {
     const g = group.current
     if (!g) return
     const dt = Math.min(delta, 0.05)
-    const site = MARS_LANDING_SITES.find((s) => s.explorer === selected)
+    const site = sites.find((s) => s.explorer === selected)
     const spun = isSpinning(drag.current)
     const turn = takeDragTurn(drag.current)
     if (!landing && (turn.yaw !== 0 || turn.pitch !== 0)) {
@@ -277,7 +292,7 @@ function Globe({
     } else {
       // PIP's suggested spot drifts into view, a little off-center, so the
       // child can see the glowing spot PIP is talking about.
-      const hint = MARS_LANDING_SITES.find((s) => s.explorer === suggested)
+      const hint = sites.find((s) => s.explorer === suggested)
       if (hint) {
         const target = rotationToFace(hint) + 0.45
         g.rotation.y += shortestAngle(g.rotation.y, target) * (1 - Math.exp(-dt * 0.9))
@@ -293,7 +308,7 @@ function Globe({
   })
 
   return (
-    <group ref={group} rotation={[0, rotationToFace(MARS_LANDING_SITES[0]!) + 0.9, 0]}>
+    <group ref={group} rotation={[0, rotationToFace(sites[0]!) + 0.9, 0]}>
       {/* The Blender Mars; the painted one shows while it loads. */}
       <Suspense
         fallback={
@@ -303,11 +318,12 @@ function Globe({
           </mesh>
         }
       >
-        <RockySurface kind="mars" radius={RADIUS} />
+        <RockySurface kind={world} radius={RADIUS} />
       </Suspense>
       {markers.map((marker) => (
         <Marker
           key={marker.explorer}
+          world={world}
           marker={marker}
           active={marker.explorer === selected}
           glow={marker.explorer === suggested && !selected}

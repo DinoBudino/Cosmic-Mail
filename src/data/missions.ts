@@ -22,6 +22,7 @@ export const MISSION_IDS = [
   'spirit',
   'pioneer-10',
   'opportunity',
+  'apollo-11',
 ] as const
 export type MissionId = (typeof MISSION_IDS)[number]
 
@@ -34,6 +35,7 @@ export type MissionId = (typeof MISSION_IDS)[number]
  */
 export const ACTIVE_MISSION_IDS: readonly MissionId[] = [
   'surveyor-3',
+  'apollo-11',
   'opportunity',
   'spirit',
 ]
@@ -79,7 +81,10 @@ export interface MissionComponent {
    * (e.g. "It looks"). Shown on the scan result card; the scan itself is
    * the same single hold for every part.
    */
-  howItWorks?: { verb: 'Looks' | 'Touches' | 'Senses heat'; detail: string }
+  howItWorks?: {
+    verb: 'Looks' | 'Touches' | 'Senses heat' | 'Measures' | 'Pushes' | 'Remembers'
+    detail: string
+  }
   /**
    * The parts hunt: PIP's spoken clue when this part is the one to find,
    * and a short version for the objective bar. Only used after discovery.
@@ -89,7 +94,7 @@ export interface MissionComponent {
     short: string
     /** Name on the hunt tracker once found. */
     label: string
-    icon: 'eye' | 'tool' | 'heat'
+    icon: 'eye' | 'tool' | 'heat' | 'radar' | 'engine' | 'plaque'
   }
   /** Optional position on the scanner map; falls back to a list. */
   hotspot?: HotspotPosition
@@ -242,6 +247,67 @@ export const SURVEYOR_3_SOURCES: readonly MissionSource[] = [
   },
 ]
 
+/** NSSDCA record: hardware details (solar panel, legs, antenna, radar). */
+export const SURVEYOR_3_HARDWARE_SOURCES: readonly MissionSource[] = [
+  ...SURVEYOR_3_SOURCES,
+  {
+    label: 'NASA NSSDCA — Surveyor 3 (1967-035A)',
+    url: 'https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1967-035A',
+  },
+]
+
+/** Official NASA sources for Apollo 11's Eagle (checked 2026-11-14). */
+export const APOLLO_11_SOURCES: readonly MissionSource[] = [
+  {
+    label: 'NASA — Apollo 11',
+    url: 'https://www.nasa.gov/mission/apollo-11/',
+  },
+  {
+    label: 'NASA NSSDCA — Apollo 11 Lunar Module (1969-059C)',
+    url: 'https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-059C',
+  },
+]
+
+export const APOLLO_11_PROBE_SOURCES: readonly MissionSource[] = [
+  ...APOLLO_11_SOURCES,
+  {
+    label: 'NASA — The Eagle Prepares to Land',
+    url: 'https://www.nasa.gov/image-article/eagle-prepares-land/',
+  },
+  {
+    label: 'NASA — Apollo 11 mission log (lunar surface sensing probes)',
+    url: 'https://www.nasa.gov/wp-content/uploads/static/history/ap11ann/apollo11_log/log.htm',
+  },
+]
+
+export const APOLLO_11_ENGINE_SOURCES: readonly MissionSource[] = [
+  ...APOLLO_11_SOURCES,
+  {
+    label: 'NASA History — Chariots for Apollo, chapter 6',
+    url: 'https://www.hq.nasa.gov/office/pao/History/SP-4205/ch6-5.html',
+  },
+  {
+    label: 'NASA — Apollo Experience Report: Descent Propulsion System (1973)',
+    url: 'https://ntrs.nasa.gov/citations/19730011150',
+  },
+]
+
+export const APOLLO_11_PLAQUE_SOURCES: readonly MissionSource[] = [
+  ...APOLLO_11_SOURCES,
+  {
+    label: 'NASA Science — Apollo 11 Plaque',
+    url: 'https://science.nasa.gov/resource/apollo-11-plaque/',
+  },
+]
+
+export const APOLLO_11_GEAR_SOURCES: readonly MissionSource[] = [
+  ...APOLLO_11_SOURCES,
+  {
+    label: 'NASA — Apollo Lunar Module Landing Gear (W. F. Rogers, 1973)',
+    url: 'https://ntrs.nasa.gov/api/citations/19730010151/downloads/19730010151.pdf',
+  },
+]
+
 export const SPIRIT_SOURCES: readonly MissionSource[] = [
   {
     label: 'NASA Science — Mars Exploration Rover Spirit',
@@ -317,7 +383,12 @@ export const MISSIONS: readonly MissionDefinition[] = [
           "Surveyor 3's television camera sent 6,326 pictures of the lunar surface to Earth. It used 25 mm and 100 mm lenses and a movable mirror. Apollo 12 astronauts later brought the camera back for study.",
         pipLine:
           "This camera was Surveyor 3's eye. It sent home thousands of pictures so people could see the Moon up close.",
-        scanHint: 'A round camera assembly near the top of the lander.',
+        pipHint: pipLine('surveyor-hint-camera'),
+        pipDirectHint: pipLine('surveyor-direct-camera'),
+        howItWorks: { verb: 'Looks', detail: 'A camera that looked at the Moon through a turning mirror.' },
+        huntClue: { line: pipLine('surveyor-clue-camera'), short: "Find the lander's eye · the tall camera", label: 'Eye', icon: 'eye' },
+        hotspot: { x: 64, y: 40 },
+        scanHint: 'A tall camera with a mirror hood, on the side of the lander.',
         sources: SURVEYOR_3_SOURCES,
         validation: 'source-checked',
       },
@@ -329,7 +400,12 @@ export const MISSIONS: readonly MissionDefinition[] = [
           'Surveyor 3 carried a surface sampler that could reach about 1.5 meters from the lander and dig about 18 centimeters deep. It dug trenches and tested how the lunar soil held weight.',
         pipLine:
           'This scoop touched the Moon for us. It dug little trenches and showed how the dusty ground holds weight.',
-        scanHint: 'A small arm folded against the side of the lander.',
+        pipHint: pipLine('surveyor-hint-scoop'),
+        pipDirectHint: pipLine('surveyor-direct-scoop'),
+        howItWorks: { verb: 'Touches', detail: 'A little scoop that dug trenches and pressed on the ground.' },
+        huntClue: { line: pipLine('surveyor-clue-scoop'), short: 'Find the digging scoop · folding arm, down low', label: 'Scoop', icon: 'tool' },
+        hotspot: { x: 30, y: 70 },
+        scanHint: 'A small scoop at the end of a folding arm, low on the lander.',
         sources: SURVEYOR_3_SOURCES,
         validation: 'source-checked',
       },
@@ -341,8 +417,48 @@ export const MISSIONS: readonly MissionDefinition[] = [
           "Surveyor 3 used descent radar to measure its height and speed during landing. Reflective rocks confused the radar, and the main engine did not cut off at the expected moment, so the lander bounced twice before settling.",
         pipLine:
           'This radar helped Surveyor 3 feel its way down. The landing was a little bumpy, but it still reached the surface safely.',
-        scanHint: 'A sensor cluster aimed down toward the ground.',
+        pipHint: pipLine('surveyor-hint-radar'),
+        pipDirectHint: pipLine('surveyor-direct-radar'),
+        howItWorks: { verb: 'Measures', detail: 'Radio waves bounced off the ground to measure height and speed.' },
+        huntClue: { line: pipLine('surveyor-clue-radar'), short: 'Find the radar · under the body', label: 'Radar', icon: 'radar' },
+        hotspot: { x: 48, y: 66 },
+        scanHint: 'Two flat radar antennas under the body, aimed down toward the ground.',
         sources: SURVEYOR_3_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    distractors: [
+      {
+        id: 'surveyor-3-solar-panel',
+        name: 'Solar panel',
+        shortName: 'Solar panel',
+        historicalRecord:
+          'Surveyor 3 made electricity with a solar panel of about 0.86 square metres covered with 792 solar cells, mounted at the top of its mast.',
+        pipNote:
+          "A solar panel! It turned sunlight into power. Nice find, but it won't unlock a memory fragment.",
+        sources: SURVEYOR_3_HARDWARE_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'surveyor-3-footpads',
+        name: 'Landing legs and footpads',
+        shortName: 'Legs',
+        historicalRecord:
+          'Surveyor 3 stood on three legs with shock absorbers and crushable aluminium honeycomb footpads that softened the landing.',
+        pipNote:
+          "Three legs with squishy footpads for a soft landing. Important, but not a fragment.",
+        sources: SURVEYOR_3_HARDWARE_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'surveyor-3-antenna',
+        name: 'Planar antenna',
+        shortName: 'Antenna',
+        historicalRecord:
+          'A flat high-gain antenna on the mast sent Surveyor 3\'s television pictures and data back to Earth.',
+        pipNote:
+          'This flat antenna sent the pictures home. Good to know, but not a fragment.',
+        sources: SURVEYOR_3_HARDWARE_SOURCES,
         validation: 'source-checked',
       },
     ],
@@ -354,7 +470,13 @@ export const MISSIONS: readonly MissionDefinition[] = [
       discoveries:
         'Its camera sent 6,326 pictures to Earth. The surface sampler dug trenches and tested how lunar soil holds weight, helping engineers understand what a lander would meet on the Moon.',
       missionEnd:
-        'Surveyor 3 stopped communicating in May 1967. In November 1969, Apollo 12 astronauts landed nearby and brought some of its parts back to Earth for study.',
+        'Surveyor 3 stopped communicating in May 1967. In November 1969, Apollo 12 astronauts landed about 180 metres away and brought some of its parts, including the camera and the soil scoop, back to Earth for study.',
+      timeline: {
+        launch: '17 April 1967',
+        landing: 'Ocean of Storms · Apr 1967',
+        discovery: '6,326 pictures',
+        end: 'Apollo 12 visit · 1969',
+      },
     },
     reconstruction: {
       title: 'Surveyor 3 · First-person reconstruction',
@@ -369,9 +491,167 @@ export const MISSIONS: readonly MissionDefinition[] = [
     },
     stampId: 'stamp-surveyor-3',
     stampLabel: 'Surveyor 3 · Moon',
-    completionStory:
-      "Surveyor 3's history is restored. Its pictures and soil tests helped scientists understand the Moon before Apollo astronauts arrived.",
+    completionStory: pipLine('surveyor-completion-story'),
+    narrative: {
+      entered: pipLine('moon-arrival'),
+      detected: pipLine('moon-detected'),
+      approached: pipLine('moon-approached'),
+      approachedTouch: pipLine('moon-approached-touch'),
+      identified: pipLine('surveyor-identified'),
+      scannerPromptDesktop: pipLine('mars-scanner-prompt-desktop'),
+      scannerPromptTouch: pipLine('mars-scanner-prompt-touch'),
+      completed: pipLine('mars-completed-1'),
+      memoryRecovered: pipLine('mars-memory-recovered'),
+      letterPrepared: pipLine('surveyor-letter-prepared'),
+      returnToShip: pipLine('mars-return-to-ship'),
+      hintOrientation: pipLine('mars-hint-orientation'),
+      hintContext: pipLine('surveyor-hint-context'),
+      genericHint: pipLine('surveyor-generic-hint'),
+      ambient: [pipLine('moon-ambient-1'), pipLine('moon-ambient-2')],
+      revisitInProgress: pipLine('mars-revisit-in-progress'),
+      revisitLetterReady: pipLine('mars-revisit-letter-ready'),
+      revisitTransmitted: pipLine('mars-revisit-transmitted'),
+    },
     sources: SURVEYOR_3_SOURCES,
+    contentStatus: 'source-checked',
+    reviewNote: null,
+  },
+  {
+    id: 'apollo-11',
+    destination: 'moon',
+    machineName: 'Eagle',
+    missionName: 'Apollo 11 Eagle · Moon',
+    yearLabel: '1969',
+    summary:
+      "Eagle was the Lunar Module of Apollo 11. On 20 July 1969 it carried Neil Armstrong and Buzz Aldrin down to the Sea of Tranquility, the first crewed landing on the Moon. Its lower half, the descent stage, is still there.",
+    pipBriefing:
+      'Eagle carried the first two people who walked on the Moon. Its bottom half stayed behind when they flew home. Let us find the parts that tell its story.',
+    worldMode: 'surface',
+    components: [
+      {
+        id: 'apollo-11-surface-probe',
+        name: 'Lunar surface sensing probe',
+        shortName: 'Contact probe',
+        historicalRecord:
+          "Three of Eagle's four footpads carried a thin probe about 1.7 metres (68 inches) long. When a probe touched the surface, a light on the instrument panel told the crew to shut down the engine. Buzz Aldrin called out 'Contact light' at touchdown.",
+        pipLine: pipLine('apollo-probe'),
+        pipHint: pipLine('apollo-hint-probe'),
+        pipDirectHint: pipLine('apollo-direct-probe'),
+        howItWorks: { verb: 'Touches', detail: 'A long feeler that lit a light when it touched the ground.' },
+        huntClue: { line: pipLine('apollo-clue-probe'), short: 'Find the feeler · flat in the dust by a footpad', label: 'Feeler', icon: 'tool' },
+        scanHint: 'A long thin rod lying flat in the dust beside a footpad.',
+        hotspot: { x: 80, y: 82 },
+        sources: APOLLO_11_PROBE_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'apollo-11-descent-engine',
+        name: 'Descent engine',
+        shortName: 'Engine',
+        historicalRecord:
+          "Eagle's descent engine could be throttled: the crew could turn its push up and down, from about 4,700 to 43,900 newtons (1,050 to 9,870 pounds), to slow down and hover before landing. A throttleable engine was new for crewed spacecraft.",
+        pipLine: pipLine('apollo-engine'),
+        pipHint: pipLine('apollo-hint-engine'),
+        pipDirectHint: pipLine('apollo-direct-engine'),
+        howItWorks: { verb: 'Pushes', detail: 'A rocket engine that could push softly or strongly.' },
+        huntClue: { line: pipLine('apollo-clue-engine'), short: 'Find the engine · under the gold body', label: 'Engine', icon: 'engine' },
+        scanHint: 'The engine bell under the middle of the stage.',
+        hotspot: { x: 50, y: 62 },
+        sources: APOLLO_11_ENGINE_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'apollo-11-plaque',
+        name: 'Plaque',
+        shortName: 'Plaque',
+        historicalRecord:
+          "A plaque was attached to the ladder on the landing-gear strut of Eagle's descent stage. It reads: 'Here men from the planet Earth first set foot upon the Moon, July 1969 A.D. We came in peace for all mankind.'",
+        pipLine: pipLine('apollo-plaque'),
+        pipHint: pipLine('apollo-hint-plaque'),
+        pipDirectHint: pipLine('apollo-direct-plaque'),
+        howItWorks: { verb: 'Remembers', detail: 'A metal sign that tells who came here and why.' },
+        huntClue: { line: pipLine('apollo-clue-plaque'), short: 'Find the plaque · on the ladder leg', label: 'Plaque', icon: 'plaque' },
+        scanHint: 'A small metal sign on the leg with the ladder.',
+        hotspot: { x: 22, y: 44 },
+        sources: APOLLO_11_PLAQUE_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    distractors: [
+      {
+        id: 'apollo-11-landing-legs',
+        name: 'Landing legs and footpads',
+        shortName: 'Legs',
+        historicalRecord:
+          'Eagle stood on four legs with shock-absorbing struts. Each leg ended in a round footpad about 0.9 metres (3 feet) across.',
+        pipNote:
+          "Four strong legs with big round feet! Important, but they won't unlock a memory fragment.",
+        sources: APOLLO_11_GEAR_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'apollo-11-ladder',
+        name: 'Ladder',
+        shortName: 'Ladder',
+        historicalRecord:
+          "Eagle's ladder ran down its front leg. Neil Armstrong climbed down it to take the first human step on the Moon.",
+        pipNote:
+          'The famous ladder! The first steps on the Moon started here. Nice find, but not a fragment.',
+        sources: APOLLO_11_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    smartLetter: {
+      identity:
+        "Eagle was the Lunar Module of Apollo 11. Its job was to carry two astronauts from lunar orbit down to the surface of the Moon and later send them back up.",
+      trajectory:
+        "Apollo 11 launched on 16 July 1969. Eagle landed in the Sea of Tranquility on 20 July 1969 with Neil Armstrong and Buzz Aldrin aboard, while Michael Collins stayed in orbit around the Moon.",
+      discoveries:
+        "Armstrong and Aldrin were the first people to walk on the Moon. During their 22-hour stay they explored around Eagle, collected Moon rocks and dust and set up experiments for scientists on Earth.",
+      missionEnd:
+        "The top half of Eagle lifted off and carried the astronauts back to orbit, using the bottom half as a launch pad. That descent stage, with its plaque, is still at Tranquility Base. The crew splashed down on Earth on 24 July 1969.",
+      timeline: {
+        launch: '16 July 1969',
+        landing: 'Sea of Tranquility · Jul 1969',
+        discovery: 'First steps on the Moon',
+        end: 'Stays at Tranquility Base',
+      },
+    },
+    reconstruction: {
+      title: 'Eagle · First-person reconstruction',
+      status: 'script-draft',
+      lines: [
+        'Two people ride inside me as I fall toward a gray plain.',
+        'My engine pushes softly. Rocks pass below. We fly on, looking for a smooth place.',
+        'A feeler under my foot touches the dust. A light turns on: contact.',
+        'The hatch opens and a boot steps down my ladder onto the Moon.',
+        'My top half flies away. I stay here, holding a message of peace.',
+      ],
+    },
+    stampId: 'stamp-apollo-11',
+    stampLabel: 'Eagle · Moon',
+    completionStory: pipLine('apollo-completion-story'),
+    narrative: {
+      entered: pipLine('moon-arrival'),
+      detected: pipLine('moon-detected'),
+      approached: pipLine('moon-approached'),
+      approachedTouch: pipLine('moon-approached-touch'),
+      identified: pipLine('apollo-identified'),
+      scannerPromptDesktop: pipLine('mars-scanner-prompt-desktop'),
+      scannerPromptTouch: pipLine('mars-scanner-prompt-touch'),
+      completed: pipLine('mars-completed-1'),
+      memoryRecovered: pipLine('mars-memory-recovered'),
+      letterPrepared: pipLine('apollo-letter-prepared'),
+      returnToShip: pipLine('mars-return-to-ship'),
+      hintOrientation: pipLine('mars-hint-orientation'),
+      hintContext: pipLine('apollo-hint-context'),
+      genericHint: pipLine('apollo-generic-hint'),
+      ambient: [pipLine('moon-ambient-1'), pipLine('moon-ambient-2')],
+      revisitInProgress: pipLine('mars-revisit-in-progress'),
+      revisitLetterReady: pipLine('mars-revisit-letter-ready'),
+      revisitTransmitted: pipLine('mars-revisit-transmitted'),
+    },
+    sources: APOLLO_11_SOURCES,
     contentStatus: 'source-checked',
     reviewNote: null,
   },

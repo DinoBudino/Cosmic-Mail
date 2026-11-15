@@ -48,6 +48,33 @@ function RewardIcon({ celebration }: { celebration: ScanCelebration }) {
       </svg>
     )
   }
+  if (celebration.verb === 'Measures') {
+    return (
+      <svg {...common}>
+        <path d="M6 32h28" />
+        <path d="M12 26a8 8 0 0 1 16 0" />
+        <path d="M7 20a14 14 0 0 1 26 0" />
+        <circle cx="20" cy="26" r="2.5" fill="#2b1a14" />
+      </svg>
+    )
+  }
+  if (celebration.verb === 'Pushes') {
+    return (
+      <svg {...common}>
+        <path d="M15 6h10v7l5 14H10l5-14z" />
+        <path d="M15 31c1.5 2 3.5 3 5 3s3.5-1 5-3" />
+      </svg>
+    )
+  }
+  if (celebration.verb === 'Remembers') {
+    return (
+      <svg {...common}>
+        <rect x="7" y="8" width="26" height="19" rx="3" />
+        <path d="M13 15h14M13 21h9" />
+        <path d="M20 27v6" />
+      </svg>
+    )
+  }
   // Practice and landscape: a rock with a check mark.
   return (
     <svg {...common}>

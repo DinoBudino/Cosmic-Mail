@@ -1,3 +1,4 @@
+import { getActiveWorld } from '../data/spiritSite'
 import { getMission } from '../data/missions'
 import { isStepAtLeast } from '../data/arrivalProtocol'
 import { SPIRIT_SITE } from '../data/spiritSite'
@@ -69,7 +70,7 @@ export function MissionPanel() {
     <aside className="mission-panel" aria-label="Mission briefing">
      <details className="mission-panel__details">
       <summary className="mission-panel__summary">
-        <span className="settings-eyebrow">Mission 01 · Mars</span>
+        <span className="settings-eyebrow">{getActiveWorld() === 'moon' ? 'Mission · Moon' : 'Mission · Mars'}</span>
         <span className="mission-panel__state">{spiritStatus}</span>
       </summary>
 

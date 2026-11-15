@@ -34,7 +34,7 @@ export function Onboarding() {
 
   if (phase === 'orbit') {
     return (
-      <main className="onboarding" data-phase={phase} aria-label="Mars orbit">
+      <main className="onboarding" data-phase={phase} aria-label="Orbit">
         <MarsOrbit />
       </main>
     )

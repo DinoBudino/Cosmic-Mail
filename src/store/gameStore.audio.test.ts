@@ -77,7 +77,6 @@ describe('game store audio settings', () => {
           quality: 'high',
           reducedMotion: false,
           voiceEnabled: true,
-          voiceName: null,
           musicVolume: 0.2,
         }),
       setItem: () => {},

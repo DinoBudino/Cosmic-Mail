@@ -111,7 +111,6 @@ export function PipSpeech() {
   const pipMessageKey = useGameStore((state) => state.pipMessageKey)
   const clearPipMessage = useGameStore((state) => state.clearPipMessage)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
   const scannerOpen = useGameStore((state) => state.scannerOpen)
@@ -152,13 +151,12 @@ export function PipSpeech() {
       stopPipVoice()
       return
     }
-    speakPip(activeText, voiceName, voiceEnabled, activeEmotion)
+    speakPip(activeText, voiceEnabled, activeEmotion)
     return () => stopPipVoice()
   }, [
     activeKey,
     activeText,
     hidden,
-    voiceName,
     voiceEnabled,
     activeEmotion,
   ])

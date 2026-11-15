@@ -40,7 +40,6 @@ export function Intro() {
   const setDialogueIndex = useOnboardingStore((state) => state.setDialogueIndex)
   const setPipTalking = useOnboardingStore((state) => state.setPipTalking)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
 
   const [replayNonce, setReplayNonce] = useState(0)
@@ -68,7 +67,7 @@ export function Intro() {
   }
 
   useEffect(() => {
-    speakPip(beat.line, voiceName, voiceEnabled)
+    speakPip(beat.line, voiceEnabled)
     setPipTalking(true)
     const talkMs = Math.min(7200, 1200 + beat.line.length * 42)
     const mouthTimer = window.setTimeout(() => setPipTalking(false), talkMs)
@@ -77,7 +76,7 @@ export function Intro() {
       window.clearTimeout(mouthTimer)
       setPipTalking(false)
     }
-  }, [beat.line, replayNonce, voiceName, voiceEnabled, setPipTalking])
+  }, [beat.line, replayNonce, voiceEnabled, setPipTalking])
 
   useEffect(() => () => stopPipVoice(), [])
 

@@ -1,13 +1,13 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
-  MARS_LANDING_SITES,
+  landingSitesFor,
   getLandingSiteProgress,
   getLandingSiteState,
   getOrbitGuidance,
 } from '../../data/marsLandingSites'
 import { getMission } from '../../data/missions'
 import { pipLine } from '../../data/pipVoiceCatalog'
-import type { MarsExplorerId } from '../../data/spiritSite'
+import type { ExplorerId as MarsExplorerId } from '../../data/spiritSite'
 import { emitAudio } from '../../game/audio/audioEvents'
 import { onPipVoiceEnded, speakPip, stopPipVoice } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
@@ -36,12 +36,13 @@ export function MarsOrbit() {
   const landAt = useOnboardingStore((state) => state.landAt)
   const leaveOrbit = useOnboardingStore((state) => state.leaveOrbit)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
   const openArchive = useGameStore((state) => state.openArchive)
 
-  const guidance = getOrbitGuidance(save)
+  const world = save?.currentDestination === 'moon' ? 'moon' : 'mars'
+  const worldName = world === 'moon' ? 'Moon' : 'Mars'
+  const guidance = getOrbitGuidance(save, world)
   const [selected, setSelected] = useState<MarsExplorerId | null>(null)
   const [landing, setLanding] = useState(false)
   // PIP's own reply to a pick / the landing; otherwise the guidance line.
@@ -53,7 +54,7 @@ export function MarsOrbit() {
 
   const markers: OrbitMarker[] = useMemo(
     () =>
-      MARS_LANDING_SITES.map((site) => {
+      landingSitesFor(world).map((site) => {
         const state = getLandingSiteState(save, site.explorer)
         // The explorer's name stays hidden until the child finds it.
         const label =
@@ -61,14 +62,14 @@ export function MarsOrbit() {
         const percent = getLandingSiteProgress(save, site.explorer)
         return { explorer: site.explorer, label, state, percent }
       }),
-    [save],
+    [save, world],
   )
 
   // PIP speaks the guidance whenever it changes (arrival, after delivery).
   useEffect(() => {
     if (archiveOpen) return
-    speakPip(guidance.line, voiceName, voiceEnabled, 'happy')
-  }, [guidance.line, archiveOpen, voiceName, voiceEnabled])
+    speakPip(guidance.line, voiceEnabled, 'happy')
+  }, [guidance.line, archiveOpen, voiceEnabled])
 
   useEffect(
     () => () => {
@@ -87,7 +88,7 @@ export function MarsOrbit() {
     setLanding(true)
     const text = pipLine('orbit-landing')
     setReply(text)
-    speakPip(text, voiceName, voiceEnabled, 'excited')
+    speakPip(text, voiceEnabled, 'excited')
     // Touch down only once PIP has finished "Hold on tight…": leaving the
     // orbit screen earlier would cut the line in half.
     const startedAt = performance.now()
@@ -117,10 +118,16 @@ export function MarsOrbit() {
   }
 
   return (
-    <section className="orbit" data-landing={landing} aria-label="Mars orbit: choose where to land">
+    <section
+      className="orbit"
+      data-world={world}
+      data-landing={landing}
+      aria-label={`${worldName} orbit: choose where to land`}
+    >
       <div className="orbit__scene">
         <Suspense fallback={null}>
           <MarsOrbitScene
+            world={world}
             markers={markers}
             selected={selected}
             suggested={guidance.suggested}
@@ -157,7 +164,7 @@ export function MarsOrbit() {
       )}
 
       <header className="orbit__top">
-        <p className="orbit__title">Mars orbit</p>
+        <p className="orbit__title">{worldName} orbit</p>
         <ul className="orbit__sites" aria-label="Landing spots">
           {markers.map((marker) => (
             <li key={marker.explorer}>

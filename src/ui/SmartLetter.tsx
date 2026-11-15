@@ -49,7 +49,6 @@ function SmartLetter({
   )
   const archiveLine = useNarrativeStore((state) => state.archiveLine)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const openArchive = useGameStore((state) => state.openArchive)
   const phase = useOnboardingStore((state) => state.phase)
 
@@ -95,9 +94,9 @@ function SmartLetter({
     // The dialog speaks this beat, so the world queue must not replay it
     // after the overlay closes.
     useNarrativeStore.getState().markSpoken(activeCue.id)
-    speakPip(pipLine, voiceName, voiceEnabled, 'hopeful')
+    speakPip(pipLine, voiceEnabled, 'hopeful')
     return () => stopPipVoice()
-  }, [pipLine, activeCue.id, voiceName, voiceEnabled])
+  }, [pipLine, activeCue.id, voiceEnabled])
 
   const handleDialogClick = (event: React.MouseEvent<HTMLDialogElement>) => {
     if (event.target === event.currentTarget && !storyOnly) onClose()

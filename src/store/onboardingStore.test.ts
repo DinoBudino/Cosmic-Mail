@@ -99,12 +99,12 @@ describe('new onboarding flow', () => {
     ).toEqual(['spirit-pancam'])
   })
 
-  it('only selects the implemented Mars destination', () => {
+  it('selects the Moon and Mars, the two playable destinations', () => {
     useOnboardingStore.setState({ phase: 'hub' })
     const onboarding = useOnboardingStore.getState()
 
     onboarding.selectDestination('moon')
-    expect(useOnboardingStore.getState().selectedDestination).toBeNull()
+    expect(useOnboardingStore.getState().selectedDestination).toBe('moon')
 
     onboarding.selectDestination('mars')
     expect(useOnboardingStore.getState().selectedDestination).toBe('mars')

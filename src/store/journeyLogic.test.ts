@@ -135,7 +135,7 @@ describe('Cosmic Scanner rules', () => {
     expect(discovered.updatedAt).toBe(2000)
 
     expect(markMissionDiscovered(discovered, 'opportunity', 3000)).toBe(discovered)
-    expect(markMissionDiscovered(save, 'apollo-11' as MissionId, 3000)).toBe(
+    expect(markMissionDiscovered(save, 'voyager-1' as MissionId, 3000)).toBe(
       save,
     )
   })
@@ -178,7 +178,7 @@ describe('Cosmic Scanner rules', () => {
       'invalid-component',
     )
     expect(
-      scanComponent(save, 'apollo-11' as MissionId, 'anything').status,
+      scanComponent(save, 'voyager-1' as MissionId, 'anything').status,
     ).toBe('unknown-mission')
   })
 
@@ -235,7 +235,7 @@ describe('Full recognition scan and memory core', () => {
 
   it('rejects an unknown mission safely', () => {
     const save = createDiscoveredJourney()
-    const result = completeFullScan(save, 'apollo-11' as MissionId)
+    const result = completeFullScan(save, 'voyager-1' as MissionId)
     expect(result.status).toBe('unknown-mission')
     expect(result.save).toBe(save)
   })
@@ -324,9 +324,9 @@ describe('Smart letter, reconstruction and transmission', () => {
   it('reports an unknown mission safely', () => {
     const save = createDiscoveredJourney()
     expect(
-      prepareSmartLetter(save, 'apollo-11' as MissionId).status,
+      prepareSmartLetter(save, 'voyager-1' as MissionId).status,
     ).toBe('unknown-mission')
-    expect(transmitLetter(save, 'apollo-11' as MissionId).status).toBe(
+    expect(transmitLetter(save, 'voyager-1' as MissionId).status).toBe(
       'unknown-mission',
     )
   })
@@ -368,7 +368,7 @@ describe('Reset pilot rules', () => {
 
   it('returns the same save for an unknown mission', () => {
     const save = createJourney('Ada', 1000)
-    expect(resetMissionProgress(save, 'apollo-11' as MissionId, 2000)).toBe(
+    expect(resetMissionProgress(save, 'voyager-1' as MissionId, 2000)).toBe(
       save,
     )
   })

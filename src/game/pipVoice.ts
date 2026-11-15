@@ -12,24 +12,8 @@ import PIP_VOICE_LINES from '../data/pipVoiceLines.json'
 import { audioManager } from './audio/audioManager'
 import { estimateVoiceDurationMs } from './audio/audioMath'
 
-export interface RecordedVoice {
-  id: string
-  label: string
-}
-
-export const PIP_VOICES: readonly RecordedVoice[] = [
-  { id: 'heart', label: 'Heart (US, female)' },
-  { id: 'sky', label: 'Sky (US, female)' },
-  { id: 'lily', label: 'Lily (UK, female)' },
-  { id: 'michael', label: 'Michael (US, male)' },
-]
-
-const DEFAULT_VOICE = 'heart'
-
-/** Resolves a stored voice id ('heart' | 'lily' | 'michael') with fallback. */
-export function resolveVoiceId(name: string | null): string {
-  return PIP_VOICES.some((voice) => voice.id === name) ? name! : DEFAULT_VOICE
-}
+/** PIP has one voice: Kokoro `af_heart` (recordings in audio/pip/heart). */
+export const PIP_VOICE_ID = 'heart'
 
 /**
  * Recorded onboarding/cabin/launch lines. The source of truth is shared
@@ -188,12 +172,10 @@ function playFile(url: string, fallbackText: string, token: number): void {
 
 /**
  * Plays PIP's recorded line (random take + robot chirp first), falling
- * back to browser TTS when no recording exists. `voiceName` is a
- * recorded-voice id ('heart', …).
+ * back to browser TTS when no recording exists.
  */
 export function speakPip(
   text: string,
-  voiceName: string | null,
   enabled: boolean,
   emotion?: string | null,
 ): void {
@@ -206,7 +188,7 @@ export function speakPip(
 
   const key = audioKeyForLine(text)
   if (key) {
-    const voiceId = resolveVoiceId(voiceName)
+    const voiceId = PIP_VOICE_ID
     const variant: 1 | 2 = Math.random() < 0.5 ? 1 : 2
     const token = ++playToken
     const audio = getSharedAudio()

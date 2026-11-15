@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { CALIBRATION_SAMPLE, PRACTICE_STATION_VIEW } from '../data/calibrationSample'
-import { SCAN_STATION_VIEW, SPIRIT_SITE } from '../data/spiritSite'
+import { getScanStationView, SPIRIT_SITE } from '../data/spiritSite'
 import type { ScanStationTarget } from '../store/gameStore'
 import { getTerrainHeight } from './terrainHeight'
 
@@ -12,7 +12,7 @@ import { getTerrainHeight } from './terrainHeight'
 function stationOf(target: ScanStationTarget) {
   return target === 'practice'
     ? { center: CALIBRATION_SAMPLE.position, view: PRACTICE_STATION_VIEW }
-    : { center: SPIRIT_SITE.position, view: SCAN_STATION_VIEW }
+    : { center: SPIRIT_SITE.position, view: getScanStationView() }
 }
 
 /** Where the astronaut stands (world x/z; y is 0). */

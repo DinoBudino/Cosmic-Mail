@@ -39,7 +39,6 @@ function MemoryReconstruction({
 }) {
   const save = useJourneyStore((state) => state.save)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const openArchive = useGameStore((state) => state.openArchive)
   const progress = save?.missions[mission.id] ?? null
   const unlocked = progress?.smartLetterCreatedAt != null
@@ -73,9 +72,9 @@ function MemoryReconstruction({
 
   useEffect(() => {
     if (!unlocked) return
-    speakPip(current, voiceName, voiceEnabled)
+    speakPip(current, voiceEnabled)
     return () => stopPipVoice()
-  }, [current, unlocked, voiceName, voiceEnabled])
+  }, [current, unlocked, voiceEnabled])
 
   useEffect(() => {
     if (unlocked && index > 0) emitAudio('reconstructionLine')

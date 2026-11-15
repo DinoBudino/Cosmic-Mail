@@ -14,6 +14,7 @@
 
 import type { NarrativeExpression } from './missionNarrative'
 import { pipLine } from './pipVoiceCatalog'
+import { getActiveWorld } from './spiritSite'
 
 export type BriefingStepId =
   | 'arrival'
@@ -122,8 +123,15 @@ export const BRIEFING_STEPS: readonly BriefingStep[] = [
   },
 ]
 
+/** On the Moon the welcome names the Moon; every other step is shared. */
+const MOON_ARRIVAL: BriefingStep = {
+  ...BRIEFING_STEPS[0]!,
+  line: pipLine('moon-briefing-arrival'),
+}
+
 export function briefingStep(index: number): BriefingStep {
-  return BRIEFING_STEPS[Math.max(0, Math.min(index, BRIEFING_STEPS.length - 1))]!
+  const step = BRIEFING_STEPS[Math.max(0, Math.min(index, BRIEFING_STEPS.length - 1))]!
+  return step.id === 'arrival' && getActiveWorld() === 'moon' ? MOON_ARRIVAL : step
 }
 
 export function isLastBriefingStep(index: number): boolean {
@@ -193,7 +201,7 @@ export const BRIEFING_TITLE = 'To start exploring, you need to know…'
 /** Every visible string of the briefing (identity audit). */
 export function getBriefingTexts(): string[] {
   const texts: string[] = [BRIEFING_TITLE]
-  for (const step of BRIEFING_STEPS) {
+  for (const step of [...BRIEFING_STEPS, MOON_ARRIVAL]) {
     texts.push(step.line)
     if (step.cta) texts.push(step.cta)
   }

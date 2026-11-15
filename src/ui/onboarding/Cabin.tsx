@@ -48,7 +48,6 @@ function PipLine({
 }) {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const setPipTalking = useOnboardingStore((state) => state.setPipTalking)
   const [typed, setTyped] = useState(reducedMotion ? line : '')
   const intervalRef = useRef<number | null>(null)
@@ -63,7 +62,7 @@ function PipLine({
     doneRef.current = false
     typedRef.current = ''
     setPipTalking(true)
-    speakPip(line, voiceName, voiceEnabled)
+    speakPip(line, voiceEnabled)
     intervalRef.current = window.setInterval(() => {
       const next = line.slice(0, typedRef.current.length + 1)
       typedRef.current = next
@@ -83,7 +82,7 @@ function PipLine({
       setPipTalking(false)
       stopPipVoice()
     }
-  }, [line, reducedMotion, voiceEnabled, voiceName, setPipTalking, onDone])
+  }, [line, reducedMotion, voiceEnabled, setPipTalking, onDone])
 
   // Complete the visible line during render when a skip arrives (React's
   // "adjust state while rendering" pattern) instead of inside an effect.

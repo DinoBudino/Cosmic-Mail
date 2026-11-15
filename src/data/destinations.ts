@@ -38,8 +38,8 @@ export const DESTINATIONS: readonly Destination[] = [
     missionId: 'surveyor-3',
     kind: "Earth's natural satellite",
     terrain: 'Gray dust and craters',
-    clue: 'A clue on the lunar surface.',
-    available: false,
+    clue: 'Two old explorers wait on the gray plains.',
+    available: true,
   },
   {
     id: 'mars',

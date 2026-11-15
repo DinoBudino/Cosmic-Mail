@@ -683,5 +683,313 @@
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
+  },
+  {
+    "key": "moon-briefing-arrival",
+    "text": "We made it to the Moon! You flew like a real space carrier.",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "moon-arrival",
+    "text": "We're on the Moon, explorer! No air and no wind, just gray dust and a signal to follow!",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "moon-detected",
+    "text": "Whoa, look over there! Something shiny is sitting in the dust.",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "moon-approached",
+    "text": "Shh, an old machine is resting here! Press E to take a closer look.",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "moon-approached-touch",
+    "text": "Shh, an old machine is resting here! Tap Inspect to take a closer look.",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "moon-ambient-1",
+    "text": "There's no wind on the Moon, so footprints here can last for a very, very long time!",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "moon-ambient-2",
+    "text": "Look up! That blue ball in the black sky is Earth, our home.",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-moon-intro",
+    "text": "Look, it's the Moon! Two old explorers are waiting down there, tap a glowing spot to pick one!",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-tranquility",
+    "text": "That's the Sea of Tranquility, a wide flat plain. Someone is waiting there!",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-procellarum",
+    "text": "That's the Ocean of Storms, with a small crater in it. Someone is waiting there!",
+    "speed": 1.06,
+    "category": "moon",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-identified",
+    "text": "Beep boop, I remember now! This is Surveyor 3, a robot that tested the Moon's ground before astronauts came.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-clue-camera",
+    "text": "Clue one: find the lander's eye! It's a tall camera with a little mirror hood.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-clue-scoop",
+    "text": "Clue two: find the digging scoop! It's at the end of a folding arm, down low.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-clue-radar",
+    "text": "Last clue: find the radar! It's tucked under the body, looking down at the ground.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-camera",
+    "text": "Click, click! This camera sent thousands of pictures of the Moon home to Earth.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-scoop",
+    "text": "Dig, dig! This scoop made little trenches to test if the ground was strong enough to stand on.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-radar",
+    "text": "Beep, beep! This radar measured how high and how fast Surveyor 3 was while it came down.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-hint-camera",
+    "text": "Psst! Look for the tall camera on the side!",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-hint-scoop",
+    "text": "Psst! Look low, at the end of the folding arm!",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-hint-radar",
+    "text": "Psst! Look under the body, near the ground!",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-direct-camera",
+    "text": "The eye is still missing! Aim at the tall camera and hold the scan button.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-direct-scoop",
+    "text": "The scoop is still missing! Aim low, at the end of the arm, and hold the scan button.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-direct-radar",
+    "text": "The radar is still missing! Aim under the body and hold the scan button.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-hint-context",
+    "text": "Its tools are the tall camera, the folding arm and the radar underneath. Aim there and hold to scan!",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-generic-hint",
+    "text": "Try your scanner on the camera, the arm and under the body, explorer!",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-letter-prepared",
+    "text": "Sealed! Tap Watch its story to see Surveyor 3's adventure.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "surveyor-completion-story",
+    "text": "We did it! Surveyor 3 is quiet now, but it helped astronauts land safely on the Moon.",
+    "speed": 1.06,
+    "category": "surveyor",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-identified",
+    "text": "Beep boop, I remember now! This is Eagle, the lander that carried the first people to walk on the Moon.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-clue-probe",
+    "text": "Clue one: find the feeler! A long thin rod is lying flat in the dust beside a footpad.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-clue-engine",
+    "text": "Clue two: find the engine! It's the big bell hiding under the gold body.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-clue-plaque",
+    "text": "Last clue: find the plaque! It's a small metal sign on the leg with the ladder.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-probe",
+    "text": "Contact! When this feeler touched the Moon, a light turned on inside Eagle.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-engine",
+    "text": "Whoosh! This engine could push softly or strongly, so Eagle could land gently.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-plaque",
+    "text": "This sign says they came in peace for all mankind. That means everyone, everywhere!",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-hint-probe",
+    "text": "Psst! Look down in the dust, next to a big round foot!",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-hint-engine",
+    "text": "Psst! Look under the middle of the gold body!",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-hint-plaque",
+    "text": "Psst! Look at the leg with the ladder!",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-direct-probe",
+    "text": "The feeler is still missing! Aim at the thin rod on the ground and hold the scan button.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-direct-engine",
+    "text": "The engine is still missing! Aim under the gold body and hold the scan button.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-direct-plaque",
+    "text": "The plaque is still missing! Aim at the ladder leg and hold the scan button.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-hint-context",
+    "text": "Its parts are the feeler on the ground, the engine underneath and the plaque by the ladder. Aim and hold to scan!",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-generic-hint",
+    "text": "Try your scanner on the ground by the feet, under the body and on the ladder leg, explorer!",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-letter-prepared",
+    "text": "Sealed! Tap Watch its story to see Eagle's adventure.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
+  },
+  {
+    "key": "apollo-completion-story",
+    "text": "We did it! Eagle still stands on the Moon, keeping its message of peace.",
+    "speed": 1.06,
+    "category": "apollo",
+    "pitch": 1.05
   }
 ]

@@ -46,9 +46,8 @@ export interface ScanCelebration {
 interface PersistedSettings extends AudioPreferences {
   quality: Quality
   reducedMotion: boolean
-  /** PIP voice output (speechSynthesis, prefers Samantha when available). */
+  /** PIP voice output (recorded Kokoro `af_heart` lines). */
   voiceEnabled: boolean
-  voiceName: string | null
   scannerCamera: ScannerCamera
   /** Accessibility-only assisted component review. Off by default. */
   assistedScanEnabled: boolean
@@ -73,7 +72,6 @@ function loadSettings(): PersistedSettings {
     quality: detectDefaultQuality(),
     reducedMotion: detectReducedMotion(),
     voiceEnabled: true,
-    voiceName: null,
     scannerCamera: 'first-person',
     assistedScanEnabled: false,
   }
@@ -99,10 +97,6 @@ function loadSettings(): PersistedSettings {
         typeof record.voiceEnabled === 'boolean'
           ? record.voiceEnabled
           : fallback.voiceEnabled,
-      voiceName:
-        typeof record.voiceName === 'string' && record.voiceName.length > 0
-          ? record.voiceName
-          : null,
       scannerCamera:
         record.scannerCamera === 'third-person'
           ? 'third-person'
@@ -127,7 +121,6 @@ interface GameState {
   quality: Quality
   reducedMotion: boolean
   voiceEnabled: boolean
-  voiceName: string | null
   scannerCamera: ScannerCamera
   assistedScanEnabled: boolean
   masterVolume: number
@@ -263,7 +256,6 @@ interface GameState {
   setQuality: (quality: Quality) => void
   setReducedMotion: (reducedMotion: boolean) => void
   setVoiceEnabled: (enabled: boolean) => void
-  setVoiceName: (name: string | null) => void
   setMasterVolume: (volume: number) => void
   setMusicVolume: (volume: number) => void
   setAmbienceVolume: (volume: number) => void
@@ -283,7 +275,6 @@ export const useGameStore = create<GameState>((set, get) => {
       quality: state.quality,
       reducedMotion: state.reducedMotion,
       voiceEnabled: state.voiceEnabled,
-      voiceName: state.voiceName,
       scannerCamera: state.scannerCamera,
       assistedScanEnabled: state.assistedScanEnabled,
       masterVolume: state.masterVolume,
@@ -299,7 +290,6 @@ export const useGameStore = create<GameState>((set, get) => {
   quality: initialSettings.quality,
   reducedMotion: initialSettings.reducedMotion,
   voiceEnabled: initialSettings.voiceEnabled,
-  voiceName: initialSettings.voiceName,
   scannerCamera: initialSettings.scannerCamera,
   assistedScanEnabled: initialSettings.assistedScanEnabled,
   masterVolume: initialSettings.masterVolume,
@@ -710,10 +700,6 @@ export const useGameStore = create<GameState>((set, get) => {
   },
   setVoiceEnabled: (voiceEnabled) => {
     set({ voiceEnabled })
-    persistSettings()
-  },
-  setVoiceName: (voiceName) => {
-    set({ voiceName })
     persistSettings()
   },
   setScannerCamera: (scannerCamera) => {

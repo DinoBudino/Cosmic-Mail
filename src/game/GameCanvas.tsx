@@ -5,7 +5,9 @@ import { useGameStore } from '../store/gameStore'
 import { SceneStatus } from '../ui/SceneStatus'
 import { CameraControls } from './CameraControls'
 import { clearInput } from './input'
+import { getActiveWorld } from '../data/spiritSite'
 import { MarsWorld } from './MarsWorld'
+import { MoonWorld } from './MoonWorld'
 import { PauseWhenCovered } from './PauseWhenCovered'
 import { CAMERA, QUALITY_PRESETS } from './worldConfig'
 
@@ -52,7 +54,7 @@ export default function GameCanvas() {
       <ContextMonitor onLost={() => setContextLost(true)} />
       <PauseWhenCovered />
       <CameraControls />
-      <MarsWorld />
+      {getActiveWorld() === 'moon' ? <MoonWorld /> : <MarsWorld />}
     </Canvas>
   )
 }

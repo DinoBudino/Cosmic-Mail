@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { MAILWING_LANDING } from '../data/spiritSite'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { MARS_OBJECTS } from '../data/marsObjects'
-import { SPIRIT_SITE } from '../data/spiritSite'
+import { getActiveExplorer, getActiveWorld, SPIRIT_SITE, type MoonExplorerId } from '../data/spiritSite'
+import { createLunarRocks } from './lunarRocks'
 import { mulberry32 } from './random'
 import {
   distanceToPath,
@@ -47,6 +48,11 @@ function valueNoise3(x: number, y: number, z: number, seed: number): number {
  * darker crevices; the instance colour tints the whole rock.
  */
 export function buildRockGeometry(variant: number, detail = 3): THREE.BufferGeometry {
+  return buildTintedRockGeometry(variant, detail, PALETTE.dust)
+}
+
+/** Same rock shape with another dust tone on its upper faces (the Moon). */
+export function buildTintedRockGeometry(variant: number, detail: number, dustColor: string): THREE.BufferGeometry {
   const seed = 17 + variant * 31
   const base = mergeVertices(new THREE.IcosahedronGeometry(1, detail))
   base.deleteAttribute('normal')
@@ -91,7 +97,7 @@ export function buildRockGeometry(variant: number, detail = 3): THREE.BufferGeom
   base.computeVertexNormals()
   // Fine dust settles on the faces looking up.
   const normal = base.getAttribute('normal')
-  const dust = new THREE.Color(PALETTE.dust)
+  const dust = new THREE.Color(dustColor)
   for (let index = 0; index < position.count; index += 1) {
     const up = THREE.MathUtils.smoothstep(normal.getY(index), 0.45, 0.95) * 0.42
     colors[index * 3] = THREE.MathUtils.lerp(colors[index * 3]!, dust.r * 1.25, up)
@@ -126,6 +132,9 @@ export interface RockInstance {
 }
 
 export function createRocks(count: number): RockInstance[] {
+  if (getActiveWorld() === 'moon') {
+    return createLunarRocks(getActiveExplorer() as MoonExplorerId, count)
+  }
   const random = mulberry32(0x5eed1)
   const rocks: RockInstance[] = []
   const maxAttempts = count * 40
@@ -312,7 +321,7 @@ export interface BoulderObstacle {
   topY: number
 }
 
-const boulderCaches = new Map<number, BoulderObstacle[]>()
+const boulderCaches = new Map<string, BoulderObstacle[]>()
 
 /**
  * Deterministic boulders (scale ≥ 0.8, including trail waymarks) shared with
@@ -321,7 +330,9 @@ const boulderCaches = new Map<number, BoulderObstacle[]>()
  * without rebuilding every frame when the two systems alternate calls.
  */
 export function getBoulderObstacles(count = 150): BoulderObstacle[] {
-  const cached = boulderCaches.get(count)
+  // Keyed by landing too: each world (and each Moon site) has its own rocks.
+  const key = `${getActiveExplorer()}:${count}`
+  const cached = boulderCaches.get(key)
   if (cached) return cached
   const list = createRocks(count)
     .filter((rock) => rock.scale >= 0.8)
@@ -331,7 +342,7 @@ export function getBoulderObstacles(count = 150): BoulderObstacle[] {
       radius: rock.scale * Math.max(rock.stretchX, rock.stretchZ) * 0.85,
       topY: rock.y + rock.scale * rock.stretchY * 0.5,
     }))
-  boulderCaches.set(count, list)
+  boulderCaches.set(key, list)
   return list
 }
 

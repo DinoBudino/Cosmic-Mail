@@ -27,7 +27,6 @@ import { PipAvatar } from '../PipSpeech'
 export function LaunchSequence() {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const voiceEnabled = useGameStore((state) => state.voiceEnabled)
-  const voiceName = useGameStore((state) => state.voiceName)
   const finishLaunch = useOnboardingStore((state) => state.finishLaunch)
   const destinationId =
     useJourneyStore((state) => state.save?.currentDestination) ?? 'mars'
@@ -77,8 +76,8 @@ export function LaunchSequence() {
   }, [duration, finish])
 
   useEffect(() => {
-    speakPip(LAUNCH_CABIN_LINE, voiceName, voiceEnabled)
-  }, [voiceName, voiceEnabled])
+    speakPip(LAUNCH_CABIN_LINE, voiceEnabled)
+  }, [voiceEnabled])
 
   useEffect(() => {
     if (previousStageRef.current === stage) return

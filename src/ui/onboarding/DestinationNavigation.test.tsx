@@ -13,17 +13,17 @@ describe('cabin navigation', () => {
     expect(html).toContain('Mars')
     expect(html).toContain('Moon')
     expect(html).toContain('Signal awaiting identification')
-    expect(html).toContain('Mission in development')
     expect(html).not.toMatch(/Surveyor|Spirit|Pioneer/i)
   })
 
-  it('marks only Mars as a selectable destination', () => {
+  it('marks both the Moon and Mars as selectable destinations', () => {
     const save = createJourney('Ada', 1000)
     const html = renderToStaticMarkup(
       <DestinationNavigation saveOverride={save} />,
     )
     const disabled = html.match(/disabled=""/g) ?? []
-    expect(disabled).toHaveLength(1)
+    expect(disabled).toHaveLength(0)
     expect(html).toContain('aria-label="Mars: signal awaiting identification"')
+    expect(html).toContain('aria-label="Moon: signal awaiting identification"')
   })
 })

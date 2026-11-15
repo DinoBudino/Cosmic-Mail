@@ -1,14 +1,14 @@
 import type { JourneySave } from '../store/journeySchema'
-import type { MarsExplorerId } from './spiritSite'
+import type { ExplorerId, WorldId } from './spiritSite'
 import { pipLine } from './pipVoiceCatalog'
 
 /**
- * The two Mars explorers seen from orbit. Coordinates are the NASA landing
- * sites (planetocentric latitude, east longitude); the orbit globe is a
- * painted, stylized Mars, so they only place the markers around the sphere.
+ * The explorers seen from orbit, two per world. Coordinates are the NASA
+ * landing sites (latitude, east longitude); on the orbit globe they place
+ * the markers around the sphere.
  */
 export interface MarsLandingSite {
-  explorer: MarsExplorerId
+  explorer: ExplorerId
   /** Place name: the only thing shown before the explorer is identified. */
   place: string
   latitude: number
@@ -34,12 +34,40 @@ export const MARS_LANDING_SITES: readonly MarsLandingSite[] = [
   },
 ]
 
+/**
+ * The two Moon explorers. Apollo 11 (Tranquility Base) and Surveyor 3, in
+ * the south-east of Oceanus Procellarum (NASA: 3.0 S, 23.41 W).
+ */
+export const MOON_LANDING_SITES: readonly MarsLandingSite[] = [
+  {
+    explorer: 'apollo-11',
+    place: 'Sea of Tranquility',
+    latitude: 0.674,
+    longitude: 23.473,
+    line: pipLine('orbit-tranquility'),
+  },
+  {
+    explorer: 'surveyor-3',
+    place: 'Ocean of Storms',
+    latitude: -3.0,
+    longitude: 336.59,
+    line: pipLine('orbit-procellarum'),
+  },
+]
+
+export type LandingSite = MarsLandingSite
+
+/** Landing spots seen from orbit around a world. */
+export function landingSitesFor(world: WorldId): readonly LandingSite[] {
+  return world === 'moon' ? MOON_LANDING_SITES : MARS_LANDING_SITES
+}
+
 /** unknown → found (identified) → letter (sealed, not sent) → done (sent). */
 export type LandingSiteState = 'unknown' | 'found' | 'letter' | 'done'
 
 export function getLandingSiteState(
   save: JourneySave | null,
-  explorer: MarsExplorerId,
+  explorer: ExplorerId,
 ): LandingSiteState {
   const progress = save?.missions[explorer]
   if (!progress) return 'unknown'
@@ -55,7 +83,7 @@ export function getLandingSiteState(
  */
 export function getLandingSiteProgress(
   save: JourneySave | null,
-  explorer: MarsExplorerId,
+  explorer: ExplorerId,
 ): number {
   const progress = save?.missions[explorer]
   if (!progress) return 0
@@ -71,15 +99,18 @@ export interface OrbitGuidance {
   /** PIP's line on arrival in orbit. */
   line: string
   /** A sealed letter is aboard: send it before landing again. */
-  pendingDelivery: MarsExplorerId | null
+  pendingDelivery: ExplorerId | null
   /** Both stories are safe: time to fly home. */
   allDone: boolean
   /** The spot PIP suggests next (glows brighter), if any. */
-  suggested: MarsExplorerId | null
+  suggested: ExplorerId | null
 }
 
-export function getOrbitGuidance(save: JourneySave | null): OrbitGuidance {
-  const states = MARS_LANDING_SITES.map((site) => ({
+export function getOrbitGuidance(
+  save: JourneySave | null,
+  world: WorldId = 'mars',
+): OrbitGuidance {
+  const states = landingSitesFor(world).map((site) => ({
     explorer: site.explorer,
     state: getLandingSiteState(save, site.explorer),
   }))
@@ -103,7 +134,9 @@ export function getOrbitGuidance(save: JourneySave | null): OrbitGuidance {
   }
   const someDone = remaining.length < states.length
   return {
-    line: someDone ? pipLine('orbit-next') : pipLine('orbit-intro'),
+    line: someDone
+      ? pipLine('orbit-next')
+      : pipLine(world === 'moon' ? 'orbit-moon-intro' : 'orbit-intro'),
     pendingDelivery: null,
     allDone: false,
     // A story already started comes first; otherwise the first spot.

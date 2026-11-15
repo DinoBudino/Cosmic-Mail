@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { getDestination } from '../data/destinations'
 import type { DestinationId } from '../data/missions'
-import { setActiveExplorer, type MarsExplorerId } from '../data/spiritSite'
+import { setActiveExplorer, type ExplorerId } from '../data/spiritSite'
 import { clearInput } from '../game/input'
 import { useJourneyStore } from './journeyStore'
 
@@ -16,7 +16,7 @@ export type OnboardingPhase =
   | 'registration'
   | 'hub'
   | 'launching'
-  /** Mailwing orbits Mars: the child picks which explorer to visit. */
+  /** Mailwing orbits Mars or the Moon: the child picks which explorer to visit. */
   | 'orbit'
   | 'playing'
 
@@ -62,10 +62,10 @@ interface OnboardingState {
   /** Return from a surface mission to Mailwing without losing progress. */
   returnToShip: () => void
   /** Orbit: land at the chosen explorer's site. */
-  landAt: (explorer: MarsExplorerId) => void
+  landAt: (explorer: ExplorerId) => void
   /** Walk back aboard on Mars: Mailwing climbs back to orbit. */
   returnToOrbit: () => void
-  /** Leave Mars orbit and go back to the cabin. */
+  /** Leave orbit and go back to the cabin. */
   leaveOrbit: () => void
   goBack: () => void
   resetPresentation: () => void
@@ -189,9 +189,11 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   finishLaunch: () => {
     if (get().phase !== 'launching') return
     clearInput()
-    // Mars has two explorers: Mailwing stops in orbit so the child picks one.
+    // Mars and the Moon have two explorers each: Mailwing stops in orbit so
+    // the child picks one.
     const destination = useJourneyStore.getState().save?.currentDestination
-    set({ phase: destination === 'mars' ? 'orbit' : 'playing', pipTalking: false })
+    const orbits = destination === 'mars' || destination === 'moon'
+    set({ phase: orbits ? 'orbit' : 'playing', pipTalking: false })
   },
 
   landAt: (explorer) => {

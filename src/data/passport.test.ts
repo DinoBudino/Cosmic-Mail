@@ -38,9 +38,10 @@ describe('Cosmic Passport projection', () => {
     const view = getPassportView(save)
     expect(view.carrierName).toBe('Ada')
     expect(view.carrierId).toMatch(/^CM-\d{5}$/)
-    // One story per explorer: Surveyor 3 (Moon), Opportunity and Spirit (Mars).
+    // One story per explorer: Surveyor 3 and Eagle (Moon), Opportunity and Spirit (Mars).
     expect(view.stories.map((story) => story.missionId)).toEqual([
       'surveyor-3',
+      'apollo-11',
       'opportunity',
       'spirit',
     ])

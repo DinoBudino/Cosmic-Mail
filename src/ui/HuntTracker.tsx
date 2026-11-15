@@ -1,6 +1,6 @@
 import type { MissionDefinition } from '../data/missions'
 
-export type HuntIcon = 'eye' | 'tool' | 'heat'
+export type HuntIcon = 'eye' | 'tool' | 'heat' | 'radar' | 'engine' | 'plaque'
 
 /** Simple line icons, readable at 22 px. */
 export function HuntIconGlyph({ name }: { name: HuntIcon }) {
@@ -20,6 +20,33 @@ export function HuntIconGlyph({ name }: { name: HuntIcon }) {
       <svg {...common}>
         <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
         <circle cx="12" cy="12" r="3" />
+      </svg>
+    )
+  }
+  if (name === 'radar') {
+    return (
+      <svg {...common}>
+        <path d="M4 20h16" />
+        <path d="M7 16a5 5 0 0 1 10 0" />
+        <path d="M3.5 12.5a9 9 0 0 1 17 0" />
+        <circle cx="12" cy="16" r="1.4" />
+      </svg>
+    )
+  }
+  if (name === 'engine') {
+    return (
+      <svg {...common}>
+        <path d="M9 3h6v4l3 9H6l3-9Z" />
+        <path d="M9 19.5c.8 1 2 1.5 3 1.5s2.2-.5 3-1.5" />
+      </svg>
+    )
+  }
+  if (name === 'plaque') {
+    return (
+      <svg {...common}>
+        <rect x="4" y="5" width="16" height="12" rx="2" />
+        <path d="M8 9h8M8 13h5" />
+        <path d="M12 17v4" />
       </svg>
     )
   }

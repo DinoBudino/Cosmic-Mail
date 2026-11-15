@@ -15,10 +15,9 @@ import { getMission } from '../data/missions'
 import { PIP_VOICE_LINE_CATALOG } from '../data/pipVoiceCatalog'
 import {
   ONBOARDING_VOICE_LINES,
-  PIP_VOICES,
+  PIP_VOICE_ID,
   SUBTITLE_ONLY_LINES,
   audioKeyForLine,
-  resolveVoiceId,
 } from './pipVoice'
 
 const ONBOARDING_TEXTS = [
@@ -32,20 +31,14 @@ const ONBOARDING_TEXTS = [
 ]
 
 describe('recorded PIP voices', () => {
-  it('exposes the four selectable voices', () => {
-    expect(PIP_VOICES.map((voice) => voice.id)).toEqual([
-      'heart',
-      'sky',
-      'lily',
-      'michael',
-    ])
+  it('uses a single PIP voice, Heart', () => {
+    expect(PIP_VOICE_ID).toBe('heart')
   })
 
-  it('resolves a known voice id and falls back to Heart', () => {
-    expect(resolveVoiceId('michael')).toBe('michael')
-    expect(resolveVoiceId(null)).toBe('heart')
-    expect(resolveVoiceId('amy')).toBe('heart')
-    expect(resolveVoiceId('')).toBe('heart')
+  it('ships no recordings for the retired voices', () => {
+    for (const retired of ['sky', 'lily', 'michael']) {
+      expect(existsSync(join(process.cwd(), 'public', 'audio', 'pip', retired))).toBe(false)
+    }
   })
 
   it('keeps the Mars landmark recordings mapped', () => {
@@ -88,9 +81,9 @@ describe('recorded PIP voices', () => {
     }
   })
 
-  it('ships both natural takes for every recorded line in all voices', () => {
+  it('ships both natural takes for every recorded line', () => {
     for (const line of ONBOARDING_VOICE_LINES) {
-      for (const voice of PIP_VOICES) {
+      for (const voice of [{ id: PIP_VOICE_ID }]) {
         for (const take of [1, 2]) {
           const file = join(
             process.cwd(),
