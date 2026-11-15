@@ -119,8 +119,9 @@ export function LaunchSequence() {
         skipLaunch()
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    // Capture phase: runs before the global Escape (settings) handler.
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [skipLaunch])
 
   return (

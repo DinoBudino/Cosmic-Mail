@@ -72,10 +72,14 @@ export function Hub() {
   useEffect(() => {
     if (!routeOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && navBackEnabled) setRouteOpen(false)
+      if (event.key === 'Escape' && navBackEnabled) {
+        event.preventDefault()
+        setRouteOpen(false)
+      }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    // Capture phase: runs before the global Escape (settings) handler.
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [routeOpen, setRouteOpen, navBackEnabled])
 
   useEffect(() => {
@@ -86,8 +90,8 @@ export function Hub() {
         closeDetail()
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [passportDetailOpen, closeDetail])
 
   return (

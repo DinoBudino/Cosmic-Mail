@@ -63,10 +63,14 @@ export function SiteTitle() {
   useEffect(() => {
     if (!showing) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === ' ' || event.key === 'Enter' || event.key === 'Escape') skip()
+      if (event.key === ' ' || event.key === 'Enter' || event.key === 'Escape') {
+        // Escape here only skips the title; it must not also open settings.
+        if (event.key === 'Escape') event.preventDefault()
+        skip()
+      }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [showing, skip])
 
   if (!showing || !title) return null

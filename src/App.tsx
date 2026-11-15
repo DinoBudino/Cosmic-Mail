@@ -74,6 +74,8 @@ export default function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      // A screen that owns Escape (launch skip, album, route) already used it.
+      if (event.defaultPrevented) return
       // Escape releases Pointer Lock first; the next press opens settings.
       if (document.pointerLockElement) return
       const state = useGameStore.getState()
