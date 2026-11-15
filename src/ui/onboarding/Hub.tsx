@@ -3,7 +3,7 @@ import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { hubElementEnabled, useHubFocus } from '../../store/hubFocus'
 import { areAllMissionsComplete } from '../../store/journeyLogic'
-import { ArchiveFinale } from './ArchiveFinale'
+import { ArchiveRestored } from './ArchiveRestored'
 import { DestinationNavigation } from './DestinationNavigation'
 import { Passport } from './Passport'
 
@@ -146,7 +146,7 @@ export function Hub() {
         </button>
       </div>
 
-      {finaleOpen && <ArchiveFinale onClose={() => showFinalQuote()} />}
+      {finaleOpen && <ArchiveRestored onClose={() => showFinalQuote()} />}
 
       {passportDetailOpen && (
         <div

@@ -1355,5 +1355,47 @@
     "speed": 1.06,
     "category": "onboarding",
     "pitch": 1.05
+  },
+  {
+    "key": "finale-last-story",
+    "text": "That was the last one! Every story is on its way home, so let's fly back to the cabin!",
+    "speed": 1.06,
+    "category": "finale",
+    "pitch": 1.07
+  },
+  {
+    "key": "finale-wake",
+    "text": "Look, carrier! The Cosmic Archive is waking up!",
+    "speed": 1.06,
+    "category": "finale",
+    "pitch": 1.07
+  },
+  {
+    "key": "finale-files",
+    "text": "Every explorer's file is whole again, and all the links are back!",
+    "speed": 1.06,
+    "category": "finale",
+    "pitch": 1.06
+  },
+  {
+    "key": "finale-memory",
+    "text": "And I remember now! Every single story, every single explorer!",
+    "speed": 1.06,
+    "category": "finale",
+    "pitch": 1.08
+  },
+  {
+    "key": "finale-thanks",
+    "text": "Thank you, carrier. From now on, you are a Master Carrier!",
+    "speed": 1.06,
+    "category": "finale",
+    "pitch": 1.07
+  },
+  {
+    "key": "finale-keepsake",
+    "text": "Here's something to remember our journey. Download it and keep it forever!",
+    "speed": 1.06,
+    "category": "finale",
+    "pitch": 1.06
   }
 ]

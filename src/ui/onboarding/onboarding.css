@@ -1808,24 +1808,6 @@
   margin-top: 8px;
 }
 
-.finale__quote {
-  margin: 16px 0 0;
-  padding: 14px 16px;
-  border-left: 4px solid #8a6a2f;
-  background: rgba(255, 217, 168, 0.22);
-  color: #2a1a33;
-  font-size: 0.95rem;
-  font-style: italic;
-  line-height: 1.55;
-}
-
-.finale__theme {
-  margin: 12px 0 0;
-  color: #5b4050;
-  font-size: 0.82rem;
-  line-height: 1.55;
-}
-
 /* Cinematic intro beats: scene progress and pacing aids */
 .cine__progress {
   display: flex;

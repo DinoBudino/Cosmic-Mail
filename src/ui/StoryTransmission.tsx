@@ -7,6 +7,7 @@ import { audioManager } from '../game/audio/audioManager'
 import { emitAudio } from '../game/audio/audioEvents'
 import { speakPip, stopPipVoice } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
+import { areAllMissionsComplete } from '../store/journeyLogic'
 import { useJourneyStore } from '../store/journeyStore'
 import { useOnboardingStore } from '../store/onboardingStore'
 import { PipAvatar } from './PipSpeech'
@@ -80,6 +81,8 @@ export function StoryTransmission({
   const muted = useGameStore((state) => state.muted)
   const phaseOnboarding = useOnboardingStore((state) => state.phase)
   const onMars = phaseOnboarding === 'playing'
+  // The very last story: the journey's finale waits in the cabin.
+  const lastStory = Boolean(save && areAllMissionsComplete(save) && !save.finalQuoteShown)
 
   // A replay (already delivered) never shows the sending part again.
   const [alreadySent] = useState(
@@ -148,13 +151,24 @@ export function StoryTransmission({
       phase === 'record' && !alreadySent
         ? 'story-send-ready'
         : phase === 'delivered'
-          ? 'story-delivered'
+          ? lastStory && !alreadySent
+            ? 'finale-last-story'
+            : 'story-delivered'
           : null
     if (!key) return
     speakPip(pipLine(key), voiceEnabled, 'excited')
     const frame = window.requestAnimationFrame(() => actionRef.current?.focus())
     return () => window.cancelAnimationFrame(frame)
-  }, [phase, alreadySent, voiceEnabled])
+  }, [phase, alreadySent, voiceEnabled, lastStory])
+
+  /** After the last story, Mailwing flies straight home to the finale. */
+  const flyHome = () => {
+    onClose()
+    const onboarding = useOnboardingStore.getState()
+    if (onboarding.phase === 'playing') onboarding.returnToShip()
+    else if (onboarding.phase === 'orbit') onboarding.leaveOrbit()
+  }
+  const finale = lastStory && !alreadySent
 
   const togglePlay = useCallback(() => {
     const element = videoRef.current
@@ -456,16 +470,20 @@ export function StoryTransmission({
           <p className="story-tx__pip-line">
             <PipAvatar />
             <span>
-              <strong>PIP</strong> {pipLine('story-delivered')}
+              <strong>PIP</strong> {pipLine(finale ? 'finale-last-story' : 'story-delivered')}
             </span>
           </p>
           <button
             ref={actionRef}
             type="button"
             className="story-tx__btn story-tx__btn--main"
-            onClick={onClose}
+            onClick={finale ? flyHome : onClose}
           >
-            {onMars ? `Back to ${getActiveWorld() === 'moon' ? 'the Moon' : 'Mars'}` : 'Done'}
+            {finale
+              ? 'Fly home'
+              : onMars
+                ? `Back to ${getActiveWorld() === 'moon' ? 'the Moon' : 'Mars'}`
+                : 'Done'}
           </button>
         </div>
       )}

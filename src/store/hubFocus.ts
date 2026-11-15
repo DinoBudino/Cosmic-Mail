@@ -5,6 +5,7 @@ import {
   type HubTarget,
 } from '../data/onboardingNarrative'
 import { getSliceClosure } from '../data/sliceClosure'
+import { areAllMissionsComplete } from './journeyLogic'
 import { useGameStore } from './gameStore'
 import { useJourneyStore } from './journeyStore'
 import { useOnboardingStore } from './onboardingStore'
@@ -35,7 +36,9 @@ export function useHubFocus(): HubFocus {
   // the slice-closing lines never talk over the delivery ceremony.
   const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
 
-  if (phase !== 'hub' || archiveOpen) {
+  // The journey's finale (ArchiveRestored) owns the cabin until it closes.
+  const finalePending = Boolean(save && areAllMissionsComplete(save) && !save.finalQuoteShown)
+  if (phase !== 'hub' || archiveOpen || finalePending) {
     return { steps: [], step: null, target: null, tourActive: false }
   }
   const closure = getSliceClosure(save)
