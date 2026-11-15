@@ -40,6 +40,7 @@ coverage/
 # Local documentation and backups (not published)
 /README.md
 *.md
+!/README.md
 /backups/
 *.bak
 
@@ -62,3 +63,8 @@ blender/*.glb
 *.njsproj
 *.sln
 *.sw?
+
+# TurboSquid source files (not redistributable)
+/blender/Earth/
+/blender/Mars/
+/blender/Moon/
