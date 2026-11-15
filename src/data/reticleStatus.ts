@@ -9,6 +9,8 @@ export type ReticleStatus =
   | 'blocked'
   | 'recorded'
   | 'ready'
+  /** A part further down the hunt: the next one comes first. */
+  | 'later'
   | null
 
 export interface ReticleStatusInput {
@@ -16,6 +18,8 @@ export interface ReticleStatusInput {
   physicalState: 'idle' | 'valid' | 'out-of-range' | 'occluded'
   triggerHeld: boolean
   recorded: boolean
+  /** The aimed part is not the next one in the hunt. */
+  later?: boolean
 }
 
 export function getReticleStatus(input: ReticleStatusInput): ReticleStatus {
@@ -24,6 +28,7 @@ export function getReticleStatus(input: ReticleStatusInput): ReticleStatus {
   if (input.physicalState === 'occluded') return 'blocked'
   if (!input.hasTarget) return null
   if (input.recorded) return 'recorded'
+  if (input.later) return 'later'
   if (input.triggerHeld) return 'scanning'
   return 'ready'
 }
@@ -36,4 +41,5 @@ export const RETICLE_STATUS_LABEL: Readonly<
   blocked: 'Blocked',
   recorded: 'Recorded',
   ready: 'Hold to scan',
+  later: 'Not yet',
 }

@@ -7,7 +7,6 @@ import {
 import { useGameStore } from '../store/gameStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import { isPipSpeechHidden } from './pipSpeechVisibility'
-import { pipScreenAnchor } from '../game/pipScreenAnchor'
 
 const LEGACY_MESSAGE_LIFETIME_MS = 6000
 const TYPE_INTERVAL_MS = 18
@@ -121,8 +120,6 @@ export function PipSpeech() {
   const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
   const settingsOpen = useGameStore((state) => state.settingsOpen)
   const activeSiteId = useGameStore((state) => state.activeSiteId)
-  const scanStation = useGameStore((state) => state.scanStation)
-  const boxRef = useRef<HTMLElement>(null)
 
   const hidden = isPipSpeechHidden({
     scannerEquipped,
@@ -229,43 +226,6 @@ export function PipSpeech() {
   ])
 
   const showing = Boolean(activeText) && !hidden
-  // At the scan station the box follows PIP and sits on its left side, so
-  // the child sees who is talking (wide screens; phones keep the corner).
-  const anchored = scanStation && showing
-  useEffect(() => {
-    if (!anchored) return
-    const node = boxRef.current
-    let frame = 0
-    const follow = () => {
-      frame = window.requestAnimationFrame(follow)
-      const box = boxRef.current
-      if (!box) return
-      const wide = window.innerWidth >= 720
-      if (!wide || !pipScreenAnchor.visible) {
-        box.classList.remove('pip-speech--beside')
-        box.style.removeProperty('left')
-        box.style.removeProperty('top')
-        return
-      }
-      box.classList.add('pip-speech--beside')
-      const gap = 56
-      const left = Math.max(12, pipScreenAnchor.x - gap - box.offsetWidth)
-      const top = Math.min(
-        window.innerHeight - box.offsetHeight - 12,
-        Math.max(12, pipScreenAnchor.y - box.offsetHeight / 2),
-      )
-      box.style.left = `${left.toFixed(1)}px`
-      box.style.top = `${top.toFixed(1)}px`
-    }
-    follow()
-    return () => {
-      window.cancelAnimationFrame(frame)
-      node?.classList.remove('pip-speech--beside')
-      node?.style.removeProperty('left')
-      node?.style.removeProperty('top')
-    }
-  }, [anchored, activeKey])
-
   if (!showing) return null
 
   const skip = () => {
@@ -280,7 +240,6 @@ export function PipSpeech() {
 
   return (
     <aside
-      ref={boxRef}
       className="pip-speech"
       data-emotion={activeEmotion ?? 'neutral'}
       aria-label="PIP is speaking"

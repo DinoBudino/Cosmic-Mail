@@ -10,9 +10,17 @@ import { getTerrainHeight } from './terrainHeight'
  * framed view: the practice rock and the explorer's parts hunt.
  */
 function stationOf(target: ScanStationTarget) {
-  return target === 'practice'
-    ? { center: CALIBRATION_SAMPLE.position, view: PRACTICE_STATION_VIEW }
-    : { center: SPIRIT_SITE.position, view: getScanStationView() }
+  if (target === 'practice') {
+    return { center: CALIBRATION_SAMPLE.position, view: PRACTICE_STATION_VIEW }
+  }
+  // The view centres on the explorer, or on a point beside it when its
+  // parts are spread out (lookOffset).
+  const view = getScanStationView()
+  const offset = view.lookOffset ?? { x: 0, z: 0 }
+  return {
+    center: { x: SPIRIT_SITE.position.x + offset.x, z: SPIRIT_SITE.position.z + offset.z },
+    view,
+  }
 }
 
 /** Where the astronaut stands (world x/z; y is 0). */

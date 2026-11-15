@@ -170,6 +170,11 @@ export interface ScanStationView {
   distance: number
   eyeHeight: number
   lookHeight: number
+  /**
+   * World offset (x/z) of the point the view centres on, from the
+   * explorer's origin. For a wide explorer whose parts are spread out.
+   */
+  lookOffset?: { x: number; z: number }
 }
 
 const STATION_VIEWS: Readonly<Record<WorldId | ExplorerId, ScanStationView>> = {
@@ -181,9 +186,16 @@ const STATION_VIEWS: Readonly<Record<WorldId | ExplorerId, ScanStationView>> = {
   'viking-1': { direction: { x: 0.55, z: 1 }, distance: 4.8, eyeHeight: 1.7, lookHeight: 1.0 },
   // Camera, scoop and the radar under the frame, seen from the south.
   'surveyor-3': { direction: { x: 0.15, z: 1 }, distance: 4.9, eyeHeight: 1.35, lookHeight: 0.85 },
-  // South-west: the probe on the south pad, the engine between the legs
-  // and the plaque on the west (ladder) leg.
-  'apollo-11': { direction: { x: -0.8, z: 1 }, distance: 8.2, eyeHeight: 1.8, lookHeight: 1.3 },
+  // Centred between the plaque on the ladder leg and the probe lying by
+  // a footpad, from far enough that all three parts sit in the middle of
+  // the view (clear of the scanner, PIP's box and the corner buttons).
+  'apollo-11': {
+    direction: { x: -0.42, z: 0.91 },
+    distance: 10.5,
+    eyeHeight: 1.85,
+    lookHeight: 0.95,
+    lookOffset: { x: 0.3, z: 1.9 },
+  },
 }
 
 /** Station view of the active explorer. */

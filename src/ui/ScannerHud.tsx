@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { getEnvironmentalSite } from '../data/environmentalSites'
 import { RETICLE_STATUS_LABEL, getReticleStatus } from '../data/reticleStatus'
-import { fragmentLabel } from '../data/scanMarkers'
+import { fragmentLabel, getNextMarkerNumber, isPartScannableNow } from '../data/scanMarkers'
 import { getScanAnchors } from '../data/spiritSite'
 
 const markerOrder = () => getScanAnchors().map((anchor) => anchor.componentId)
@@ -187,8 +187,18 @@ export function ScannerHud() {
       settingsOpen ||
       activeSiteId,
   )
+  // The hunt goes in order: a later part is named but not recorded yet.
+  const scannedIds = progress?.scannedComponentIds ?? []
+  const later = Boolean(
+    target &&
+      discovered &&
+      !alreadyScanned &&
+      !isPartScannableNow(markerOrder(), scannedIds, target.id),
+  )
+  const nextNumber = later ? getNextMarkerNumber(markerOrder(), scannedIds) : null
   // One status word under the label, consistent with the panel and bar.
   const reticleStatus = getReticleStatus({
+    later,
     hasTarget: Boolean(target || environmental || distractor),
     physicalState: scannerPhysicalState,
     triggerHeld,
@@ -198,7 +208,7 @@ export function ScannerHud() {
     !save ||
     (!target && !environmental && !distractor) ||
     (Boolean(target) &&
-      (!discovered || alreadyScanned)) ||
+      (!discovered || alreadyScanned || later)) ||
     Boolean(environmental && environmentalDetailed)
   let reticleState:
     | 'idle'
@@ -230,7 +240,9 @@ export function ScannerHud() {
       ? 'inspect'
       : alreadyScanned
         ? 'already-scanned'
-        : triggerHeld
+        : later
+          ? 'inspect'
+          : triggerHeld
           ? 'scanning'
           : 'valid'
   } else {
@@ -347,7 +359,9 @@ export function ScannerHud() {
               className="scanner-reticle__status"
               data-status={reticleStatus}
             >
-              {RETICLE_STATUS_LABEL[reticleStatus]}
+              {reticleStatus === 'later' && nextNumber
+                ? `Find #${nextNumber} first`
+                : RETICLE_STATUS_LABEL[reticleStatus]}
             </p>
           )}
         </div>

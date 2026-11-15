@@ -3854,6 +3854,7 @@
 }
 
 .scanner-reticle__status[data-status='out-of-range'],
+.scanner-reticle__status[data-status='later'],
 .scanner-reticle__status[data-status='blocked'] {
   color: #ffb4a0;
 }
@@ -4649,29 +4650,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .archive-tablet, .archive-tablet__action--seal { animation: none; }
-}
-
-/* Scan station: the speech box sits on PIP's left, a tail pointing at PIP. */
-.pip-speech.pip-speech--beside {
-  right: auto;
-  bottom: auto;
-  max-width: min(320px, 38vw);
-  transition: left 0.18s ease-out, top 0.18s ease-out;
-}
-.pip-speech.pip-speech--beside::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: -9px;
-  width: 16px;
-  height: 16px;
-  transform: translateY(-50%) rotate(45deg);
-  background: inherit;
-  border-top: 1px solid rgba(244, 180, 223, 0.35);
-  border-right: 1px solid rgba(244, 180, 223, 0.35);
-}
-@media (prefers-reduced-motion: reduce) {
-  .pip-speech.pip-speech--beside { transition: none; }
 }
 
 /* ------------------------------------------------------------------ */

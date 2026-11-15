@@ -49,3 +49,18 @@ export function getNextMarkerNumber(
   const index = orderedComponentIds.findIndex((id) => !scanned.has(id))
   return index === -1 ? null : index + 1
 }
+
+/**
+ * The hunt goes in order (1 → 2 → 3), like PIP's clues: only the next
+ * part can be recorded. Aiming at a later part says "find N first".
+ */
+export function isPartScannableNow(
+  orderedComponentIds: readonly string[],
+  scannedIds: readonly string[],
+  componentId: string,
+): boolean {
+  if (!orderedComponentIds.includes(componentId)) return true
+  const scanned = new Set(scannedIds)
+  if (scanned.has(componentId)) return false
+  return orderedComponentIds.find((id) => !scanned.has(id)) === componentId
+}

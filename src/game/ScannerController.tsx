@@ -10,6 +10,7 @@ import {
 } from '../data/arrivalProtocol'
 import { getEnvironmentalSite } from '../data/environmentalSites'
 import { getMission } from '../data/missions'
+import { isPartScannableNow } from '../data/scanMarkers'
 import { PRACTICE_SCAN_RESULT } from '../data/calibrationSample'
 import { emitAudio } from './audio/audioEvents'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
@@ -361,8 +362,17 @@ export function ScannerController() {
       Boolean(save) &&
       discovered &&
       store.scannerTriggerHeld
+    // Parts are recorded in hunt order, the same order as PIP's clues.
+    const inHuntOrder =
+      componentId && missionId
+        ? isPartScannableNow(
+            getMission(missionId).components.map((component) => component.id),
+            progress?.scannedComponentIds ?? [],
+            componentId,
+          )
+        : true
     const canScanComponent =
-      wantsScan && Boolean(componentId) && !alreadyScanned
+      wantsScan && Boolean(componentId) && !alreadyScanned && inHuntOrder
     const canScanDistractor = wantsScan && Boolean(distractorId)
     const calibrating =
       Boolean(validEnvironmentalId) &&

@@ -1,7 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef, useState, type RefObject } from 'react'
 import * as THREE from 'three'
-import { pipScreenAnchor } from './pipScreenAnchor'
 import { MARS_WORLD_SITES, REGION_APPROACH_RADIUS } from '../data/marsObjects'
 import { SPIRIT_SITE, getScanAnchors } from '../data/spiritSite'
 import { useJourneyStore } from '../store/journeyStore'
@@ -113,7 +112,6 @@ export function Companion({
   const forwardRef = useRef<PipPoint>({ x: 0, z: -1 })
   const sideRef = useRef<1 | -1>(1)
   const yawRate = useRef(0)
-  const screenPos = useRef(new THREE.Vector3())
   // Gestures: a happy spin on each find, a curious look-around when idle.
   const lastReactionUntil = useRef(0)
   const spinStart = useRef(-10)
@@ -679,15 +677,6 @@ export function Companion({
     }
     shell.rotation.x = damp(shell.rotation.x, tiltX, 8, dt)
     shell.rotation.z = damp(shell.rotation.z, tiltZ, 8, dt)
-
-    // Where PIP is on screen, so the speech box can sit right beside it.
-    const screen = screenPos.current.copy(current.position)
-    screen.y += 0.2
-    screen.project(state.camera)
-    pipScreenAnchor.visible =
-      screen.z < 1 && Math.abs(screen.x) < 1 && Math.abs(screen.y) < 1
-    pipScreenAnchor.x = state.size.left + (screen.x * 0.5 + 0.5) * state.size.width
-    pipScreenAnchor.y = state.size.top + (-screen.y * 0.5 + 0.5) * state.size.height
   })
 
   return (
