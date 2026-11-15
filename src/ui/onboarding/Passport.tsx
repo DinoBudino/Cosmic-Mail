@@ -679,15 +679,15 @@ function ExplorerCard({
           {story.status === 'memory_recovered' ? (
             <button
               type="button"
-              className={`xcard__btn${guideTarget === 'seal' ? ' is-tour-target is-guide-target' : ''}`}
+              className={`xcard__btn xcard__btn--action${guideTarget === 'seal' ? ' is-tour-target is-guide-target' : ''}`}
               onClick={onPrepare}
             >
-              Seal the letter
+              <span aria-hidden="true">✉</span> Seal the letter
             </button>
           ) : story.canTransmit ? (
             <button
               type="button"
-              className={`xcard__btn${guideTarget === 'story' ? ' is-tour-target is-guide-target' : ''}`}
+              className={`xcard__btn xcard__btn--action${guideTarget === 'story' ? ' is-tour-target is-guide-target' : ''}`}
               onClick={onDeliver}
             >
               <span aria-hidden="true">▶</span> Watch its story

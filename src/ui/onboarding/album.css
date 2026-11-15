@@ -829,6 +829,49 @@
   cursor: pointer;
 }
 .xcard__btn:hover:not(:disabled) { filter: brightness(1.06); }
+
+/* The next step for an explorer (seal its letter, watch its story): not
+   the same orange as "See rewards". Purple, bigger, with a glint that
+   sweeps across now and then so a child's eye finds it. */
+.xcard__btn--action {
+  position: relative;
+  padding: 12px 12px;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+  background:
+    linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%) no-repeat,
+    linear-gradient(180deg, #8f6bff, #5b3fc4);
+  background-size: 250% 100%, 100% 100%;
+  background-position: 160% 0, 0 0;
+  box-shadow: 0 4px 0 #3a2591, 0 6px 16px rgba(91, 63, 196, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  animation: xcard-glint 2.8s ease-in-out 0.6s infinite;
+}
+@keyframes xcard-glint {
+  0%, 55% { background-position: 160% 0, 0 0; }
+  100% { background-position: -60% 0, 0 0; }
+}
+/* PIP points at it: a bouncing "Tap!" arrow over the button's right end
+   (clear of the stars in the middle). */
+.xcard__btn--action.is-guide-target::after {
+  content: 'Tap! ▼';
+  position: absolute;
+  right: 6px;
+  bottom: calc(100% + 6px);
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: #5b3fc4;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(43, 32, 99, 0.35);
+  animation: xcard-tap 0.9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes xcard-tap {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
 .xcard__btn:disabled {
   cursor: default;
   color: #a7a1c4;
@@ -1201,6 +1244,15 @@
   outline-offset: 3px;
   animation: album-guide-pulse 1.6s ease-in-out infinite;
 }
+.ctab .xcard__btn--action.is-guide-target {
+  animation:
+    xcard-glint 2.8s ease-in-out 0.6s infinite,
+    album-guide-pulse-action 1.6s ease-in-out infinite;
+}
+@keyframes album-guide-pulse-action {
+  0%, 100% { box-shadow: 0 4px 0 #3a2591, 0 0 0 0 rgba(143, 107, 255, 0.75); }
+  50% { box-shadow: 0 4px 0 #3a2591, 0 0 0 11px rgba(143, 107, 255, 0); }
+}
 @keyframes album-guide-pulse {
   0%, 100% { box-shadow: 0 3px 0 var(--orange-dk), 0 0 0 0 rgba(255, 138, 42, 0.7); }
   50% { box-shadow: 0 3px 0 var(--orange-dk), 0 0 0 9px rgba(255, 138, 42, 0); }
@@ -1218,6 +1270,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ctab .is-guide-target,
+  .ctab .xcard__btn--action,
+  .ctab .xcard__btn--action::after,
   .ctab__guide-strip,
   .ctab__speech.is-guide,
   .xcard__pop,
