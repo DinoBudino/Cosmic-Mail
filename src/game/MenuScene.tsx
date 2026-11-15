@@ -782,8 +782,14 @@ function BackdropPlanet() {
   // to the ship. Only INSIDE the cabin does the window reflect the
   // last mission's destination. The launch keeps showing the chosen
   // destination (it is already the latest recorded mission).
+  // A new game (intro + registration) starts at home too: the previous
+  // save is still on disk until registration replaces it, so its last
+  // destination must not leak into the new journey.
+  const newJourney = phase === 'intro' || phase === 'registration'
   const kind: PlanetKind =
-    phase === 'menu' || (phase !== 'launching' && boardingStage === 'approach')
+    phase === 'menu' ||
+    newJourney ||
+    (phase !== 'launching' && boardingStage === 'approach')
       ? 'earth'
       : destinationPlanetKind(destination)
   const texture = useMemo(() => makePlanetTexture(kind), [kind])

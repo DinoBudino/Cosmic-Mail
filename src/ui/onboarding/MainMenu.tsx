@@ -26,13 +26,11 @@ export function MainMenu() {
   const firstRenderRef = useRef(true)
   const timerRef = useRef<number | null>(null)
 
+  // With a save on disk, New Game asks first in the game's own screen.
+  const [askingNew, setAskingNew] = useState(false)
   const startNewGame = () => {
-    if (
-      save &&
-      !window.confirm(
-        'Starting a new game will replace this carrier and all restored histories. The previous save is replaced only after you confirm. Continue?',
-      )
-    ) {
+    if (save) {
+      setAskingNew(true)
       return
     }
     useOnboardingStore.getState().startNewJourney()
@@ -151,11 +149,109 @@ export function MainMenu() {
           Carrier {save.playerName} · Cosmic Mail
         </p>
       )}
+      {askingNew && save && (
+        <NewGameConfirm
+          carrier={save.playerName}
+          onCancel={() => {
+            emitAudio('uiClick')
+            setAskingNew(false)
+            optionRefs.current[selected]?.focus()
+          }}
+          onConfirm={() => {
+            emitAudio('uiConfirm')
+            setAskingNew(false)
+            useOnboardingStore.getState().startNewJourney()
+          }}
+        />
+      )}
       {!save && loadStatus === 'corrupt' && (
         <p className="menu__carrier" role="status">
           The saved journey could not be read. New Game will start a fresh one.
         </p>
       )}
     </section>
+  )
+}
+
+/**
+ * "Start a new journey?" on a tech screen, not the browser's own confirm.
+ * Keeping the current journey is the safe, focused default.
+ */
+function NewGameConfirm({
+  carrier,
+  onCancel,
+  onConfirm,
+}: {
+  carrier: string
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const keepRef = useRef<HTMLButtonElement>(null)
+  const startRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    keepRef.current?.focus()
+  }, [])
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onCancel()
+      return
+    }
+    // Two buttons: Tab and the arrows simply switch between them.
+    if (['Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault()
+      const next =
+        document.activeElement === keepRef.current ? startRef.current : keepRef.current
+      next?.focus()
+    }
+  }
+
+  return (
+    <div
+      className="newgame-scrim"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+    >
+      <div
+        className="newgame"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="newgame-title"
+        aria-describedby="newgame-text"
+        onKeyDown={onKeyDown}
+      >
+        <p className="newgame__eyebrow">Cosmic Mail · new journey</p>
+        <div className="newgame__icon" aria-hidden="true">
+          ✦
+        </div>
+        <h2 id="newgame-title">Start a new journey?</h2>
+        <p id="newgame-text">
+          Carrier <strong>{carrier}</strong>&apos;s stamps and saved stories will be
+          replaced. This can&apos;t be undone.
+        </p>
+        <div className="newgame__actions">
+          <button
+            ref={keepRef}
+            type="button"
+            className="newgame__btn newgame__btn--keep"
+            onClick={onCancel}
+          >
+            Keep my journey
+          </button>
+          <button
+            ref={startRef}
+            type="button"
+            className="newgame__btn newgame__btn--start"
+            onClick={onConfirm}
+          >
+            Start new
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

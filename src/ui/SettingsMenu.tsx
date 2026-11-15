@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AUDIO_ASSETS } from '../game/audio/audioManifest'
 import { PIP_VOICES, resolveVoiceId, speakPip } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
@@ -74,7 +74,7 @@ export function SettingsMenu() {
   const setMuted = useGameStore((state) => state.setMuted)
 
   const effectiveVoice = resolveVoiceId(voiceName)
-  const [activeTab, setActiveTab] = useState<'graphics' | 'sounds'>('graphics')
+  const [activeTab, setActiveTab] = useState<SettingsTab>('game')
 
   const panelRef = useRef<HTMLDivElement>(null)
   const previousFocus = useRef<Element | null>(null)
@@ -124,6 +124,13 @@ export function SettingsMenu() {
 
   if (!settingsOpen) return null
 
+  const tabs: Array<{ id: SettingsTab; label: string }> = [
+    { id: 'game', label: 'Game' },
+    { id: 'sound', label: 'Sound' },
+    { id: 'pip', label: 'PIP' },
+    { id: 'credits', label: 'Credits' },
+  ]
+
   return (
     <div
       className="settings-scrim"
@@ -133,16 +140,15 @@ export function SettingsMenu() {
     >
       <div
         ref={panelRef}
-        className="settings-panel"
+        className="settings-panel settings-panel--tabs"
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        aria-describedby="settings-description"
         tabIndex={-1}
       >
         <div className="settings-header">
           <div>
-            <p className="settings-eyebrow">Cosmic Mail</p>
+            <p className="settings-eyebrow">Cosmic Mail · game paused</p>
             <h2 id="settings-title">Settings</h2>
           </div>
           <button
@@ -155,285 +161,220 @@ export function SettingsMenu() {
           </button>
         </div>
 
-        <p id="settings-description" className="settings-description">
-          The simulation is paused while this menu is open.
-        </p>
-
-        <div className="settings-tabs" role="tablist" aria-label="Settings sections">
-          <button
-            type="button"
-            role="tab"
-            id="tab-graphics"
-            aria-selected={activeTab === 'graphics'}
-            aria-controls="panel-graphics"
-            className={activeTab === 'graphics' ? 'is-active' : ''}
-            onClick={() => setActiveTab('graphics')}
-          >
-            Graphics
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="tab-sounds"
-            aria-selected={activeTab === 'sounds'}
-            aria-controls="panel-sounds"
-            className={activeTab === 'sounds' ? 'is-active' : ''}
-            onClick={() => setActiveTab('sounds')}
-          >
-            Sounds
-          </button>
-        </div>
-
-        <div
-          role="tabpanel"
-          id="panel-graphics"
-          aria-labelledby="tab-graphics"
-          hidden={activeTab !== 'graphics'}
-        >
-        <fieldset className="settings-group">
-          <legend>Graphics quality</legend>
-          <div className="segmented">
-            <button
-              type="button"
-              className={quality === 'high' ? 'is-active' : ''}
-              aria-pressed={quality === 'high'}
-              onClick={() => setQuality('high')}
-            >
-              High
-            </button>
-            <button
-              type="button"
-              className={quality === 'low' ? 'is-active' : ''}
-              aria-pressed={quality === 'low'}
-              onClick={() => setQuality('low')}
-            >
-              Low
-            </button>
-          </div>
-          <p className="settings-hint">
-            Low disables shadows and post-processing and reduces detail for
-            slower devices.
-          </p>
-        </fieldset>
-
-        <fieldset className="settings-group">
-          <legend>Scanner camera</legend>
-          <div className="segmented">
-            <button
-              type="button"
-              className={scannerCamera === 'first-person' ? 'is-active' : ''}
-              aria-pressed={scannerCamera === 'first-person'}
-              onClick={() => setScannerCamera('first-person')}
-            >
-              First person
-            </button>
-            <button
-              type="button"
-              className={scannerCamera === 'third-person' ? 'is-active' : ''}
-              aria-pressed={scannerCamera === 'third-person'}
-              onClick={() => setScannerCamera('third-person')}
-            >
-              Third person
-            </button>
-          </div>
-          <p className="settings-hint">
-            First person gives precise aiming. Click the world to capture the
-            mouse; if capture is unavailable, right-drag to look. Third person
-            keeps the astronaut visible while the scanner is held.
-          </p>
-        </fieldset>
-
-        <fieldset className="settings-group">
-          <legend>Accessibility</legend>
-          <label className="settings-toggle">
-            <input
-              type="checkbox"
-              checked={reducedMotion}
-              onChange={(event) =>
-                setReducedMotion(event.target.checked)
-              }
-            />
-            <span>
-              <strong>Reduced motion</strong>
-              <small>
-                Disables walking bob, guide pulses and floating dust.
-              </small>
-            </span>
-          </label>
-          <label className="settings-toggle">
-            <input
-              type="checkbox"
-              checked={assistedScanEnabled}
-              onChange={(event) =>
-                setAssistedScanEnabled(event.target.checked)
-              }
-            />
-            <span>
-              <strong>Assisted component review</strong>
-              <small>
-                Accessibility option. Lets you review discovered components
-                from a list instead of aiming the physical scanner. It never
-                replaces the physical scan in normal play.
-              </small>
-            </span>
-          </label>
-        </fieldset>
-        </div>
-
-        <div
-          role="tabpanel"
-          id="panel-sounds"
-          aria-labelledby="tab-sounds"
-          hidden={activeTab !== 'sounds'}
-        >
-        <fieldset className="settings-group">
-          <legend>PIP voice</legend>
-          <label className="settings-toggle">
-            <input
-              type="checkbox"
-              checked={voiceEnabled}
-              onChange={(event) => setVoiceEnabled(event.target.checked)}
-            />
-            <span>
-              <strong>PIP talks</strong>
-              <small>Spoken subtitles. Subtitles always stay on.</small>
-            </span>
-          </label>
-          <label htmlFor="voice-select" className="voice-label">PIP voice</label>
-          <select
-            id="voice-select"
-            className="voice-select"
-            value={effectiveVoice}
-            disabled={!voiceEnabled}
-            onChange={(event) => setVoiceName(event.target.value)}
-          >
-            {PIP_VOICES.map((voice) => (
-              <option key={voice.id} value={voice.id}>
-                {voice.label}
-              </option>
+        <div className="set-body">
+          <div className="set-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`tab-${tab.id}`}
+                aria-selected={activeTab === tab.id}
+                aria-controls={`panel-${tab.id}`}
+                className={activeTab === tab.id ? 'is-active' : ''}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
             ))}
-          </select>
-          <button
-            type="button"
-            className="site-action"
-            disabled={!voiceEnabled}
-            onClick={() => speakPip('Hi! I am PIP, your mail companion.', effectiveVoice, true)}
-          >
-            Hear PIP
-          </button>
-        </fieldset>
-
-        <fieldset className="settings-group">
-          <legend>Audio mix</legend>
-          <label className="settings-toggle">
-            <input
-              type="checkbox"
-              checked={muted}
-              onChange={(event) => setMuted(event.target.checked)}
-            />
-            <span>
-              <strong>Mute all audio</strong>
-              <small>
-                Keeps subtitles on. Your individual channel levels are
-                remembered.
-              </small>
-            </span>
-          </label>
-
-          <div className="volume-grid">
-            <VolumeControl
-              id="master-volume"
-              label="Master"
-              value={masterVolume}
-              onChange={setMasterVolume}
-            />
-            <VolumeControl
-              id="music-volume"
-              label="Music"
-              value={musicVolume}
-              onChange={setMusicVolume}
-            />
-            <VolumeControl
-              id="ambience-volume"
-              label="Ambience"
-              value={ambienceVolume}
-              onChange={setAmbienceVolume}
-            />
-            <VolumeControl
-              id="sfx-volume"
-              label="Effects"
-              value={sfxVolume}
-              onChange={setSfxVolume}
-            />
-            <VolumeControl
-              id="voice-volume"
-              label="PIP voice"
-              value={voiceVolume}
-              onChange={setVoiceVolume}
-            />
           </div>
-          <p className="settings-hint">
-            Music and ambience duck automatically while PIP speaks. The
-            scanner, footsteps and critical cues stay audible.
-          </p>
-        </fieldset>
 
-        <details className="settings-credits">
-          <summary>Music and sound credits</summary>
-          <p>
-            Music by Pixabay creators under the{' '}
-            <a
-              href="https://pixabay.com/service/license-summary/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Pixabay Content License
-            </a>
-            . Sound effects from{' '}
-            <a
-              href="https://kenney.nl/assets"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Kenney
-            </a>{' '}
-            (CC0). PIP chirps and ambience beds are original project audio.
-          </p>
-          <ul className="settings-credits__list">
-            {MUSIC_CREDITS.map((asset) => (
-              <li key={asset.id}>
-                <strong>{asset.source.title}</strong> · {asset.source.author}
-                {asset.source.contentIdRisk === 'registered' && (
-                  <span className="settings-credits__warning">
-                    {' '}
-                    · Content ID registered on Pixabay; verify before
-                    publishing video.
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-          <p className="settings-hint">
-            <a
-              href="audio/ATTRIBUTION.md"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Full attribution file
-            </a>{' '}
-            · repository notes in AUDIO_CREDITS.md.
-          </p>
-        </details>
+          <div className="set-pages">
+            {activeTab === 'game' && (
+              <div role="tabpanel" id="panel-game" aria-labelledby="tab-game" className="set-page">
+                <SettingRow label="Graphics" hint="Low runs better on slower computers.">
+                  <Segmented
+                    value={quality}
+                    options={[
+                      { value: 'high', label: 'High' },
+                      { value: 'low', label: 'Low' },
+                    ]}
+                    onChange={setQuality}
+                  />
+                </SettingRow>
+                <SettingRow label="Scanner view" hint="How you see while holding the scanner.">
+                  <Segmented
+                    value={scannerCamera}
+                    options={[
+                      { value: 'first-person', label: 'My eyes' },
+                      { value: 'third-person', label: 'Behind me' },
+                    ]}
+                    onChange={setScannerCamera}
+                  />
+                </SettingRow>
+                <SettingRow label="Less motion" hint="Calmer camera, fewer pulses and dust.">
+                  <Switch
+                    checked={reducedMotion}
+                    onChange={setReducedMotion}
+                    label="Less motion"
+                  />
+                </SettingRow>
+                <SettingRow label="Scan from a list" hint="Accessibility: review found parts without aiming.">
+                  <Switch
+                    checked={assistedScanEnabled}
+                    onChange={setAssistedScanEnabled}
+                    label="Scan from a list"
+                  />
+                </SettingRow>
+              </div>
+            )}
+
+            {activeTab === 'sound' && (
+              <div role="tabpanel" id="panel-sound" aria-labelledby="tab-sound" className="set-page">
+                <SettingRow label="Sound on" hint="Subtitles always stay on.">
+                  <Switch checked={!muted} onChange={(on) => setMuted(!on)} label="Sound on" />
+                </SettingRow>
+                <div className="set-sliders" data-muted={muted}>
+                  <VolumeControl id="master-volume" label="Master" value={masterVolume} onChange={setMasterVolume} />
+                  <VolumeControl id="music-volume" label="Music" value={musicVolume} onChange={setMusicVolume} />
+                  <VolumeControl id="ambience-volume" label="Ambience" value={ambienceVolume} onChange={setAmbienceVolume} />
+                  <VolumeControl id="sfx-volume" label="Effects" value={sfxVolume} onChange={setSfxVolume} />
+                  <VolumeControl id="voice-volume" label="PIP voice" value={voiceVolume} onChange={setVoiceVolume} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'pip' && (
+              <div role="tabpanel" id="panel-pip" aria-labelledby="tab-pip" className="set-page">
+                <SettingRow label="PIP talks" hint="PIP reads its lines out loud.">
+                  <Switch checked={voiceEnabled} onChange={setVoiceEnabled} label="PIP talks" />
+                </SettingRow>
+                <div className="set-row set-row--stack">
+                  <span className="set-row__label" id="voice-picker-label">PIP voice</span>
+                  <div className="set-voices" role="radiogroup" aria-labelledby="voice-picker-label">
+                    {PIP_VOICES.map((voice) => (
+                      <button
+                        key={voice.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={effectiveVoice === voice.id}
+                        disabled={!voiceEnabled}
+                        className={effectiveVoice === voice.id ? 'is-active' : ''}
+                        onClick={() => {
+                          setVoiceName(voice.id)
+                          speakPip('Hi! I am PIP, your mail companion.', voice.id, true)
+                        }}
+                      >
+                        {voice.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="set-row__hint">Tap a voice to hear it.</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'credits' && (
+              <div role="tabpanel" id="panel-credits" aria-labelledby="tab-credits" className="set-page set-credits">
+                <p>
+                  Music by Pixabay creators (
+                  <a href="https://pixabay.com/service/license-summary/" target="_blank" rel="noopener noreferrer">
+                    Pixabay Content License
+                  </a>
+                  ). Sound effects from{' '}
+                  <a href="https://kenney.nl/assets" target="_blank" rel="noopener noreferrer">
+                    Kenney
+                  </a>{' '}
+                  (CC0). PIP chirps and ambience beds are original project audio.
+                </p>
+                <ul>
+                  {MUSIC_CREDITS.map((asset) => (
+                    <li key={asset.id}>
+                      <strong>{asset.source.title}</strong> · {asset.source.author}
+                      {asset.source.contentIdRisk === 'registered' && (
+                        <span className="settings-credits__warning">
+                          {' '}· Content ID registered on Pixabay; verify before publishing video.
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  <a href="audio/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer">
+                    Full attribution file
+                  </a>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
-        <button
-          type="button"
-          className="settings-resume"
-          onClick={closeSettings}
-        >
-          Resume exploring
+        <button type="button" className="settings-resume" onClick={closeSettings}>
+          Done
         </button>
       </div>
     </div>
+  )
+}
+
+type SettingsTab = 'game' | 'sound' | 'pip' | 'credits'
+
+/** One compact line: what it is (and a short hint) on the left, control on the right. */
+function SettingRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="set-row">
+      <div className="set-row__text">
+        <span className="set-row__label">{label}</span>
+        {hint && <span className="set-row__hint">{hint}</span>}
+      </div>
+      <div className="set-row__control">{children}</div>
+    </div>
+  )
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: Array<{ value: T; label: string }>
+  onChange: (value: T) => void
+}) {
+  return (
+    <div className="segmented set-segmented">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className={value === option.value ? 'is-active' : ''}
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className="set-switch"
+      onClick={() => onChange(!checked)}
+    >
+      <span aria-hidden="true" />
+    </button>
   )
 }
