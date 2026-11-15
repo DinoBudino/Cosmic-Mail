@@ -13,6 +13,7 @@ import { useGameStore } from '../store/gameStore'
 import { buildRockGeometry } from './landscape'
 import { getTerrainHeight } from './terrainHeight'
 import { PALETTE } from './worldConfig'
+import { getGuideLane, getGuideMode } from './practiceGuide'
 
 const OUTCROP_URL = 'models/mars-outcrop.glb'
 useGLTF.preload(OUTCROP_URL)
@@ -137,6 +138,7 @@ export function EnvironmentalObjects() {
         />
       ))}
       <CalibrationStation />
+      <GuideTrail />
     </group>
   )
 }
@@ -234,6 +236,70 @@ function CalibrationStation() {
           blending={THREE.AdditiveBlending}
         />
       </mesh>
+    </group>
+  )
+}
+
+const TRAIL_DOTS = 9
+
+/**
+ * Guided first walk: a row of light dots on the ground from the landing
+ * to the practice rock. A soft wave runs along them toward the rock, so the
+ * way is obvious even without reading. Gone once the child arrives.
+ */
+function GuideTrail() {
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const group = useRef<THREE.Group>(null)
+  const fade = useRef(0)
+  const { dots, materials } = useMemo(() => {
+    const { start, end } = getGuideLane()
+    const positions: Array<[number, number, number]> = []
+    for (let i = 0; i < TRAIL_DOTS; i += 1) {
+      const k = (i + 1) / (TRAIL_DOTS + 1)
+      const x = start.x + (end.x - start.x) * k
+      const z = start.z + (end.z - start.z) * k
+      positions.push([x, getTerrainHeight(x, z) + 0.05, z])
+    }
+    const mats = positions.map(
+      () =>
+        new THREE.MeshBasicMaterial({
+          color: PALETTE.accent,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+        }),
+    )
+    return { dots: positions, materials: mats }
+  }, [])
+  useEffect(() => () => materials.forEach((material) => material.dispose()), [materials])
+
+  useFrame((state, delta) => {
+    const on = getGuideMode() === 'walk'
+    fade.current = THREE.MathUtils.damp(fade.current, on ? 1 : 0, 4, delta)
+    if (group.current) group.current.visible = fade.current > 0.01
+    if (fade.current <= 0.01) return
+    const t = state.clock.elapsedTime
+    materials.forEach((material, i) => {
+      const wave = reducedMotion
+        ? 0.6
+        : 0.35 + 0.65 * Math.max(0, Math.sin(t * 3 - i * 0.7))
+      material.opacity = wave * 0.85 * fade.current
+    })
+  })
+
+  return (
+    <group ref={group} visible={false}>
+      {dots.map((position, i) => (
+        <mesh
+          key={i}
+          position={position}
+          rotation={[-Math.PI / 2, 0, 0]}
+          material={materials[i]}
+          userData={{ scannerIgnore: true }}
+        >
+          <circleGeometry args={[0.16, 20]} />
+        </mesh>
+      ))}
     </group>
   )
 }

@@ -9,7 +9,7 @@ import { getMission } from '../../data/missions'
 import { pipLine } from '../../data/pipVoiceCatalog'
 import type { MarsExplorerId } from '../../data/spiritSite'
 import { emitAudio } from '../../game/audio/audioEvents'
-import { speakPip, stopPipVoice } from '../../game/pipVoice'
+import { onPipVoiceEnded, speakPip, stopPipVoice } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
 import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
@@ -18,7 +18,11 @@ import type { OrbitMarker } from '../../game/MarsOrbitScene'
 
 const MarsOrbitScene = lazy(() => import('../../game/MarsOrbitScene'))
 
+/** Shortest dive (voice off) and the dive while PIP talks. */
 const LANDING_MS = 1900
+const LANDING_TALK_MS = 3400
+/** Never wait longer than this for the voice (a stuck audio element). */
+const LANDING_MAX_MS = 6500
 
 /**
  * Mailwing in orbit around Mars. The planet turns slowly and can be spun
@@ -44,6 +48,7 @@ export function MarsOrbit() {
   const [reply, setReply] = useState<string | null>(null)
   const line = reply ?? guidance.line
   const landTimer = useRef<number | null>(null)
+  const stopVoiceWait = useRef<(() => void) | null>(null)
   const labels = useRef<Partial<Record<MarsExplorerId, HTMLElement | null>>>({})
 
   const markers: OrbitMarker[] = useMemo(
@@ -68,6 +73,7 @@ export function MarsOrbit() {
   useEffect(
     () => () => {
       if (landTimer.current) window.clearTimeout(landTimer.current)
+      stopVoiceWait.current?.()
       stopPipVoice()
     },
     [],
@@ -82,10 +88,32 @@ export function MarsOrbit() {
     const text = pipLine('orbit-landing')
     setReply(text)
     speakPip(text, voiceName, voiceEnabled, 'excited')
-    landTimer.current = window.setTimeout(
-      () => landAt(explorer),
-      reducedMotion ? 300 : LANDING_MS,
-    )
+    // Touch down only once PIP has finished "Hold on tight…": leaving the
+    // orbit screen earlier would cut the line in half.
+    const startedAt = performance.now()
+    const minimum = reducedMotion ? 300 : voiceEnabled ? LANDING_TALK_MS : LANDING_MS
+    let voiceDone = !voiceEnabled
+    let landed = false
+    const touchDown = () => {
+      if (landed) return
+      landed = true
+      stopListening()
+      if (landTimer.current) window.clearTimeout(landTimer.current)
+      landAt(explorer)
+    }
+    const tryLand = () => {
+      if (voiceDone && performance.now() - startedAt >= minimum - 20) touchDown()
+    }
+    const stopListening = onPipVoiceEnded(() => {
+      voiceDone = true
+      // A short breath after the last word, then down we go.
+      window.setTimeout(tryLand, 250)
+    })
+    stopVoiceWait.current = stopListening
+    landTimer.current = window.setTimeout(() => {
+      tryLand()
+      if (!landed) landTimer.current = window.setTimeout(touchDown, LANDING_MAX_MS - minimum)
+    }, minimum)
   }
 
   return (
@@ -120,7 +148,13 @@ export function MarsOrbit() {
           </button>
         ))}
       </div>
-      {landing && <div className="orbit__dive" aria-hidden="true" />}
+      {landing && (
+        <div
+          className="orbit__dive"
+          aria-hidden="true"
+          style={{ animationDuration: `${(voiceEnabled ? LANDING_TALK_MS : LANDING_MS) / 1000}s` }}
+        />
+      )}
 
       <header className="orbit__top">
         <p className="orbit__title">Mars orbit</p>

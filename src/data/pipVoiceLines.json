@@ -601,6 +601,20 @@
     "pitch": 1.05
   },
   {
+    "key": "mars-press-q",
+    "text": "We're here! Press Q to take out your scanner.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-tap-scanner",
+    "text": "We're here! Tap the scanner button to take it out.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
     "key": "mars-ship-board-desktop",
     "text": "There's our ship! Press E to climb aboard.",
     "speed": 1.06,

@@ -12,6 +12,7 @@ import {
   isOutsideCorridor,
   isRadarVisible,
   isScannerUnlocked,
+  isStepAtLeast,
   needsArrivalBriefing,
   type ProtocolStep,
   hasPriorFieldWork,
@@ -55,6 +56,7 @@ import { stopPipVoice } from './pipVoice'
 import { getCurrentProtocolStep } from './protocolStep'
 import { playerPosition } from './playerPosition'
 import { faceOrbitToward } from './cameraRig'
+import { getGuideLane } from './practiceGuide'
 import { CALIBRATION_SAMPLE, PRACTICE_STATION_VIEW } from '../data/calibrationSample'
 import type { ScanStationTarget } from '../store/gameStore'
 import { PLAYER } from './worldConfig'
@@ -384,6 +386,9 @@ export function MissionNarrativeController() {
       // reading panel because this tick returned earlier.
       if (
         shouldOfferSoftHint(guideTimingRef.current, now) &&
+        // The guided walk and practice rock have their own step-by-step
+        // guidance; the explorer hint ("follow the star…") would contradict it.
+        isStepAtLeast(getCurrentProtocolStep(), 'M3') &&
         !game.scannerTriggerHeld &&
         game.scannerScanProgress === 0 &&
         !game.pipMessage &&
@@ -433,6 +438,7 @@ export function MissionNarrativeController() {
   // at the right step. It runs even after transmission (M7 opens the world).
   const lastStepRef = useRef<ProtocolStep | null>(null)
   const lastStationRef = useRef<ScanStationTarget | null>(null)
+  const lastBriefedRef = useRef<boolean | null>(null)
   useEffect(() => {
     if (!save) return
     const tick = () => {
@@ -537,7 +543,22 @@ export function MissionNarrativeController() {
         game.unequipScanner()
       }
 
+      // Guided first walk: when PIP's briefing ends the view turns down the
+      // lane to the practice rock, and on arrival it turns to the rock.
+      const briefedNow = useNarrativeStore.getState().protocol.briefed
+      if (briefedNow && !lastBriefedRef.current && (step === 'M0' || step === 'M1')) {
+        const { end } = getGuideLane()
+        faceOrbitToward(end.x - playerPosition.x, end.z - playerPosition.z)
+      }
+      lastBriefedRef.current = briefedNow
+
       const previous = lastStepRef.current
+      if (previous !== step && step === 'M2' && previous !== null) {
+        faceOrbitToward(
+          CALIBRATION_SAMPLE.position.x - playerPosition.x,
+          CALIBRATION_SAMPLE.position.z - playerPosition.z,
+        )
+      }
       if (previous !== step) {
         lastStepRef.current = step
         // The first observed step is the starting point (landing line or a

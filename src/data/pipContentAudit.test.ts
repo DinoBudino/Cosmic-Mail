@@ -7,6 +7,8 @@ import {
   SCANNER_LOCKED_LINE,
   STATION_STAY_LINE,
   PRACTICE_STAY_LINE,
+  PRESS_Q_LINE,
+  TAP_SCANNER_LINE,
   STEP_ENTRY_LINES,
   getProtocolHint,
 } from './arrivalProtocol'
@@ -58,6 +60,8 @@ describe('PIP content limits', () => {
       CALIBRATE_FIRST_LINE.text,
       STATION_STAY_LINE.text,
       PRACTICE_STAY_LINE.text,
+      PRESS_Q_LINE.text,
+      TAP_SCANNER_LINE.text,
       ...(['M0', 'M1', 'M2', 'M3'] as const).flatMap((step) =>
         [false, true].map((touch) => getProtocolHint(step, touch)!),
       ),

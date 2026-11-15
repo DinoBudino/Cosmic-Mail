@@ -54,7 +54,7 @@ export const INITIAL_PROTOCOL_FLAGS: ProtocolFlags = {
 /** Distance the player must walk to finish the landing step. */
 export const WALK_DISTANCE = 8
 /** Distance to the station that counts as arriving. */
-export const STATION_REACH_RADIUS = 6
+export const STATION_REACH_RADIUS = 3.6
 /** How far from the survey trail before PIP asks to stay on it. */
 export const CORRIDOR_HALF_WIDTH = 30
 
@@ -397,6 +397,16 @@ export const OFF_TRAIL_LINE: ProtocolLine = {
 export const PRACTICE_STAY_LINE: ProtocolLine = {
   id: 'protocol:practice-stay',
   text: 'Almost there! Hold the scan on the practice rock, you can do it!',
+}
+
+export const PRESS_Q_LINE: ProtocolLine = {
+  id: 'protocol:press-q',
+  text: "We're here! Press Q to take out your scanner.",
+}
+
+export const TAP_SCANNER_LINE: ProtocolLine = {
+  id: 'protocol:tap-scanner',
+  text: "We're here! Tap the scanner button to take it out.",
 }
 
 export const LATER_LINE: ProtocolLine = {

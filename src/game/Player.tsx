@@ -3,6 +3,7 @@ import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MARS_WORLD_SITES, REGION_INFO } from '../data/marsObjects'
 import { SPIRIT_SITE } from '../data/spiritSite'
+import { clampToLane, getGuideLane, getGuideMode, getPracticeRock } from './practiceGuide'
 import {
   getScanStationEyeHeight,
   getScanStationLook,
@@ -21,7 +22,9 @@ import {
 import {
   SCANNER_LOCKED_LINE,
   PRACTICE_STAY_LINE,
+  PRESS_Q_LINE,
   STATION_STAY_LINE,
+  TAP_SCANNER_LINE,
   areFreeScansAllowed,
 } from '../data/arrivalProtocol'
 import { getCurrentProtocolStep } from './protocolStep'
@@ -297,6 +300,35 @@ export function Player() {
       forward.current.y * axes.current.y +
       right.current.y * axes.current.x
 
+    // Guided first walk: once the practice rock is near, the astronaut
+    // walks the last steps alone and waits there for the scanner (Q).
+    const guide = getGuideMode()
+    let guideArrived = false
+    if (guide === 'arrive') {
+      const { end } = getGuideLane()
+      const gx = end.x - player.position.x
+      const gz = end.z - player.position.z
+      const gd = Math.hypot(gx, gz)
+      if (Math.hypot(axes.current.x, axes.current.y) > 0.01) {
+        requestProtocolLine(
+          window.matchMedia?.('(pointer: coarse)').matches
+            ? TAP_SCANNER_LINE
+            : PRESS_Q_LINE,
+          7_000,
+        )
+      }
+      if (gd > 0.3) {
+        // Walking pace, whatever keys are held.
+        const pace = Math.min(1, gd) * (runHeld ? 1 / PLAYER.runSpeedMultiplier : 1) * 0.85
+        moveX = (gx / gd) * pace
+        moveZ = (gz / gd) * pace
+      } else {
+        moveX = 0
+        moveZ = 0
+        guideArrived = true
+      }
+    }
+
     if (store.travelTargetId) {
       if (Math.hypot(axes.current.x, axes.current.y) > 0.01) {
         store.cancelTravel()
@@ -319,6 +351,8 @@ export function Player() {
 
     player.position.x += velocity.current.x * dt
     player.position.z += velocity.current.z * dt
+    // The walk to the practice rock follows one lane: no wandering off.
+    if (guide === 'walk') clampToLane(player.position)
 
     const distanceFromCenter = Math.hypot(
       player.position.x,
@@ -394,6 +428,18 @@ export function Player() {
       yaw.current += difference * (1 - Math.exp(-14 * dt))
       player.rotation.y = yaw.current
       turnRef.current = 0
+    } else if (guideArrived) {
+      // In place at the rock: turn to face it, ready for the scanner.
+      const rock = getPracticeRock()
+      const targetYaw = Math.atan2(
+        -(rock.x - player.position.x),
+        -(rock.z - player.position.z),
+      )
+      let difference = targetYaw - yaw.current
+      difference = Math.atan2(Math.sin(difference), Math.cos(difference))
+      turnRef.current = difference
+      yaw.current += difference * (1 - Math.exp(-PLAYER.turnSpeed * dt))
+      player.rotation.y = yaw.current
     } else if (horizontalSpeed > 0.12) {
       const targetYaw = Math.atan2(
         -velocity.current.x,

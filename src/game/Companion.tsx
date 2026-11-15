@@ -24,6 +24,7 @@ import {
 import { getBoulderObstacles } from './landscape'
 import { getTerrainHeight } from './terrainHeight'
 import { CALIBRATION_SAMPLE } from '../data/calibrationSample'
+import { getGuideLane, getGuideMode, projectOnLane } from './practiceGuide'
 import { WORLD } from './worldConfig'
 
 type Expression =
@@ -308,7 +309,24 @@ export function Companion({
     // camera, and looks at it with a curious face. After each find it moves
     // on to the next part.
     let pointingPart: THREE.Vector3 | null = null
-    if (game.scanStation && game.scanStationTarget === 'practice') {
+    const guideMode = getGuideMode()
+    if (guideMode === 'walk') {
+      // Guided first walk: PIP flies a few steps ahead down the lane, so
+      // the child just follows it to the practice rock.
+      const { start, end } = getGuideLane()
+      const laneLength = Math.hypot(end.x - start.x, end.z - start.z) || 1
+      const along = projectOnLane(player.position.x, player.position.z, partWorld.current)
+      const k = Math.min(1, along + 2.6 / laneLength)
+      const dirX = (end.x - start.x) / laneLength
+      const dirZ = (end.z - start.z) / laneLength
+      const gx = start.x + (end.x - start.x) * k - dirZ * 0.9
+      const gz = start.z + (end.z - start.z) * k + dirX * 0.9
+      goal.current.set(gx, getTerrainHeight(gx, gz) + 1.5, gz)
+    }
+    if (
+      guideMode === 'arrive' ||
+      (game.scanStation && game.scanStationTarget === 'practice')
+    ) {
       // Practice station: PIP floats beside the rock and points at it.
       const rock = partWorld.current.set(
         CALIBRATION_SAMPLE.position.x,
