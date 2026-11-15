@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   HUB_ASSIGNMENT_LINE,
+  HUB_MASTER_RETURN_LINE,
   HUB_RETURNING_LINE,
   HUB_TOUR_LINES,
   INTRO_BEATS,
@@ -25,6 +26,7 @@ const ONBOARDING_TEXTS = [
   REGISTRATION_LINE,
   HUB_ASSIGNMENT_LINE,
   ...HUB_TOUR_LINES,
+  HUB_MASTER_RETURN_LINE,
   HUB_RETURNING_LINE,
   ROUTE_READY_LINE,
   LAUNCH_CABIN_LINE,
@@ -61,7 +63,7 @@ describe('recorded PIP voices', () => {
       const key = audioKeyForLine(text)
       expect(key).not.toBeNull()
       expect(key).toMatch(
-        /^(intro-\d{2}|registration|hub-assignment|hub-tour-\d{1,2}|hub-return|route-ready|launch-cabin)$/,
+        /^(intro-\d{2}|registration|hub-assignment|hub-tour-\d{1,2}|hub-return|hub-master-return|route-ready|launch-cabin)$/,
       )
     }
     expect(new Set(ONBOARDING_VOICE_LINES.map((line) => line.key)).size).toBe(

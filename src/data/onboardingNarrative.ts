@@ -657,6 +657,10 @@ export const NEW_SIGNAL_LINE =
 export const HUB_RETURNING_LINE =
   'Welcome back, carrier! The Archive is waiting for our next delivery.'
 
+/** Back in the cabin after the finale: every story is home, nothing is pending. */
+export const HUB_MASTER_RETURN_LINE =
+  "Welcome back, Master Carrier! Every story is safe on Earth, and you can visit them in your album anytime."
+
 export const ROUTE_READY_LINE =
   'Route ready! Now press the big red button to take off.'
 
@@ -685,6 +689,9 @@ export function hubDialogueSteps(options: HubDialogueOptions): HubDialogueStep[]
   }
   const restored = options.restoredCount ?? 0
   const total = options.totalStories ?? 2
+  if (options.hubVisited && total > 0 && restored >= total) {
+    return [plainStep(HUB_MASTER_RETURN_LINE)]
+  }
   if (options.hubVisited && restored > 0 && restored < total) {
     return [plainStep(restoredLine(restored, total)), plainStep(NEW_SIGNAL_LINE)]
   }

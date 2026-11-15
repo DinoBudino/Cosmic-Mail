@@ -10,6 +10,7 @@ import {
 import { createJourney, type JourneySave } from '../store/journeySchema'
 import { ACTIVE_MISSION_IDS, MISSIONS } from './missions'
 import {
+  HUB_MASTER_RETURN_LINE,
   HUB_RETURNING_LINE,
   NEW_SIGNAL_LINE,
   hubDialogueLines,
@@ -80,6 +81,10 @@ describe('slice closure after Spirit', () => {
       HUB_RETURNING_LINE,
     ])
     expect(hubDialogueLines({ ...base })).toEqual([HUB_RETURNING_LINE])
+    // Every story delivered: PIP welcomes back a Master Carrier instead.
+    expect(hubDialogueLines({ ...base, restoredCount: 5, totalStories: 5 })).toEqual([
+      HUB_MASTER_RETURN_LINE,
+    ])
     // Route-ready and first-visit tour keep priority.
     expect(
       hubDialogueLines({ ...base, routeConfirmed: true, restoredCount: 1 }),

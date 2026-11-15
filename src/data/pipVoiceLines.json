@@ -1397,5 +1397,12 @@
     "speed": 1.06,
     "category": "finale",
     "pitch": 1.06
+  },
+  {
+    "key": "hub-master-return",
+    "text": "Welcome back, Master Carrier! Every story is safe on Earth, and you can visit them in your album anytime.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.06
   }
 ]
