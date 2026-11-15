@@ -7,6 +7,7 @@ import { LunarSky } from './LunarSky'
 import { LunarTerrain } from './LunarTerrain'
 import { Player } from './Player'
 import { ScanFx } from './ScanFx'
+import { ScanKeyLabel } from './ScanKeyLabel'
 import { ScannerBeam } from './ScannerBeam'
 import { ScannerController } from './ScannerController'
 
@@ -33,6 +34,7 @@ export function MoonWorld() {
       <Player />
       <ScannerBeam />
       <ScannerController />
+      <ScanKeyLabel />
       <ScanFx />
     </>
   )

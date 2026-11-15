@@ -21,8 +21,10 @@ import { ShipInteraction } from './ui/ShipInteraction'
 import { CinematicOverlay } from './ui/CinematicOverlay'
 import { Hud } from './ui/Hud'
 import { AlbumOverlay } from './ui/AlbumOverlay'
+import { ArrivalVeil } from './ui/ArrivalVeil'
 import { MissionPanel } from './ui/MissionPanel'
 import { ObjectiveBar } from './ui/ObjectiveBar'
+import { PipTipCard } from './ui/PipTipCard'
 import { PipSpeech } from './ui/PipSpeech'
 import { SettingsMenu } from './ui/SettingsMenu'
 import { TouchControls } from './ui/TouchControls'
@@ -107,6 +109,9 @@ export default function App() {
                 <GameCanvas />
               </Suspense>
             </SceneBoundary>
+            {/* Covers the first moments while the ground loads, in the
+                orbit dive's final colour, then fades away. */}
+            <ArrivalVeil />
 
             {/* The guided arrival briefing owns the screen: only the radar
                 PIP presents stays, everything else waits until it ends. */}
@@ -117,6 +122,7 @@ export default function App() {
             <ScannerHud />
             {!briefingOpen && <ScanReward />}
             {!briefingOpen && <PipSpeech />}
+            {!briefingOpen && <PipTipCard />}
             <CinematicOverlay />
             {!briefingOpen && <TouchControls />}
             <MissionNarrativeController />

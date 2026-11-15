@@ -6,6 +6,10 @@ import { buildStarGeometry } from './starfield'
 interface StarfieldProps {
   count: number
   reducedMotion: boolean
+  /** Multiplies every star's glow and size (1 = as built). */
+  brightness?: number
+  /** Stars only twinkle through air; the Moon's sky keeps them steady. */
+  twinkle?: boolean
 }
 
 const VERTEX_SHADER = /* glsl */ `
@@ -17,6 +21,7 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float uTime;
   uniform float uTwinkle;
   uniform float uPixelRatio;
+  uniform float uBrightness;
 
   varying vec3 vColor;
   varying float vAlpha;
@@ -28,11 +33,11 @@ const VERTEX_SHADER = /* glsl */ `
       0.68 + 0.32 * sin(uTime * 1.7 + aPhase),
       uTwinkle
     );
-    vAlpha = aAlpha * twinkle;
+    vAlpha = min(aAlpha * twinkle * uBrightness, 1.0);
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mvPosition;
-    gl_PointSize = aSize * uPixelRatio;
+    gl_PointSize = aSize * uPixelRatio * mix(1.0, uBrightness, 0.5);
   }
 `
 
@@ -51,7 +56,7 @@ const FRAGMENT_SHADER = /* glsl */ `
   }
 `
 
-export function Starfield({ count, reducedMotion }: StarfieldProps) {
+export function Starfield({ count, reducedMotion, brightness = 1, twinkle = true }: StarfieldProps) {
   const pointsRef = useRef<THREE.Points>(null)
   const geometry = useMemo(() => buildStarGeometry(count), [count])
   const material = useMemo(
@@ -61,6 +66,7 @@ export function Starfield({ count, reducedMotion }: StarfieldProps) {
           uTime: { value: 0 },
           uTwinkle: { value: 1 },
           uPixelRatio: { value: 1 },
+          uBrightness: { value: 1 },
         },
         vertexShader: VERTEX_SHADER,
         fragmentShader: FRAGMENT_SHADER,
@@ -84,7 +90,8 @@ export function Starfield({ count, reducedMotion }: StarfieldProps) {
     if (!current) return
     current.uniforms.uTime.value = state.clock.elapsedTime
     current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
-    current.uniforms.uTwinkle.value = reducedMotion ? 0 : 1
+    current.uniforms.uTwinkle.value = reducedMotion || !twinkle ? 0 : 1
+    current.uniforms.uBrightness.value = brightness
   })
 
   return (

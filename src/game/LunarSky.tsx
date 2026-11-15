@@ -1,5 +1,5 @@
 import { useFrame, useLoader } from '@react-three/fiber'
-import { lazy, Suspense, useMemo, useRef } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { getActiveExplorer, type MoonExplorerId } from '../data/spiritSite'
 import { useGameStore } from '../store/gameStore'
@@ -25,6 +25,58 @@ const EARTH_DISPLAY_SCALE = 2
 const EARTH_RADIUS = SKY * Math.tan((1.9 / 2) * (Math.PI / 180)) * EARTH_DISPLAY_SCALE
 /** The Sun is about 0.53 deg across. */
 const SUN_RADIUS = SKY * Math.tan((0.53 / 2) * (Math.PI / 180))
+
+/**
+ * The Milky Way: a faint, uneven band of light across the black sky. With
+ * no air in the way the Moon's sky shows it crisply, so it is a cheap way
+ * to make the sky feel deep instead of empty. Additive and very dim.
+ */
+const MILKY_WAY_VERTEX = `varying vec3 vDir;
+void main() {
+  vDir = normalize(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`
+const MILKY_WAY_FRAGMENT = `uniform vec3 uAxis; varying vec3 vDir;
+float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float noise(vec3 x) {
+  vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+}
+void main() {
+  vec3 d = normalize(vDir);
+  float across = dot(d, uAxis);
+  float band = exp(-across * across / 0.018);
+  float clouds = noise(d * 6.0) * 0.6 + noise(d * 15.0) * 0.3 + noise(d * 38.0) * 0.1;
+  // Dark dust lanes down the middle of the band.
+  float lane = smoothstep(0.0, 0.05, abs(across + (noise(d * 9.0) - 0.5) * 0.06));
+  float light = band * smoothstep(0.25, 0.85, clouds) * mix(0.45, 1.0, lane);
+  gl_FragColor = vec4(vec3(0.78, 0.82, 0.95) * light * 0.16, 1.0);
+}`
+
+function MilkyWay() {
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uAxis: { value: new THREE.Vector3(0.35, 0.62, -0.7).normalize() } },
+        vertexShader: MILKY_WAY_VERTEX,
+        fragmentShader: MILKY_WAY_FRAGMENT,
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        fog: false,
+        toneMapped: false,
+      }),
+    [],
+  )
+  useEffect(() => () => material.dispose(), [material])
+  return (
+    <mesh material={material} renderOrder={-19} frustumCulled={false}>
+      <sphereGeometry args={[SKY * 0.98, 48, 24]} />
+    </mesh>
+  )
+}
 
 /**
  * Earth's own shader: the sunlit side bright (Earth reflects far more light
@@ -97,8 +149,9 @@ function Earth({ direction, sun }: { direction: THREE.Vector3; sun: THREE.Vector
 /**
  * The Moon's sky: no air, so it is black even in daylight, the Sun is a
  * small hard disc and shadows are sharp and almost black. Earth hangs high
- * in the sky at the real angle for each landing site. A faint star field
- * stays for wonder (in daylight photos the bright ground hides the stars).
+ * in the sky at the real angle for each landing site. The stars stay for
+ * wonder (in daylight photos the bright ground hides them), steady rather
+ * than twinkling because there is no air, with the Milky Way behind them.
  */
 export function LunarSky({ quality }: { quality: Quality }) {
   const preset = QUALITY_PRESETS[quality]
@@ -117,7 +170,8 @@ export function LunarSky({ quality }: { quality: Quality }) {
     <>
       <color attach="background" args={['#000000']} />
       <group ref={skyRef}>
-        <Starfield count={Math.round(preset.starCount * 0.6)} reducedMotion={reducedMotion} />
+        <MilkyWay />
+        <Starfield count={preset.starCount} reducedMotion={reducedMotion} brightness={2.1} twinkle={false} />
         <mesh position={sun.clone().multiplyScalar(SKY * 0.95)} renderOrder={-14}>
           <sphereGeometry args={[SUN_RADIUS, 24, 16]} />
           <meshBasicMaterial color="#fffaf0" toneMapped={false} fog={false} />
@@ -134,6 +188,20 @@ export function LunarSky({ quality }: { quality: Quality }) {
             toneMapped={false}
           />
         </sprite>
+        {/* Wide, faint glare: with no air to scatter it, the Sun's light
+            only spreads inside the eye (or camera lens). */}
+        <sprite position={sun.clone().multiplyScalar(SKY * 0.93)} scale={[70, 70, 1]} renderOrder={-16}>
+          <spriteMaterial
+            map={glow ?? undefined}
+            color="#ffe9c8"
+            transparent
+            opacity={0.22}
+            depthWrite={false}
+            fog={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
+          />
+        </sprite>
         <Suspense fallback={null}>
           <Earth direction={earth} sun={sun} />
         </Suspense>
@@ -143,6 +211,9 @@ export function LunarSky({ quality }: { quality: Quality }) {
           the ground, so shadowed sides stay readable for children. */}
       <ambientLight intensity={0.12} color="#c9ccd6" />
       <hemisphereLight args={['#20242e', '#8a8680', 0.55]} />
+      {/* Earthshine: sunlight bounced off Earth, a faint cool fill from
+          Earth's direction (strongest on the Moon's night side, real). */}
+      <directionalLight position={earth.clone().multiplyScalar(80)} intensity={0.18} color="#b9cdf2" />
       <directionalLight
         position={sun.clone().multiplyScalar(80)}
         intensity={3.4}

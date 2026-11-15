@@ -66,12 +66,27 @@ class PlanetTextureLoader extends THREE.TextureLoader {
       url,
       (texture) => {
         if (url === DAY || url === NIGHT || url.endsWith('-color.jpg')) texture.colorSpace = THREE.SRGBColorSpace
-        texture.anisotropy = 4
+        // Sharper at grazing angles: the landing dive looks across the globe.
+        texture.anisotropy = 8
         onLoad?.(texture)
       },
       onProgress,
       onError,
     )
+  }
+}
+
+/**
+ * Start downloading every planet texture as soon as this module loads
+ * (with the menu), Earth first. The menu then shows the real textured
+ * Earth from its first frames instead of a plain stand-in, and Mars and
+ * the Moon are ready long before the orbit screen or the cabin window
+ * needs them.
+ */
+function preloadPlanetTextures() {
+  useLoader.preload(PlanetTextureLoader, EARTH_TEXTURE_URLS)
+  for (const spec of Object.values(ROCKY)) {
+    useLoader.preload(PlanetTextureLoader, [spec.color, spec.bump])
   }
 }
 
@@ -175,32 +190,112 @@ const ROCKY = {
     bump: `${TEXTURES}mars/mars-bump.jpg`,
     bumpScale: 1.2,
     // Thin dusty air, as the "Atmosphere" shell in Mars_2K.blend.
-    air: { color: '#ffb27a', strength: 0.9, scale: 1.0126 },
+    // Fine iron-oxide dust gives Mars its orange glow.
+    air: { color: '#ff9a55', strength: 1.35, scale: 1.016 },
+    // Close-up grain for the landing dive (see addSurfaceDetail).
+    detail: { relief: 0.0045, contrast: 0.34 },
   },
   moon: {
     color: `${TEXTURES}moon/moon-color.jpg`,
     bump: `${TEXTURES}moon/moon-bump.jpg`,
     bumpScale: 1.6,
     air: null,
+    detail: { relief: 0.006, contrast: 0.3 },
   },
 } as const
 
 export type RockyPlanet = keyof typeof ROCKY
 
+/**
+ * The globe textures are 2048 px wide: fine from orbit, but the landing
+ * dive brings the camera so close that one texel covers a dozen pixels
+ * and the ground turns to blur. This adds procedural grain and relief
+ * (noise in the sphere's own space, so it never swims) that only fades
+ * in as the camera nears the surface, so the orbit view is unchanged.
+ */
+function addSurfaceDetail(
+  material: THREE.MeshStandardMaterial,
+  detail: { relief: number; contrast: number },
+) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uDetailRelief = { value: detail.relief }
+    shader.uniforms.uDetailContrast = { value: detail.contrast }
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'varying vec3 vDetailPos;\nvoid main() {')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vDetailPos = normalize(position);')
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        'void main() {',
+        `varying vec3 vDetailPos;
+uniform float uDetailRelief;
+uniform float uDetailContrast;
+float detailHash(vec3 p) {
+  p = fract(p * 0.3183099 + 0.1);
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+float detailNoise(vec3 x) {
+  vec3 i = floor(x);
+  vec3 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(detailHash(i), detailHash(i + vec3(1, 0, 0)), f.x),
+        mix(detailHash(i + vec3(0, 1, 0)), detailHash(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(detailHash(i + vec3(0, 0, 1)), detailHash(i + vec3(1, 0, 1)), f.x),
+        mix(detailHash(i + vec3(0, 1, 1)), detailHash(i + vec3(1, 1, 1)), f.x), f.y),
+    f.z);
+}
+float detailFbm(vec3 p) {
+  float sum = 0.0;
+  float amp = 0.5;
+  for (int k = 0; k < 6; k++) {
+    sum += amp * detailNoise(p);
+    p = p * 2.07 + 13.1;
+    amp *= 0.5;
+  }
+  return sum;
+}
+void main() {`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+  // 0 from orbit, 1 in the last part of the dive.
+  float detailFade = smoothstep(2.6, 0.9, length(vViewPosition));
+  float detailHeight = 0.0;
+  if (detailFade > 0.0) {
+    detailHeight = detailFbm(vDetailPos * 70.0);
+    // Ridged layer: crisp crater rims and dune crests.
+    float ridge = 1.0 - abs(detailNoise(vDetailPos * 410.0) * 2.0 - 1.0);
+    detailHeight = detailHeight * 0.75 + ridge * ridge * 0.25;
+    diffuseColor.rgb *= mix(1.0, 1.0 + (detailHeight - 0.5) * 2.0 * uDetailContrast, detailFade);
+  }`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        THREE.ShaderChunk.normal_fragment_maps.replace(
+          'normal = perturbNormalArb( - vViewPosition, normal, dHdxy_fwd(), faceDirection );',
+          `vec2 detailSlope = vec2(dFdx(detailHeight), dFdy(detailHeight)) * uDetailRelief * 220.0 * detailFade;
+  normal = perturbNormalArb( - vViewPosition, normal, dHdxy_fwd() + detailSlope, faceDirection );`,
+        ),
+      )
+  }
+}
+
 export function RockySurface({ kind, radius }: { kind: RockyPlanet; radius: number }) {
   const spec = ROCKY[kind]
   const [color, bump] = useLoader(PlanetTextureLoader, [spec.color, spec.bump])
-  const surface = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map: color,
-        bumpMap: bump,
-        bumpScale: spec.bumpScale,
-        roughness: 0.95,
-        metalness: 0,
-      }),
-    [color, bump, spec.bumpScale],
-  )
+  const surface = useMemo(() => {
+    const material = new THREE.MeshStandardMaterial({
+      map: color,
+      bumpMap: bump,
+      bumpScale: spec.bumpScale,
+      roughness: 0.95,
+      metalness: 0,
+    })
+    addSurfaceDetail(material, spec.detail)
+    return material
+  }, [color, bump, spec])
   const air = spec.air
   const atmosphere = useMemo(
     () => (air ? makeAtmosphereMaterial(air.color, air.strength) : null),
@@ -226,3 +321,5 @@ export function RockySurface({ kind, radius }: { kind: RockyPlanet; radius: numb
     </group>
   )
 }
+
+preloadPlanetTextures()

@@ -46,9 +46,11 @@ import { emitAudio } from './audio/audioEvents'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { useNarrativeStore } from '../store/narrativeStore'
+import { useOnboardingStore } from '../store/onboardingStore'
 import {
   isCoarsePointer,
   requestProtocolLine,
+  withTipDone,
   MISSION_APPROACH_RADIUS,
   MISSION_DETECT_RADIUS,
 } from './missionNarrative'
@@ -365,7 +367,7 @@ export function MissionNarrativeController() {
           narrative.current.id === `${mission.id}:scanner-prompt`)
       ) {
         const clue = getHuntClueCue(mission, huntTarget.id)
-        if (clue && narrative.enqueue(clue)) {
+        if (clue && narrative.enqueue(withTipDone(clue, mission.id))) {
           narrative.react('hint', undefined, 2000)
         }
       }
@@ -398,7 +400,7 @@ export function MissionNarrativeController() {
         const cue = getSoftHintCue(mission, currentProgress)
         if (cue) {
           guideTimingRef.current = noteSoftHint(guideTimingRef.current, now)
-          narrative.enqueue(cue)
+          narrative.enqueue(withTipDone(cue, mission.id))
           narrative.react('hint', cue.componentId, 2400)
         }
       }
@@ -573,6 +575,8 @@ export function MissionNarrativeController() {
             tier: 0,
             // Cancelled if the player has already moved on to another step.
             cancelWhen: () => getCurrentProtocolStep() !== step,
+            // What to do in this step stays in the tip card until it is done.
+            tip: { doneWhen: () => getCurrentProtocolStep() !== step },
           })
         }
       }
@@ -629,6 +633,7 @@ export function MissionNarrativeController() {
             useNarrativeStore.getState().enqueue({
               ...prompt,
               cancelWhen: () => useGameStore.getState().scannerEquipped,
+              tip: { doneWhen: () => useGameStore.getState().scannerEquipped },
             })
           }
         }
@@ -670,7 +675,13 @@ export function MissionNarrativeController() {
         previousLetterRef.current = true
         // The tablet already said "Sealed!": the world only points home.
         const back = getReturnToShipCue(mission)
-        if (back) useNarrativeStore.getState().enqueue(back)
+        // Walking back to Mailwing stays in the tip card until boarding.
+        if (back) {
+          useNarrativeStore.getState().enqueue({
+            ...back,
+            tip: { doneWhen: () => useOnboardingStore.getState().phase !== 'playing' },
+          })
+        }
       }
     } else if (!hasLetter) {
       previousLetterRef.current = false

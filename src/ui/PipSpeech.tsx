@@ -45,7 +45,7 @@ export function PipAvatar() {
  * `forceFull` shows the complete subtitle immediately (first press of the
  * skip button); the voice keeps playing until the next press dismisses it.
  */
-function PipLine({
+export function PipLine({
   message,
   forceFull,
   onFullyTyped,
@@ -226,7 +226,9 @@ export function PipSpeech() {
   ])
 
   const showing = Boolean(activeText) && !hidden
-  if (!showing) return null
+  // Action tips are shown (and typed) by the tip card; the voice and the
+  // timing above still run from here.
+  if (!showing || current?.tip) return null
 
   const skip = () => {
     // First press completes the subtitle; the next press moves on.

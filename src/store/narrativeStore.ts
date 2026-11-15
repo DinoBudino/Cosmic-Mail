@@ -23,6 +23,44 @@ export interface StoredNarrativeLine extends NarrativeCue {
   tier: PipTier
 }
 
+/** PIP's action tip, pinned on screen until the child has done it. */
+export interface PinnedTip {
+  id: string
+  text: string
+  /** Nonce of the line that pinned it (the card types it while it plays). */
+  nonce: number
+  doneWhen?: () => boolean
+  /** Tips without `doneWhen` leave after a while (epoch ms), else null. */
+  expiresAt: number | null
+  /** Shrunk to the small "Tip" button by the child. */
+  collapsed: boolean
+  /** The child asked for it (Ask PIP): no attention chime. */
+  solicited: boolean
+}
+
+/** A tip with nothing to wait for stays this long. */
+export const TIP_DEFAULT_TTL_MS = 20_000
+
+/** The pinned tip for a line that starts playing (or the previous one). */
+function pinFor(
+  line: StoredNarrativeLine | null | undefined,
+  previous: PinnedTip | null,
+  now: number,
+): PinnedTip | null {
+  if (!line?.tip) return previous
+  if (line.tip.doneWhen?.()) return previous
+  const ttl = line.tip.doneWhen ? line.tip.ttlMs : (line.tip.ttlMs ?? TIP_DEFAULT_TTL_MS)
+  return {
+    id: line.id,
+    text: line.text,
+    nonce: line.nonce,
+    doneWhen: line.tip.doneWhen,
+    expiresAt: ttl === undefined ? null : now + ttl,
+    collapsed: false,
+    solicited: line.solicited ?? false,
+  }
+}
+
 export interface NarrativeArchiveLine extends ArchiveNarrativeCue {
   nonce: number
 }
@@ -57,6 +95,13 @@ interface NarrativeState {
   reaction: NarrativeReaction | null
   attention: NarrativeAttention | null
   archiveLine: NarrativeArchiveLine | null
+  /** The action tip on screen (tip card), independent of the voice queue. */
+  pinnedTip: PinnedTip | null
+  /** Closes the tip card once its task is done or its time is up. */
+  checkTip: (now?: number) => void
+  collapseTip: () => void
+  expandTip: () => void
+  clearTip: () => void
   /** Ephemeral arrival-protocol facts; progress itself stays in journeyStore. */
   protocol: ProtocolFlags
   markProtocol: (flag: keyof ProtocolFlags) => void
@@ -111,9 +156,30 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
   reaction: null,
   attention: null,
   archiveLine: null,
+  pinnedTip: null,
   protocol: INITIAL_PROTOCOL_FLAGS,
   policy: createPolicyMemory(),
   ambientAllowed: false,
+
+  checkTip: (now = Date.now()) => {
+    const tip = get().pinnedTip
+    if (!tip) return
+    if (tip.doneWhen?.() || (tip.expiresAt !== null && now >= tip.expiresAt)) {
+      set({ pinnedTip: null })
+    }
+  },
+
+  collapseTip: () => {
+    const tip = get().pinnedTip
+    if (tip && !tip.collapsed) set({ pinnedTip: { ...tip, collapsed: true } })
+  },
+
+  expandTip: () => {
+    const tip = get().pinnedTip
+    if (tip?.collapsed) set({ pinnedTip: { ...tip, collapsed: false } })
+  },
+
+  clearTip: () => set({ pinnedTip: null }),
 
   setAmbientAllowed: (ambientAllowed) => {
     if (get().ambientAllowed !== ambientAllowed) set({ ambientAllowed })
@@ -155,8 +221,9 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
       : state.spoken
     const policy = rememberCue(state.policy, policyCue, now)
 
+    const pinnedTip = pinFor(line, state.pinnedTip, now)
     if (decision.action === 'play') {
-      set({ current: line, spoken, policy })
+      set({ current: line, spoken, policy, pinnedTip })
     } else if (decision.action === 'preempt') {
       // A more important line cuts in. The interrupted one comes back only
       // if it was a story beat or scan feedback; optional lines are lost.
@@ -165,7 +232,7 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
         interrupted && interrupted.tier <= 1
           ? [interrupted, ...state.queue]
           : state.queue
-      set({ current: line, queue, spoken, policy })
+      set({ current: line, queue, spoken, policy, pinnedTip })
     } else {
       const queue = [...state.queue]
       const index = queue.findIndex((queued) => queued.tier > tier)
@@ -191,10 +258,14 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
       pending = pending.slice(1)
     }
     const [next, ...rest] = pending
-    set({ current: next ?? null, queue: rest })
+    set({
+      current: next ?? null,
+      queue: rest,
+      pinnedTip: pinFor(next, get().pinnedTip, Date.now()),
+    })
   },
 
-  clearDialogue: () => set({ current: null, queue: [] }),
+  clearDialogue: () => set({ current: null, queue: [], pinnedTip: null }),
 
   react: (kind, componentId, durationMs = 1800) => {
     set({
@@ -248,6 +319,7 @@ export const useNarrativeStore = create<NarrativeState>((set, get) => ({
       reaction: null,
       attention: null,
       archiveLine: null,
+      pinnedTip: null,
       protocol: INITIAL_PROTOCOL_FLAGS,
       policy: createPolicyMemory(),
       ambientAllowed: false,

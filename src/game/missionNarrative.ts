@@ -3,6 +3,7 @@ import {
   getDistractorCue,
   getHintCue,
   stageForProgress,
+  type NarrativeCue,
 } from '../data/missionNarrative'
 import {
   CALIBRATE_FIRST_LINE,
@@ -14,6 +15,31 @@ import { getCurrentProtocolStep } from './protocolStep'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { useJourneyStore } from '../store/journeyStore'
 import { useNarrativeStore } from '../store/narrativeStore'
+
+/**
+ * Gives an action tip its "done" rule: a tip about a part is done once the
+ * part is recorded; any other tip once the protocol step or mission stage
+ * moves on (the child did what PIP asked). `also` adds a specific rule.
+ */
+export function withTipDone(
+  cue: NarrativeCue,
+  missionId: MissionId = SPIRIT_SITE.missionId,
+  also?: () => boolean,
+): NarrativeCue {
+  if (!cue.tip) return cue
+  const progressNow = () => useJourneyStore.getState().save?.missions[missionId] ?? null
+  const step = getCurrentProtocolStep()
+  const stage = stageForProgress(progressNow())
+  const componentId = cue.componentId
+  const doneWhen = () => {
+    if (also?.()) return true
+    if (componentId) {
+      return progressNow()?.scannedComponentIds.includes(componentId) ?? false
+    }
+    return getCurrentProtocolStep() !== step || stageForProgress(progressNow()) !== stage
+  }
+  return { ...cue, tip: { ...cue.tip, doneWhen: cue.tip.doneWhen ?? doneWhen } }
+}
 
 /** The only implemented surface mission today. */
 
@@ -47,15 +73,21 @@ export function requestMissionHint(
   const protocolHint = getProtocolHint(protocolStep, isCoarsePointer())
   if (protocolHint) {
     const narrative = useNarrativeStore.getState()
-    narrative.enqueue({
-      id: `protocol:hint:${protocolStep}`,
-      text: protocolHint,
-      priority: 'hint',
-      once: false,
-      expression: 'thinking',
-      tier: 0,
-      solicited: true,
-    })
+    narrative.enqueue(
+      withTipDone(
+        {
+          id: `protocol:hint:${protocolStep}`,
+          text: protocolHint,
+          priority: 'hint',
+          once: false,
+          expression: 'thinking',
+          tier: 0,
+          solicited: true,
+          tip: {},
+        },
+        missionId,
+      ),
+    )
     narrative.react('hint', undefined, 2200)
     return true
   }
@@ -70,7 +102,7 @@ export function requestMissionHint(
 
   const narrative = useNarrativeStore.getState()
   // The answer to Ask PIP is always P0: it may cut in and may be repeated.
-  narrative.enqueue({ ...cue, tier: 0, solicited: true })
+  narrative.enqueue(withTipDone({ ...cue, tier: 0, solicited: true }, missionId))
   if (cue.componentId) {
     narrative.showAttention(cue.componentId, 'hint', 4200)
     narrative.react('hint', cue.componentId)
@@ -139,6 +171,9 @@ export function requestProtocolLine(
     once: false,
     expression: 'focused',
     tier: 0,
+    // A short notice ("stay on the trail", "not yet"): the tip card shows
+    // it for a moment, there is no single action that completes it.
+    tip: { ttlMs: 15_000 },
   }, now)
   if (enqueued) protocolLineAt.set(line.id, now)
   return enqueued

@@ -414,6 +414,95 @@
   to { opacity: 0; }
 }
 
+/* ------------------------------------------------------ PIP tip card */
+/* Action tips sit in the middle of the bottom of the screen, above the
+   controls, where the child looks: bigger, warmer and they stay until the
+   child has done what PIP asked. */
+.pip-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  z-index: 8;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: min(460px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 14px 16px 16px;
+  border: 2px solid #ffd9a8;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(58, 34, 72, 0.96), rgba(31, 18, 46, 0.96));
+  color: var(--cream);
+  box-shadow:
+    0 0 0 4px rgba(255, 217, 168, 0.12),
+    0 20px 44px -18px rgba(10, 4, 16, 0.95);
+  transform: translateX(-50%);
+  animation:
+    pip-tip-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    pip-tip-glow 1.1s ease-in-out 320ms 2;
+}
+.pip-tip .pip-avatar { width: 52px; height: 52px; }
+.pip-tip__copy { min-width: 0; flex: 1; }
+.pip-tip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.pip-tip__label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffd9a8;
+}
+.pip-tip__close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 217, 168, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 217, 168, 0.1);
+  color: #ffd9a8;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.pip-tip__close:hover { background: rgba(255, 217, 168, 0.22); }
+.pip-tip__text .pip-text {
+  font-size: 1.06rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.pip-tip--collapsed {
+  width: auto;
+  padding: 8px 16px;
+  gap: 6px;
+  align-items: center;
+  border-width: 1px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: #ffd9a8;
+  cursor: pointer;
+  animation: pip-tip-pop 240ms ease-out both;
+}
+@keyframes pip-tip-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.92); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes pip-tip-glow {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 217, 168, 0.12), 0 20px 44px -18px rgba(10, 4, 16, 0.95); }
+  50% { box-shadow: 0 0 0 9px rgba(255, 217, 168, 0.28), 0 20px 44px -18px rgba(10, 4, 16, 0.95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pip-tip, .pip-tip--collapsed { animation: none; }
+}
+
 /* ------------------------------------------------------ Mission panel */
 
 .mission-panel {
@@ -542,6 +631,14 @@
 .site-preview { margin: 16px 0 0; padding: 14px; border-radius: 12px; background: rgba(255, 217, 168, 0.08); font-size: 0.85rem; line-height: 1.6; }
 .touch-interact { display: none; }
 .scene-status { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; background: var(--plum-900); }
+.scan-key-label { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px 6px 12px; border: 2px solid #ffd9a8; border-radius: 999px; background: rgba(27, 16, 41, 0.88); color: #fdf4ec; font: 800 15px/1 var(--font-sans, system-ui); white-space: nowrap; box-shadow: 0 6px 18px -6px rgba(5, 2, 10, 0.8), 0 0 14px rgba(255, 178, 122, 0.45); animation: scan-key-bob 1.6s ease-in-out infinite; user-select: none; }
+.scan-key-label::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; margin-left: -5px; border-right: 2px solid #ffd9a8; border-bottom: 2px solid #ffd9a8; background: rgba(27, 16, 41, 0.95); transform: rotate(45deg); }
+.scan-key-label__key { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 5px; border-radius: 7px; background: linear-gradient(180deg, #ffd9a8, #f2a36c); color: #2a1a33; font-size: 15px; box-shadow: 0 2px 0 #b8673a; }
+@keyframes scan-key-bob { 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .scan-key-label { animation: none; } }
+.arrival-veil { position: absolute; inset: 0; z-index: 21; pointer-events: none; background: radial-gradient(circle at 50% 55%, #f6c193 0%, #eaa274 60%, #d98a5c 100%); opacity: 1; transition: opacity .7s ease-out; }
+.arrival-veil[data-world="moon"] { background: radial-gradient(circle at 50% 55%, #2a2b31 0%, #121318 70%, #08080b 100%); }
+.arrival-veil[data-stage="fade"] { opacity: 0; }
 .scene-status h2 { max-width: 28rem; font-size: 1.4rem; }
 .scene-status p, .scene-status button { max-width: 28rem; line-height: 1.6; }
 .game[data-reduced-motion="true"] *,
@@ -1178,6 +1275,13 @@
     left: calc(12px + env(safe-area-inset-left, 0px));
     bottom: calc(240px + env(safe-area-inset-bottom, 0px));
     max-width: calc(100vw - 24px);
+  }
+
+  .pip-tip {
+    bottom: calc(240px + env(safe-area-inset-bottom, 0px));
+  }
+  .pip-tip:not(.pip-tip--collapsed) {
+    width: calc(100vw - 24px);
   }
 
   .settings-scrim {

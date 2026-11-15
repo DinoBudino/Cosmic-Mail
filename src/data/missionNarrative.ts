@@ -61,6 +61,18 @@ export interface NarrativeCue {
   solicited?: boolean
   /** The player already moved on: the line is cancelled instead of played. */
   cancelWhen?: () => boolean
+  /**
+   * An action tip (what to do now): shown in PIP's tip card, which stays
+   * on screen until the child has done it, instead of the story box.
+   */
+  tip?: NarrativeTip
+}
+
+export interface NarrativeTip {
+  /** The child did what the tip says: the tip card closes. */
+  doneWhen?: () => boolean
+  /** Without `doneWhen`: how long the tip card stays (ms). */
+  ttlMs?: number
 }
 
 export type ArchiveCueKind = 'locked' | 'memory' | 'letter' | 'transmitted'
@@ -250,7 +262,7 @@ export function getScannerPromptCue(
       ? narrative.scannerPromptTouch
       : narrative.scannerPromptDesktop,
     priority: 'mission',
-    expression: 'focused',
+    expression: 'focused',  tip: {},
   }
 }
 
@@ -281,7 +293,7 @@ export function getHuntClueCue(
     text: component.huntClue.line,
     priority: 'mission',
     expression: 'curious',
-    componentId,
+    componentId,  tip: {},
   }
 }
 
@@ -323,7 +335,7 @@ export function getReturnToShipCue(
     id: `${mission.id}:return-to-ship`,
     text: narrative.returnToShip,
     priority: 'mission',
-    expression: 'celebrating',
+    expression: 'celebrating',  tip: {},
   }
 }
 
@@ -390,6 +402,7 @@ export function getHintCue(
           : narrative.hintContext,
       priority: 'hint',
       once: false,
+      tip: {},
       expression: 'thinking',
     }
   }
@@ -404,6 +417,7 @@ export function getHintCue(
       text: pipLine('mars-hint-letter'),
       priority: 'hint',
       once: false,
+      tip: {},
       expression: 'hopeful',
     }
   }
@@ -427,6 +441,7 @@ export function getHintCue(
       text: huntTarget.huntClue.line,
       priority: 'hint',
       once: false,
+      tip: {},
       expression: 'thinking',
       componentId: huntTarget.id,
     }
@@ -445,6 +460,7 @@ export function getHintCue(
       text,
       priority: 'hint',
       once: false,
+      tip: {},
       expression: 'focused',
       componentId: huntTarget.id,
     }
@@ -459,6 +475,7 @@ export function getHintCue(
           : narrative.hintContext,
       priority: 'hint',
       once: false,
+      tip: {},
       expression: 'thinking',
     }
   }
@@ -480,6 +497,7 @@ export function getHintCue(
     text,
     priority: 'hint',
     once: false,
+    tip: {},
     expression: 'focused',
     componentId: component.id,
   }

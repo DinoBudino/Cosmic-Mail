@@ -24,8 +24,8 @@ export const QUALITY_PRESETS: Record<Quality, QualityPreset> = {
     rockCount: 900,
     dustCount: 460,
     starCount: 1800,
-    fogNear: 85,
-    fogFar: 580,
+    fogNear: 60,
+    fogFar: 460,
     shadowMapSize: 2048,
   },
   low: {
@@ -36,8 +36,8 @@ export const QUALITY_PRESETS: Record<Quality, QualityPreset> = {
     rockCount: 360,
     dustCount: 170,
     starCount: 650,
-    fogNear: 75,
-    fogFar: 550,
+    fogNear: 55,
+    fogFar: 440,
     shadowMapSize: 1024,
   },
 }
@@ -157,20 +157,21 @@ export const SCANNER = {
   firstPersonPitchMax: 0.72,
 } as const
 
-/** Muted ferric dust, charcoal rock and a pale suspended-dust sky,
- * guided by the rover surface references. Scanner accents remain legible. */
+/** Muted ferric dust, charcoal rock and a butterscotch suspended-dust
+ * sky (the orange haze of fine iron-oxide dust), guided by the rover
+ * surface references. Scanner accents remain legible. */
 export const PALETTE = {
-  skyZenith: '#B6A393',
-  skyUpper: '#C3AD9B',
-  skyMid: '#D2BCAB',
-  skyHorizon: '#DED0C2',
-  skyBelow: '#BA9D87',
-  skyFloor: '#655750',
-  fog: '#CBB099',
+  skyZenith: '#A9714D',
+  skyUpper: '#C4855A',
+  skyMid: '#D99862',
+  skyHorizon: '#EDB27F',
+  skyBelow: '#C78560',
+  skyFloor: '#6B4C3D',
+  fog: '#D99868',
   sun: '#FFF2E4',
-  ambient: '#D9C9BA',
-  hemiSky: '#D4C5B7',
-  hemiGround: '#66534A',
+  ambient: '#E4C2A3',
+  hemiSky: '#E6AA7C',
+  hemiGround: '#6B4B3C',
   terrainDark: '#705448',
   terrainMid: '#A4785A',
   terrainLight: '#B88A65',
@@ -179,15 +180,15 @@ export const PALETTE = {
   rockDark: '#514C49',
   rockLight: '#948174',
   accent: '#F47B38',
-  dust: '#BDA18A',
+  dust: '#D88E5C',
   beaconAvailable: '#F47B38',
   beaconSoon: '#D9895C',
   starWarm: '#FFF0E0',
   starCool: '#F2CDB4',
   moon: '#F2CDB4',
   moonGlow: '#F2CDB4',
-  skyGlowWarm: '#E4D1BE',
-  skyGlowCool: '#A9A4A0',
+  skyGlowWarm: '#F6C396',
+  skyGlowCool: '#B0A096',
 } as const
 
 export const SUN_DIRECTION = { x: -0.62, y: 0.32, z: -0.72 } as const

@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { PerformanceMonitor, useGLTF } from '@react-three/drei'
-import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { mulberry32 } from './random'
 import { makeMarsCanvas } from './marsTexture'
@@ -768,6 +768,12 @@ function makePlanetTexture(kind: PlanetKind): THREE.CanvasTexture {
   return texture
 }
 
+/** Calls onReady once its Suspense boundary has finished loading. */
+function OnReady({ onReady }: { onReady: () => void }) {
+  useEffect(() => onReady(), [onReady])
+  return null
+}
+
 function PaintedPlanet({ texture }: { texture: THREE.Texture }) {
   return (
     <mesh>
@@ -822,6 +828,10 @@ function BackdropPlanet() {
       : destinationPlanetKind(destination)
   const texture = useMemo(() => makePlanetTexture(kind), [kind])
   const targetPlanet = useMemo(() => new THREE.Vector3(), [])
+  // 0 → 1 fade once the textured planet is mounted (the halo waits too).
+  const reveal = useRef({ kind, value: 0 })
+  const readyKind = useRef<PlanetKind | null>(null)
+  const markReady = useCallback(() => { readyKind.current = kind }, [kind])
 
   useEffect(() => () => texture.dispose(), [texture])
 
@@ -829,6 +839,16 @@ function BackdropPlanet() {
     if (groupRef.current && !reducedMotion) {
       groupRef.current.rotation.y += delta * 0.02
     }
+    const fadeIn = reveal.current
+    if (fadeIn.kind !== kind) {
+      fadeIn.kind = kind
+      fadeIn.value = 0
+    }
+    if (kind === 'deep-space') fadeIn.value = 1
+    else if (readyKind.current === kind && fadeIn.value < 1) {
+      fadeIn.value = reducedMotion ? 1 : Math.min(1, fadeIn.value + delta / 0.6)
+    }
+    const shown = fadeIn.value
     // One planet for both shots: it glides behind the window wall
     // during the approach flight, so it is already in place when
     // the cabin view cuts in.
@@ -852,7 +872,7 @@ function BackdropPlanet() {
       if (!outer.visible) return
       // Fluid entrance: eased approach (slow at first) AND a fade-in,
       // so the planet grows into frame instead of popping in big.
-      const fade = placement.fade
+      const fade = placement.fade * shown
       outer.scale.setScalar(placement.scale)
       outer.position.set(placement.x, placement.y, placement.z)
       outer.traverse((child) => {
@@ -871,8 +891,8 @@ function BackdropPlanet() {
       if (!material) return
       // Halo and clouds keep their own see-through look.
       const base = child.userData.baseOpacity as number | undefined
-      material.transparent = base != null
-      material.opacity = base ?? 1
+      material.transparent = base != null || shown < 1
+      material.opacity = (base ?? 1) * shown
     })
     targetPlanet.copy(phase === 'menu' ? MENU_PLANET : CABIN_PLANET)
     if (reducedMotion) {
@@ -901,13 +921,16 @@ function BackdropPlanet() {
         {kind === 'deep-space' ? (
           <PaintedPlanet texture={texture} />
         ) : (
-          // The Blender planets; the light painted one shows while they load.
-          <Suspense fallback={<PaintedPlanet texture={texture} />}>
+          // The Blender planets. Their textures are preloaded with the
+          // menu; if they are still arriving, nothing shows (no plain
+          // stand-in that then swaps) and the planet fades in once ready.
+          <Suspense key={kind} fallback={null}>
             {kind === 'earth' ? (
               <EarthSurface radius={PLANET_RADIUS} spin={!reducedMotion} />
             ) : (
               <RockySurface kind={kind} radius={PLANET_RADIUS} />
             )}
+            <OnReady onReady={markReady} />
           </Suspense>
         )}
       </group>

@@ -11,6 +11,13 @@
       as="audio"
       type="audio/mpeg"
     />
+    <!-- Earth's textures start downloading with the page, so the menu
+         shows the textured planet right away (PlanetGlobe.tsx). -->
+    <link rel="preload" href="%BASE_URL%textures/earth/earth-day.jpg" as="image" crossorigin="anonymous" />
+    <link rel="preload" href="%BASE_URL%textures/earth/earth-clouds.jpg" as="image" crossorigin="anonymous" />
+    <link rel="preload" href="%BASE_URL%textures/earth/earth-night.jpg" as="image" crossorigin="anonymous" />
+    <link rel="preload" href="%BASE_URL%textures/earth/earth-roughness.jpg" as="image" crossorigin="anonymous" />
+    <link rel="preload" href="%BASE_URL%textures/earth/earth-bump.jpg" as="image" crossorigin="anonymous" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"

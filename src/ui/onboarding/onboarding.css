@@ -2230,8 +2230,15 @@
 .orbit { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; color: var(--cream); background: #0b0614; }
 .orbit__scene { position: absolute; inset: 0; }
 .orbit__scene canvas { touch-action: none; }
-.orbit__dive { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, rgba(242,178,140,0) 0%, rgba(242,178,140,.55) 70%, #f2b28c 100%); animation: orbit-dive 1.9s ease-in forwards; }
-@keyframes orbit-dive { 0% { opacity: 0; } 60% { opacity: .35; } 100% { opacity: 1; } }
+/* Entry glow: Mars's dusty air lights up orange around the descent; the
+   Moon has no air, so the view simply closes in dark over the regolith.
+   It ends in the same colours as .arrival-veil (App.css), which takes over. */
+.orbit__dive { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 55%, rgba(246,193,147,0) 0%, rgba(234,162,116,.5) 55%, #d98a5c 100%); animation: orbit-dive 1.9s ease-in forwards; }
+.orbit__dive::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 55%, #f6c193 0%, #eaa274 60%, #d98a5c 100%); opacity: 0; animation: orbit-dive-close 1.9s ease-in forwards; animation-duration: inherit; }
+.orbit[data-world="moon"] .orbit__dive { background: radial-gradient(circle at 50% 55%, rgba(18,19,24,0) 0%, rgba(18,19,24,.45) 60%, #08080b 100%); }
+.orbit[data-world="moon"] .orbit__dive::after { background: radial-gradient(circle at 50% 55%, #2a2b31 0%, #121318 70%, #08080b 100%); }
+@keyframes orbit-dive { 0% { opacity: 0; } 55% { opacity: .2; } 82% { opacity: .55; } 100% { opacity: 1; } }
+@keyframes orbit-dive-close { 0%, 80% { opacity: 0; } 100% { opacity: 1; } }
 .orbit[data-landing="true"] .orbit-marker { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s; }
 .orbit__top { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 0; pointer-events: none; }
 .orbit__title { margin: 0; font-size: .72rem; font-weight: 800; letter-spacing: .32em; text-transform: uppercase; color: var(--rose-200); }
@@ -2259,7 +2266,7 @@
 .orbit__scene canvas { cursor: grab; touch-action: none; }
 .orbit__scene canvas:active { cursor: grabbing; }
 @keyframes orbit-marker-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(255,217,168,.0); } 50% { box-shadow: 0 0 16px 4px rgba(255,217,168,.55); } }
-@media (prefers-reduced-motion: reduce) { .orbit__dive, .orbit-marker[data-glow="true"] { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .orbit__dive, .orbit__dive::after, .orbit-marker[data-glow="true"] { animation: none; } }
 
 /* New game confirmation: a holo screen over the menu (no browser dialog). */
 .newgame-scrim {

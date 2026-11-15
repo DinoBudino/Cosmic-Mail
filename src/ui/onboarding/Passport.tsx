@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { getAlbumPhotos, unlockedPhotoCount } from '../../data/albumPhotos'
 import { getFieldNotesView } from '../../data/fieldNotes'
 import { getMission, type MissionId } from '../../data/missions'
@@ -169,7 +169,7 @@ export function Passport({
               </div>
 
               {tab === 'discoveries' ? (
-                <SidePanel icon="search" title="Select an explorer">
+                <SidePanel icon="search" title="Select an explorer" scroll>
                   <div className="lab-pick">
                     {view.stories.map((story) => {
                       const photo = getAlbumPhotos(story.missionId)[0]
@@ -396,20 +396,68 @@ function TabletClock() {
 function SidePanel({
   icon,
   title,
+  scroll = false,
   children,
 }: {
   icon: IconName
   title: string
+  /** Fill the side column's free height and scroll the content inside. */
+  scroll?: boolean
   children: ReactNode
 }) {
   return (
-    <section className="ctab__card">
+    <section className={`ctab__card${scroll ? ' ctab__card--scroll' : ''}`}>
       <h3 className="ctab__bar">
         <Icon name={icon} />
         {title}
       </h3>
-      <div className="ctab__card-body">{children}</div>
+      {scroll ? (
+        <ScrollBody>{children}</ScrollBody>
+      ) : (
+        <div className="ctab__card-body">{children}</div>
+      )}
     </section>
+  )
+}
+
+/**
+ * A card body that scrolls on its own, with a soft fade and a bouncing
+ * arrow at the bottom while more tiles wait below, so children notice
+ * there is more to see (a thin scrollbar alone is easy to miss).
+ */
+function ScrollBody({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [more, setMore] = useState(false)
+  const measure = useCallback(() => {
+    const node = ref.current
+    if (!node) return
+    setMore(node.scrollTop + node.clientHeight < node.scrollHeight - 4)
+  }, [])
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    for (const child of Array.from(node.children)) observer.observe(child)
+    return () => observer.disconnect()
+  }, [measure])
+  return (
+    <div className="ctab__scroll" data-more={more}>
+      <div ref={ref} className="ctab__card-body ctab__scroll-body" onScroll={measure}>
+        {children}
+      </div>
+      {more && (
+        <button
+          type="button"
+          className="ctab__more"
+          aria-label="Show more explorers"
+          onClick={() => ref.current?.scrollBy({ top: ref.current.clientHeight * 0.7, behavior: 'smooth' })}
+        >
+          <span aria-hidden="true">▾</span>
+        </button>
+      )}
+    </div>
   )
 }
 

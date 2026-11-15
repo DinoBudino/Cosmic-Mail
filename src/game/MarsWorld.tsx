@@ -6,6 +6,7 @@ import { Player } from './Player'
 import { ScannerBeam } from './ScannerBeam'
 import { ScannerController } from './ScannerController'
 import { ScanFx } from './ScanFx'
+import { ScanKeyLabel } from './ScanKeyLabel'
 import { getActiveExplorer } from '../data/spiritSite'
 import { LanderExplorer } from './LanderExplorer'
 import { MerRover } from './MerRover'
@@ -34,6 +35,7 @@ export function MarsWorld() {
       <Player />
       <ScannerBeam />
       <ScannerController />
+      <ScanKeyLabel />
       <ScanFx />
     </>
   )

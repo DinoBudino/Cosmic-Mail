@@ -130,6 +130,16 @@ export interface RockInstance {
   color: THREE.Color
 }
 
+/**
+ * Mars rocks are drawn a little smaller than they were first sized, so the
+ * plain reads wide and open from the explorer's height (the scattered
+ * rocks, trail waymarks and passage boulders all share it).
+ */
+const MARS_ROCK_SIZE = 0.75
+const MARS_PASSAGE_SIZE = 0.85
+/** Smallest rock (scale) the player and PIP bump into. */
+const SOLID_ROCK_SCALE = 0.8
+
 export function createRocks(count: number): RockInstance[] {
   if (getActiveWorld() === 'moon') {
     return createLunarRocks(getActiveExplorer() as MoonExplorerId, count)
@@ -215,6 +225,7 @@ export function createRocks(count: number): RockInstance[] {
     if (region === 'viking1') scale *= 1.3
     if (region === 'insight') scale *= 0.8
     if (region === 'ingenuity') scale *= 0.85
+    scale *= MARS_ROCK_SIZE
     const stretchY = 0.32 + random() * 0.36
     const color = new THREE.Color(PALETTE.rockDark).lerp(new THREE.Color(PALETTE.rockLight), random())
     if (region === 'viking1') color.lerp(new THREE.Color(PALETTE.rockDark), 0.45)
@@ -263,7 +274,7 @@ export function createRocks(count: number): RockInstance[] {
       }
     }
     if (nearSite) continue
-    const scale = 0.48 + (index % 3) * 0.09
+    const scale = (0.48 + (index % 3) * 0.09) * MARS_ROCK_SIZE
     rocks.push({
       x,
       y: getTerrainHeight(x, z) + scale * 0.7 * 0.42,
@@ -292,11 +303,12 @@ export function createRocks(count: number): RockInstance[] {
     const z = boulder.z
     if (distanceToSurveyTrail(x, z) < 2.2) continue
     const stretchY = 0.72
+    const scale = boulder.scale * MARS_PASSAGE_SIZE
     rocks.push({
       x,
-      y: getTerrainHeight(x, z) + boulder.scale * stretchY * 0.4,
+      y: getTerrainHeight(x, z) + scale * stretchY * 0.4,
       z,
-      scale: boulder.scale,
+      scale,
       stretchX: 1.25,
       stretchY,
       stretchZ: 1.05,
@@ -334,7 +346,11 @@ export function getBoulderObstacles(count = QUALITY_PRESETS.high.rockCount): Bou
   const cached = boulderCaches.get(key)
   if (cached) return cached
   const list = createRocks(count)
-    .filter((rock) => rock.scale >= 0.8)
+    .filter(
+      (rock) =>
+        rock.scale >=
+        SOLID_ROCK_SCALE * (getActiveWorld() === 'moon' ? 1 : MARS_ROCK_SIZE),
+    )
     .map((rock) => ({
       x: rock.x,
       z: rock.z,

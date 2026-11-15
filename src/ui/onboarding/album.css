@@ -371,6 +371,52 @@
 .ctab__bar .icon { width: 20px; height: 20px; color: var(--orange-hi); }
 .ctab__card-body { padding: 12px 14px; }
 
+/* A side card that takes the column's free height and scrolls inside
+   (the explorer picker): it never shrinks into a clipped, unscrollable box. */
+.ctab__card--scroll { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 190px; }
+.ctab__scroll { position: relative; display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.ctab__scroll-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: auto;
+  scrollbar-color: var(--orange) #efe8f7;
+}
+.ctab__scroll-body::-webkit-scrollbar { width: 10px; }
+.ctab__scroll-body::-webkit-scrollbar-track { background: #efe8f7; border-radius: 10px; }
+.ctab__scroll-body::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 10px; }
+.ctab__scroll[data-more="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 14px;
+  bottom: 0;
+  height: 46px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 85%);
+}
+.ctab__more {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 6px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--orange);
+  color: #fff;
+  font-size: 1.1rem;
+  box-shadow: 0 3px 0 var(--orange-dk);
+  cursor: pointer;
+  animation: ctab-more 1.4s ease-in-out infinite;
+}
+@keyframes ctab-more { 50% { transform: translateY(3px); } }
+
 .ctab__note { margin: 0 0 10px; font-size: 0.86rem; color: var(--ink-soft); }
 .ctab__message {
   margin: 12px 0 0;
@@ -1139,7 +1185,8 @@
 @media (prefers-reduced-motion: reduce) {
   .xcard__pop,
   .stamp__postmark,
-  .ctab__pip-img { animation: none; }
+  .ctab__pip-img,
+  .ctab__more { animation: none; }
   .meter__track span { transition: none; }
 }
 
@@ -1192,11 +1239,17 @@
   }
   .ctab__side,
   .ctab__main { overflow: visible; flex: none; }
+  /* The whole tablet body scrolls on phones: the picker shows every tile. */
+  .ctab__card--scroll { flex: none; min-height: 0; }
+  .ctab__scroll-body { overflow: visible; }
+  .ctab__more,
+  .ctab__scroll[data-more="true"]::after { display: none; }
   .ctab__pip { grid-template-columns: 78px 1fr; }
   .ctab__pip-img { width: 78px; }
   .xgrid { grid-template-columns: 1fr; }
-  .lab-pick { grid-template-columns: repeat(4, 1fr); }
-  .lab-pick__name { font-size: 0.72rem; }
+  .lab-pick { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+  .lab-pick__tile { min-width: 0; }
+  .lab-pick__name { font-size: 0.72rem; line-height: 1.15; overflow-wrap: anywhere; }
   .xcard__pop { gap: 4px; padding: 10px 8px; }
   .xcard__pop-item { width: 74px; }
   .xcard__pop-label { padding: 3px 8px; font-size: 0.74rem; }
