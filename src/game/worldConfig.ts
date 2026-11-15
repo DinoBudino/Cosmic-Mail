@@ -99,17 +99,9 @@ export const PLAYER = {
   moveSpeed: 5.4,
   runSpeedMultiplier: 1.45,
   moveAccel: 11,
-  airAccel: 5,
   turnSpeed: 13,
   radius: 0.45,
-  // Mars gravity (0.38 g): long, floaty arcs instead of Earth's snap-down.
-  gravityMars: 3.71,
-  jumpVelocity: 3.4,
-  bootThrust: 10.5,
-  maxRiseSpeed: 4.5,
-  maxFallSpeed: 5.5,
-  maxBootHeight: 5,
-  // Inspection rings only count near the ground — boots can't skip them.
+  // Inspection rings only count near the ground.
   inspectMaxHeight: 1.2,
 } as const
 
@@ -138,8 +130,11 @@ export const SCANNER = {
   range: 14,
   /** Camera ray length from the pointer/camera. */
   rayFar: 28,
-  /** Continuous hold required to register a component. */
-  holdSeconds: 1.2,
+  /**
+   * Hold time for every scan (practice rock, parts and landscape). Long
+   * enough to enjoy the sweep, short enough for small hands.
+   */
+  holdSeconds: 1.8,
   /** Comfortable third-person distance while the scanner is held. */
   cameraDistance: 8.4,
   cameraDamping: 7,
@@ -154,9 +149,6 @@ export const SCANNER = {
   armAimDamping: 14,
   /** Environmental targets are reachable from a slightly shorter range. */
   environmentalRange: 11,
-  /** A quick field reading; holding longer produces a detailed comparison. */
-  environmentalQuickSeconds: 1.4,
-  environmentalDetailSeconds: 3.4,
   /** First-person eye height and camera transition speed. */
   firstPersonEyeHeight: 1.62,
   firstPersonDamping: 9,
@@ -165,37 +157,41 @@ export const SCANNER = {
   firstPersonPitchMax: 0.72,
 } as const
 
+/**
+ * Mars palette (art direction, Nov 2026): #F47B38 · #D9895C · #E7B98D ·
+ * #69534D · #F2CDB4, plus a few in-between shades for depth. Warm dust
+ * tones only: no violet rocks or pink skies, so the planet reads like the
+ * NASA images children will meet later.
+ */
 export const PALETTE = {
-  skyZenith: '#4B3A63',
-  skyUpper: '#665077',
-  skyMid: '#85658E',
-  skyHorizon: '#E5A49A',
-  skyBelow: '#A77E8A',
-  skyFloor: '#574766',
-  fog: '#AE8A8A',
-  sun: '#FFC08F',
-  ambient: '#948ABF',
-  hemiSky: '#B7A6CC',
-  hemiGround: '#574766',
-  terrainDark: '#574766',
-  terrainMid: '#B77B65',
-  terrainLight: '#D49A77',
-  terrainHigh: '#E0AC88',
-  path: '#D0A07F',
-  rockDark: '#6B5578',
-  rockLight: '#C98B70',
-  mesaNear: '#65516F',
-  mesaFar: '#7C6888',
-  accent: '#F4B4DF',
-  dust: '#E6C3A6',
-  beaconAvailable: '#FFB994',
-  beaconSoon: '#B98AAE',
+  skyZenith: '#C98A60',
+  skyUpper: '#D9895C',
+  skyMid: '#E2AA80',
+  skyHorizon: '#F2CDB4',
+  skyBelow: '#E7B98D',
+  skyFloor: '#69534D',
+  fog: '#E7B98D',
+  sun: '#FFE6CF',
+  ambient: '#F2CDB4',
+  hemiSky: '#E7B98D',
+  hemiGround: '#69534D',
+  terrainDark: '#8A5B45',
+  terrainMid: '#C9774A',
+  terrainLight: '#D9895C',
+  terrainHigh: '#E7B98D',
+  path: '#E2A47A',
+  rockDark: '#69534D',
+  rockLight: '#A9725A',
+  accent: '#F47B38',
+  dust: '#F2CDB4',
+  beaconAvailable: '#F47B38',
+  beaconSoon: '#D9895C',
   starWarm: '#FFF0E0',
-  starCool: '#D8CCFF',
-  moon: '#F3E2D8',
-  moonGlow: '#FFD9B8',
-  skyGlowWarm: '#FFC08F',
-  skyGlowCool: '#8E86C8',
+  starCool: '#F2CDB4',
+  moon: '#F2CDB4',
+  moonGlow: '#F2CDB4',
+  skyGlowWarm: '#F2CDB4',
+  skyGlowCool: '#D9895C',
 } as const
 
 export const SUN_DIRECTION = { x: -0.62, y: 0.32, z: -0.72 } as const

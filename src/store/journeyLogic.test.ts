@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ACTIVE_MISSION_IDS,
   MISSION_IDS,
   getMission,
   type MissionId,
@@ -59,68 +60,81 @@ function createDiscoveredJourney(): JourneySave {
 }
 
 const SPIRIT_COMPONENTS = [
-  'spirit-pancam',
-  'spirit-rock-abrasion-tool',
-  'spirit-mini-tes',
+  'opportunity-pancam',
+  'opportunity-rock-abrasion-tool',
+  'opportunity-mini-tes',
 ] as const
 
 function scanAllSpirit(save = createDiscoveredJourney()) {
   return SPIRIT_COMPONENTS.reduce(
     (current, componentId, index) =>
-      scanComponent(current, 'spirit', componentId, 2000 + index).save,
+      scanComponent(current, 'opportunity', componentId, 2000 + index).save,
     save,
   )
+}
+
+/** A save written before the third part recovered the memory by itself. */
+function legacyScannedSave(): JourneySave {
+  const save = scanAllSpirit()
+  return {
+    ...save,
+    missions: {
+      ...save.missions,
+      opportunity: {
+        ...save.missions.opportunity,
+        fullScanCompletedAt: null,
+        memoryRecoveredAt: null,
+      },
+    },
+  }
 }
 
 /** Full A cycle up to a prepared smart letter. */
 function readyLetter(save = createDiscoveredJourney()): JourneySave {
   let current = scanAllSpirit(save)
-  current = completeFullScan(current, 'spirit', 3000).save
-  return prepareSmartLetter(current, 'spirit', 4000).save
+  current = completeFullScan(current, 'opportunity', 3000).save
+  return prepareSmartLetter(current, 'opportunity', 4000).save
 }
 
 describe('mission stage projection', () => {
   it('walks the canonical chain without skipping states', () => {
     let save = createJourney('Ada', 1000)
-    expect(getMissionStage(save.missions.spirit)).toBe('unknown')
+    expect(getMissionStage(save.missions.opportunity)).toBe('unknown')
 
-    save = markMissionDiscovered(save, 'spirit', 1100)
-    expect(getMissionStage(save.missions.spirit)).toBe('discovered')
+    save = markMissionDiscovered(save, 'opportunity', 1100)
+    expect(getMissionStage(save.missions.opportunity)).toBe('discovered')
 
-    save = scanComponent(save, 'spirit', SPIRIT_COMPONENTS[0], 1200).save
-    expect(getMissionStage(save.missions.spirit)).toBe('investigating')
+    save = scanComponent(save, 'opportunity', SPIRIT_COMPONENTS[0], 1200).save
+    expect(getMissionStage(save.missions.opportunity)).toBe('investigating')
 
+    // The third part recovers the memory: no separate full scan.
     save = scanAllSpirit(save)
-    expect(getMissionStage(save.missions.spirit)).toBe('ready_for_full_scan')
+    expect(getMissionStage(save.missions.opportunity)).toBe('memory_recovered')
 
-    const full = completeFullScan(save, 'spirit', 3000)
-    expect(full.status).toBe('memory-recovered')
-    expect(getMissionStage(full.save.missions.spirit)).toBe('memory_recovered')
-
-    const letter = prepareSmartLetter(full.save, 'spirit', 4000)
+    const letter = prepareSmartLetter(save, 'opportunity', 4000)
     expect(letter.status).toBe('created')
-    expect(getMissionStage(letter.save.missions.spirit)).toBe(
+    expect(getMissionStage(letter.save.missions.opportunity)).toBe(
       'smart_letter_ready',
     )
 
-    const delivery = transmitLetter(letter.save, 'spirit', 5000)
+    const delivery = transmitLetter(letter.save, 'opportunity', 5000)
     expect(delivery.status).toBe('transmitted')
-    expect(getMissionStage(delivery.save.missions.spirit)).toBe('transmitted')
+    expect(getMissionStage(delivery.save.missions.opportunity)).toBe('transmitted')
   })
 })
 
 describe('Cosmic Scanner rules', () => {
   it('marks a mission as discovered without changing scans or rewards', () => {
     const save = createJourney('Ada', 1000)
-    expect(save.missions.spirit.discovered).toBe(false)
+    expect(save.missions.opportunity.discovered).toBe(false)
 
-    const discovered = markMissionDiscovered(save, 'spirit', 2000)
-    expect(discovered.missions.spirit.discovered).toBe(true)
-    expect(discovered.missions.spirit.scannedComponentIds).toEqual([])
-    expect(discovered.missions.spirit.stampEarned).toBe(false)
+    const discovered = markMissionDiscovered(save, 'opportunity', 2000)
+    expect(discovered.missions.opportunity.discovered).toBe(true)
+    expect(discovered.missions.opportunity.scannedComponentIds).toEqual([])
+    expect(discovered.missions.opportunity.stampEarned).toBe(false)
     expect(discovered.updatedAt).toBe(2000)
 
-    expect(markMissionDiscovered(discovered, 'spirit', 3000)).toBe(discovered)
+    expect(markMissionDiscovered(discovered, 'opportunity', 3000)).toBe(discovered)
     expect(markMissionDiscovered(save, 'apollo-11' as MissionId, 3000)).toBe(
       save,
     )
@@ -128,39 +142,39 @@ describe('Cosmic Scanner rules', () => {
 
   it('scans a valid component once and persists the progress snapshot', () => {
     const save = createDiscoveredJourney()
-    const result = scanComponent(save, 'spirit', 'spirit-pancam', 2000)
+    const result = scanComponent(save, 'opportunity', 'opportunity-pancam', 2000)
 
     expect(result.status).toBe('scanned')
     expect(result.scannedCount).toBe(1)
     expect(result.fullScanUnlocked).toBe(false)
-    expect(result.save.missions.spirit.scannedComponentIds).toEqual([
-      'spirit-pancam',
+    expect(result.save.missions.opportunity.scannedComponentIds).toEqual([
+      'opportunity-pancam',
     ])
     expect(result.save.updatedAt).toBe(2000)
-    expect(save.missions.spirit.scannedComponentIds).toEqual([])
+    expect(save.missions.opportunity.scannedComponentIds).toEqual([])
   })
 
   it('does not record a scan before the explorer is discovered', () => {
     const save = createJourney('Ada', 1000)
-    const result = scanComponent(save, 'spirit', 'spirit-pancam', 2000)
+    const result = scanComponent(save, 'opportunity', 'opportunity-pancam', 2000)
 
     expect(result.status).toBe('not-discovered')
     expect(result.scannedCount).toBe(0)
     expect(result.save).toBe(save)
-    expect(save.missions.spirit.discovered).toBe(false)
-    expect(save.missions.spirit.scannedComponentIds).toEqual([])
+    expect(save.missions.opportunity.discovered).toBe(false)
+    expect(save.missions.opportunity.scannedComponentIds).toEqual([])
 
-    const discovered = markMissionDiscovered(save, 'spirit', 1100)
-    const first = scanComponent(discovered, 'spirit', 'spirit-pancam', 2000)
+    const discovered = markMissionDiscovered(save, 'opportunity', 1100)
+    const first = scanComponent(discovered, 'opportunity', 'opportunity-pancam', 2000)
     expect(first.status).toBe('scanned')
     expect(
-      scanComponent(first.save, 'spirit', 'spirit-pancam', 3000).status,
+      scanComponent(first.save, 'opportunity', 'opportunity-pancam', 3000).status,
     ).toBe('duplicate')
   })
 
   it('rejects components from another mission and unknown missions', () => {
     const save = createJourney('Ada', 1000)
-    expect(scanComponent(save, 'spirit', 'surveyor-3-tv-camera').status).toBe(
+    expect(scanComponent(save, 'opportunity', 'surveyor-3-tv-camera').status).toBe(
       'invalid-component',
     )
     expect(
@@ -170,8 +184,8 @@ describe('Cosmic Scanner rules', () => {
 
   it('never duplicates a scanned component', () => {
     const save = createDiscoveredJourney()
-    const first = scanComponent(save, 'spirit', 'spirit-pancam', 2000)
-    const duplicate = scanComponent(first.save, 'spirit', 'spirit-pancam', 3000)
+    const first = scanComponent(save, 'opportunity', 'opportunity-pancam', 2000)
+    const duplicate = scanComponent(first.save, 'opportunity', 'opportunity-pancam', 3000)
 
     expect(duplicate.status).toBe('duplicate')
     expect(duplicate.scannedCount).toBe(1)
@@ -179,15 +193,16 @@ describe('Cosmic Scanner rules', () => {
     expect(duplicate.save.updatedAt).toBe(2000)
   })
 
-  it('unlocks the full scan only after all three fragments', () => {
+  it('recovers the memory with the third fragment, never earlier', () => {
     let save = createDiscoveredJourney()
     for (const componentId of SPIRIT_COMPONENTS.slice(0, 2)) {
-      save = scanComponent(save, 'spirit', componentId).save
-      expect(isFullScanUnlocked(save, 'spirit')).toBe(false)
+      save = scanComponent(save, 'opportunity', componentId, 2000).save
+      expect(save.missions.opportunity.memoryRecoveredAt).toBeNull()
     }
-    save = scanComponent(save, 'spirit', SPIRIT_COMPONENTS[2]).save
-    expect(countScannedComponents(save, 'spirit')).toBe(3)
-    expect(isFullScanUnlocked(save, 'spirit')).toBe(true)
+    save = scanComponent(save, 'opportunity', SPIRIT_COMPONENTS[2], 2500).save
+    expect(countScannedComponents(save, 'opportunity')).toBe(3)
+    expect(save.missions.opportunity.memoryRecoveredAt).toBe(2500)
+    expect(isFullScanUnlocked(save, 'opportunity')).toBe(false)
   })
 })
 
@@ -195,27 +210,27 @@ describe('Full recognition scan and memory core', () => {
   it('is locked before all three fragments', () => {
     const save = scanComponent(
       createDiscoveredJourney(),
-      'spirit',
-      'spirit-pancam',
+      'opportunity',
+      'opportunity-pancam',
     ).save
-    const result = completeFullScan(save, 'spirit', 3000)
+    const result = completeFullScan(save, 'opportunity', 3000)
 
     expect(result.status).toBe('locked')
     expect(result.save).toBe(save)
     expect(result.progress?.memoryRecoveredAt).toBeNull()
   })
 
-  it('recovers memory exactly once and keeps the machine inert', () => {
-    const scanned = scanAllSpirit()
-    const first = completeFullScan(scanned, 'spirit', 3000)
+  it('recovers memory exactly once for a legacy save stuck at 3/3', () => {
+    const scanned = legacyScannedSave()
+    const first = completeFullScan(scanned, 'opportunity', 3000)
     expect(first.status).toBe('memory-recovered')
-    expect(first.save.missions.spirit.fullScanCompletedAt).toBe(3000)
-    expect(first.save.missions.spirit.memoryRecoveredAt).toBe(3000)
+    expect(first.save.missions.opportunity.fullScanCompletedAt).toBe(3000)
+    expect(first.save.missions.opportunity.memoryRecoveredAt).toBe(3000)
 
-    const repeat = completeFullScan(first.save, 'spirit', 4000)
+    const repeat = completeFullScan(first.save, 'opportunity', 4000)
     expect(repeat.status).toBe('already-recovered')
     expect(repeat.save).toBe(first.save)
-    expect(repeat.save.missions.spirit.memoryRecoveredAt).toBe(3000)
+    expect(repeat.save.missions.opportunity.memoryRecoveredAt).toBe(3000)
   })
 
   it('rejects an unknown mission safely', () => {
@@ -228,67 +243,67 @@ describe('Full recognition scan and memory core', () => {
 
 describe('Smart letter, reconstruction and transmission', () => {
   it('requires the recovered memory before creating the letter', () => {
-    const scanned = scanAllSpirit()
-    const result = prepareSmartLetter(scanned, 'spirit', 3000)
+    const scanned = legacyScannedSave()
+    const result = prepareSmartLetter(scanned, 'opportunity', 3000)
     expect(result.status).toBe('locked')
     expect(result.save).toBe(scanned)
   })
 
   it('creates one letter and unlocks the recreation', () => {
-    const save = completeFullScan(scanAllSpirit(), 'spirit', 3000).save
-    const first = prepareSmartLetter(save, 'spirit', 4000)
+    const save = completeFullScan(scanAllSpirit(), 'opportunity', 3000).save
+    const first = prepareSmartLetter(save, 'opportunity', 4000)
     expect(first.status).toBe('created')
-    expect(first.save.missions.spirit.smartLetterCreatedAt).toBe(4000)
+    expect(first.save.missions.opportunity.smartLetterCreatedAt).toBe(4000)
 
-    const repeat = prepareSmartLetter(first.save, 'spirit', 5000)
+    const repeat = prepareSmartLetter(first.save, 'opportunity', 5000)
     expect(repeat.status).toBe('already-created')
     expect(repeat.save).toBe(first.save)
 
-    const watched = markReconstructionWatched(first.save, 'spirit', 6000)
+    const watched = markReconstructionWatched(first.save, 'opportunity', 6000)
     expect(watched.status).toBe('watched')
-    expect(watched.save.missions.spirit.reconstructionWatchedAt).toBe(6000)
+    expect(watched.save.missions.opportunity.reconstructionWatchedAt).toBe(6000)
 
-    const replay = markReconstructionWatched(watched.save, 'spirit', 7000)
+    const replay = markReconstructionWatched(watched.save, 'opportunity', 7000)
     expect(replay.status).toBe('already-watched')
     expect(replay.save).toBe(watched.save)
   })
 
   it('never lets the recreation create rewards', () => {
     const save = createDiscoveredJourney()
-    const locked = markReconstructionWatched(save, 'spirit', 2000)
+    const locked = markReconstructionWatched(save, 'opportunity', 2000)
     expect(locked.status).toBe('locked')
     expect(locked.save).toBe(save)
   })
 
   it('transmits only a prepared smart letter and never duplicates the stamp', () => {
-    const mission = getMission('spirit')
+    const mission = getMission('opportunity')
     const scanned = scanAllSpirit()
 
-    const missing = transmitLetter(scanned, 'spirit', 3000)
+    const missing = transmitLetter(scanned, 'opportunity', 3000)
     expect(missing.status).toBe('letter-missing')
     expect(missing.save).toBe(scanned)
     expect(missing.stampId).toBeNull()
 
     const letter = readyLetter()
-    const delivered = transmitLetter(letter, 'spirit', 5000)
+    const delivered = transmitLetter(letter, 'opportunity', 5000)
     expect(delivered.status).toBe('transmitted')
     expect(delivered.stampId).toBe(mission.stampId)
-    expect(delivered.save.missions.spirit.transmittedAt).toBe(5000)
-    expect(delivered.save.missions.spirit.stampEarned).toBe(true)
-    expect(getEarnedStampIds(delivered.save)).toEqual(['spirit'])
+    expect(delivered.save.missions.opportunity.transmittedAt).toBe(5000)
+    expect(delivered.save.missions.opportunity.stampEarned).toBe(true)
+    expect(getEarnedStampIds(delivered.save)).toEqual(['opportunity'])
 
-    const repeat = transmitLetter(delivered.save, 'spirit', 6000)
+    const repeat = transmitLetter(delivered.save, 'opportunity', 6000)
     expect(repeat.status).toBe('already-transmitted')
     expect(repeat.save).toBe(delivered.save)
-    expect(repeat.save.missions.spirit.transmittedAt).toBe(5000)
-    expect(getEarnedStampIds(repeat.save)).toEqual(['spirit'])
+    expect(repeat.save.missions.opportunity.transmittedAt).toBe(5000)
+    expect(getEarnedStampIds(repeat.save)).toEqual(['opportunity'])
   })
 
   it('records exactly one stamp per transmitted mission', () => {
     let save = createDiscoveredJourney()
     let now = 2000
 
-    for (const mission of MISSION_IDS.map((id) => getMission(id))) {
+    for (const mission of ACTIVE_MISSION_IDS.map((id) => getMission(id))) {
       for (const component of mission.components) {
         save = scanComponent(save, mission.id, component.id, now).save
         now += 1
@@ -301,8 +316,8 @@ describe('Smart letter, reconstruction and transmission', () => {
       now += 1
     }
 
-    expect(getEarnedStampIds(save)).toEqual([...MISSION_IDS])
-    expect(new Set(getEarnedStampIds(save)).size).toBe(3)
+    expect(getEarnedStampIds(save)).toEqual([...ACTIVE_MISSION_IDS])
+    expect(new Set(getEarnedStampIds(save)).size).toBe(ACTIVE_MISSION_IDS.length)
     expect(areAllMissionsComplete(save)).toBe(true)
   })
 
@@ -325,7 +340,7 @@ describe('Reset pilot rules', () => {
       1200,
     )
     save = readyLetter(save)
-    save = transmitLetter(save, 'spirit', 5000).save
+    save = transmitLetter(save, 'opportunity', 5000).save
     save = scanComponent(
       save,
       'surveyor-3',
@@ -334,11 +349,11 @@ describe('Reset pilot rules', () => {
     ).save
 
     const surveyorBefore = save.missions['surveyor-3']
-    const reset = resetMissionProgress(save, 'spirit', 7000)
+    const reset = resetMissionProgress(save, 'opportunity', 7000)
 
-    expect(reset.missions.spirit).toEqual(createMissionProgress())
-    expect(countScannedComponents(reset, 'spirit')).toBe(0)
-    expect(isMissionComplete(reset, 'spirit')).toBe(false)
+    expect(reset.missions.opportunity).toEqual(createMissionProgress())
+    expect(countScannedComponents(reset, 'opportunity')).toBe(0)
+    expect(isMissionComplete(reset, 'opportunity')).toBe(false)
     expect(getEarnedStampIds(reset)).toEqual([])
 
     expect(reset.missions['surveyor-3']).toEqual(surveyorBefore)
@@ -348,7 +363,7 @@ describe('Reset pilot rules', () => {
     expect(reset.currentDestination).toBe('mars')
     expect(reset.createdAt).toBe(save.createdAt)
     expect(reset.updatedAt).toBe(7000)
-    expect(save.missions.spirit.stampEarned).toBe(true)
+    expect(save.missions.opportunity.stampEarned).toBe(true)
   })
 
   it('returns the same save for an unknown mission', () => {
@@ -367,20 +382,20 @@ describe('progress survives a reload', () => {
 
     const loaded = loadJourney(storage).save
     expect(loaded).not.toBeNull()
-    expect(loaded!.missions.spirit.scannedComponentIds).toEqual([
+    expect(loaded!.missions.opportunity.scannedComponentIds).toEqual([
       ...SPIRIT_COMPONENTS,
     ])
-    expect(loaded!.missions.spirit.memoryRecoveredAt).not.toBeNull()
-    expect(loaded!.missions.spirit.smartLetterCreatedAt).not.toBeNull()
+    expect(loaded!.missions.opportunity.memoryRecoveredAt).not.toBeNull()
+    expect(loaded!.missions.opportunity.smartLetterCreatedAt).not.toBeNull()
 
-    save = transmitLetter(loaded!, 'spirit', 7000).save
+    save = transmitLetter(loaded!, 'opportunity', 7000).save
     expect(saveJourney(storage, save)).toBe(true)
 
     const reloaded = loadJourney(storage).save
     expect(reloaded).not.toBeNull()
-    expect(reloaded!.missions.spirit.stampEarned).toBe(true)
-    expect(reloaded!.missions.spirit.transmittedAt).toBe(7000)
-    expect(getEarnedStampIds(reloaded!)).toEqual(['spirit'])
+    expect(reloaded!.missions.opportunity.stampEarned).toBe(true)
+    expect(reloaded!.missions.opportunity.transmittedAt).toBe(7000)
+    expect(getEarnedStampIds(reloaded!)).toEqual(['opportunity'])
     expect(areAllMissionsComplete(reloaded!)).toBe(false)
   })
 })
@@ -422,8 +437,8 @@ describe('optional environmental discoveries', () => {
       'env-soil-landing',
     ])
     expect(quick.save.environmentalDetailedDiscoveries).toEqual([])
-    expect(quick.save.missions.spirit).toEqual(save.missions.spirit)
-    expect(getMissionStage(quick.save.missions.spirit)).toBe('unknown')
+    expect(quick.save.missions.opportunity).toEqual(save.missions.opportunity)
+    expect(getMissionStage(quick.save.missions.opportunity)).toBe('unknown')
 
     const detailed = recordEnvironmentalScan(
       quick.save,
@@ -438,7 +453,7 @@ describe('optional environmental discoveries', () => {
     expect(detailed.save.environmentalDetailedDiscoveries).toEqual([
       'env-soil-landing',
     ])
-    expect(getMissionStage(detailed.save.missions.spirit)).toBe('unknown')
+    expect(getMissionStage(detailed.save.missions.opportunity)).toBe('unknown')
   })
 
   it('is idempotent and rejects unknown sites', () => {
@@ -493,7 +508,7 @@ describe('memorial field-note track', () => {
     }
     save = recordEnvironmentalScan(save, 'env-volcanic-landing', true).save
     expect(getEarnedStampIds(save)).toEqual([])
-    expect(getMissionStage(save.missions.spirit)).toBe('unknown')
-    expect(save.missions.spirit.stampEarned).toBe(false)
+    expect(getMissionStage(save.missions.opportunity)).toBe('unknown')
+    expect(save.missions.opportunity.stampEarned).toBe(false)
   })
 })

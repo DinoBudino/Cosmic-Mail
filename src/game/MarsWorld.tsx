@@ -2,11 +2,12 @@ import { Suspense } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { Atmosphere } from './Atmosphere'
 import { EnvironmentalObjects } from './EnvironmentalObjects'
-import { MarsObjects } from './MarsObjects'
 import { Player } from './Player'
 import { ScannerBeam } from './ScannerBeam'
 import { ScannerController } from './ScannerController'
-import { SpiritPlaceholder } from './SpiritPlaceholder'
+import { ScanFx } from './ScanFx'
+import { MerRover } from './MerRover'
+import { LandedShip } from './LandedShip'
 import { Terrain } from './Terrain'
 
 export function MarsWorld() {
@@ -19,11 +20,16 @@ export function MarsWorld() {
       <Suspense fallback={null}>
         <EnvironmentalObjects />
       </Suspense>
-      <MarsObjects />
-      <SpiritPlaceholder />
+      <Suspense fallback={null}>
+        <MerRover />
+      </Suspense>
+      <Suspense fallback={null}>
+        <LandedShip />
+      </Suspense>
       <Player />
       <ScannerBeam />
       <ScannerController />
+      <ScanFx />
     </>
   )
 }

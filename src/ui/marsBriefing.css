@@ -1,0 +1,546 @@
+/* Guided Mars arrival briefing (MarsBriefing.tsx): PIP's welcome bubble
+   and the two-card Radar / Scanner tutorial. Big type and big targets:
+   the reader is a child. */
+
+.mars-briefing {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.mars-briefing > * {
+  pointer-events: auto;
+}
+
+.mars-briefing--pip {
+  align-items: flex-end;
+  padding: 0 16px calc(28px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, rgba(12, 6, 18, 0.55), transparent 42%);
+}
+
+.mars-briefing--panel {
+  align-items: center;
+  padding: 16px;
+  background: rgba(12, 6, 18, 0.5);
+  animation: scrim-in 260ms ease both;
+}
+
+/* ------------------------------------------------------------ PIP line */
+
+.briefing-pip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(720px, 100%);
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 217, 168, 0.42);
+  border-radius: 22px;
+  background: rgba(27, 16, 41, 0.94);
+  color: var(--cream);
+  box-shadow: 0 22px 50px -24px rgba(10, 4, 16, 0.95);
+  animation: hud-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.briefing-pip .pip-avatar {
+  flex: none;
+  width: 56px;
+  height: 56px;
+}
+
+.briefing-pip__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.briefing-pip__name {
+  margin: 0 0 2px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  color: var(--rose-200);
+}
+
+.briefing-pip__text {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 560;
+  line-height: 1.45;
+}
+
+/* The untyped rest keeps its space, so the box never jumps while typing. */
+.briefing-pip__ghost {
+  visibility: hidden;
+}
+
+.briefing-cta {
+  flex: none;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd9a8, #f2a66f);
+  color: #2a1530;
+  font: inherit;
+  font-size: 1.02rem;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 10px 24px -12px rgba(242, 166, 111, 0.9);
+  animation: briefing-nudge 2.4s ease-in-out 1.2s infinite;
+}
+
+.briefing-cta:hover {
+  filter: brightness(1.06);
+}
+
+.briefing-cta:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.briefing-hint {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px dashed rgba(143, 227, 216, 0.6);
+  border-radius: 999px;
+  color: #bff3ea;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.briefing-hint__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #8fe3d8;
+  animation: briefing-ping 1.4s ease-out infinite;
+}
+
+/* --------------------------------------------------------------- panel */
+
+.briefing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(880px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 26px 26px 18px;
+  border: 1px solid rgba(255, 217, 168, 0.3);
+  border-radius: 28px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(67, 42, 76, 0.85), transparent 60%),
+    rgba(27, 16, 41, 0.96);
+  color: var(--cream);
+  box-shadow: 0 30px 80px -30px rgba(10, 4, 16, 0.95);
+  animation: panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.briefing-panel .briefing-pip {
+  width: 100%;
+  border-color: rgba(253, 244, 236, 0.14);
+  background: rgba(12, 6, 18, 0.45);
+  box-shadow: none;
+  animation: none;
+}
+
+.briefing-panel__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.briefing-panel__title {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.6vw, 1.75rem);
+  font-weight: 700;
+  text-align: center;
+}
+
+.briefing-progress {
+  width: min(560px, 100%);
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(253, 244, 236, 0.12);
+  overflow: hidden;
+}
+
+.briefing-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6fd3c4, #a9f0dc);
+  box-shadow: 0 0 12px rgba(143, 227, 216, 0.6);
+  transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ------------------------------------------------------- overview cards */
+
+.briefing-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.briefing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 230px;
+  padding: 20px 16px 22px;
+  border: 2px solid rgba(253, 244, 236, 0.14);
+  border-radius: 22px;
+  background: rgba(253, 244, 236, 0.05);
+  color: var(--cream);
+  font: inherit;
+  text-align: center;
+  cursor: default;
+  transition:
+    transform 200ms ease,
+    border-color 200ms ease,
+    opacity 200ms ease;
+}
+
+.briefing-card:disabled {
+  opacity: 1;
+}
+
+.briefing-card[data-locked] {
+  opacity: 0.42;
+  filter: saturate(0.5);
+}
+
+.briefing-card.is-target {
+  cursor: pointer;
+  border-color: rgba(143, 227, 216, 0.85);
+  background: rgba(143, 227, 216, 0.08);
+  animation: briefing-target 1.8s ease-in-out infinite;
+}
+
+.briefing-card.is-target:hover {
+  transform: translateY(-3px) scale(1.01);
+}
+
+.briefing-card.is-target:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.briefing-card.is-learned {
+  border-color: rgba(255, 217, 168, 0.5);
+}
+
+.briefing-card__art svg {
+  width: 120px;
+  height: 120px;
+}
+
+.briefing-card__title {
+  font-size: 1.4rem;
+  font-weight: 750;
+}
+
+.briefing-card__summary {
+  font-size: 0.98rem;
+  color: var(--cream-dim);
+}
+
+.briefing-card__badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 217, 168, 0.18);
+  color: var(--rose-200);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.briefing-card__badge--tap {
+  background: #8fe3d8;
+  color: #12222a;
+}
+
+/* ----------------------------------------------------------- big card */
+
+.briefing-detail {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 28px;
+  padding: 22px 26px;
+  border: 2px solid rgba(255, 217, 168, 0.4);
+  border-radius: 22px;
+  background: rgba(253, 244, 236, 0.05);
+  animation: panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.briefing-detail__art svg {
+  width: 190px;
+  height: 190px;
+}
+
+.briefing-detail__title {
+  margin: 0 0 12px;
+  font-size: 1.6rem;
+  font-weight: 750;
+}
+
+.briefing-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefing-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.briefing-tip__number {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 217, 168, 0.16);
+  color: var(--rose-200);
+  font-weight: 750;
+  font-size: 0.9rem;
+}
+
+.briefing-key {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border: 1px solid rgba(253, 244, 236, 0.35);
+  border-bottom-width: 3px;
+  border-radius: 7px;
+  background: rgba(253, 244, 236, 0.08);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ artwork */
+
+/* Overview card: the star sits up and to the right. */
+.briefing-radar__turn {
+  transform-origin: 60px 60px;
+  transform: rotate(40deg);
+}
+
+.briefing-radar__halo {
+  fill: rgba(244, 123, 56, 0.4);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: briefing-ping 1.6s ease-out infinite;
+}
+
+/* Detail view: the map turns until the star is on top, then the star
+   comes down to the arrow, as when walking straight to it. */
+.briefing-radar.is-animated .briefing-radar__turn {
+  animation: briefing-turn 5s ease-in-out infinite;
+}
+
+.briefing-radar.is-animated .briefing-radar__signal {
+  animation: briefing-approach 5s ease-in-out infinite;
+}
+
+.briefing-scanner__beam {
+  fill: rgba(143, 227, 216, 0.28);
+  animation: briefing-beam 1.2s ease-in-out infinite alternate;
+}
+
+.briefing-scanner__ring {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 30;
+}
+
+.briefing-scanner.is-animated .briefing-scanner__ring {
+  animation: briefing-fill 3s ease-in-out infinite;
+}
+
+@keyframes briefing-ping {
+  0% { opacity: 0.9; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+@keyframes briefing-turn {
+  0%, 10% { transform: rotate(70deg); }
+  38%, 100% { transform: rotate(0deg); }
+}
+
+@keyframes briefing-approach {
+  0%, 42% { transform: translateY(0); }
+  82%, 92% { transform: translateY(30px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes briefing-beam {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+@keyframes briefing-fill {
+  0% { stroke-dashoffset: 100; }
+  75%, 100% { stroke-dashoffset: 0; }
+}
+
+@keyframes briefing-target {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(143, 227, 216, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(143, 227, 216, 0); }
+}
+
+@keyframes briefing-nudge {
+  0%, 80%, 100% { transform: translateY(0); }
+  88% { transform: translateY(-3px); }
+}
+
+/* The real HUD radar while PIP presents it. */
+.cosmic-radar.is-briefing-focus {
+  z-index: 21;
+  animation: radar-arrive 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.cosmic-radar.is-briefing-focus .cosmic-radar__map-wrap {
+  box-shadow:
+    0 0 0 4px #8fe3d8,
+    0 0 0 10px rgba(143, 227, 216, 0.2),
+    0 0 40px rgba(143, 227, 216, 0.5);
+  animation: briefing-target 1.8s ease-in-out 600ms infinite;
+}
+
+/* Floating callout so a child knows exactly where to look. */
+.cosmic-radar.is-briefing-focus::before {
+  content: 'Your radar';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 14px);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #8fe3d8;
+  color: #12222a;
+  font-size: 0.95rem;
+  font-weight: 750;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  animation: briefing-bob 1.4s ease-in-out infinite;
+}
+
+.cosmic-radar.is-briefing-focus::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  border: 8px solid transparent;
+  border-top-color: #8fe3d8;
+  border-bottom-width: 0;
+  transform: translateX(-50%);
+  animation: briefing-bob 1.4s ease-in-out infinite;
+}
+
+@keyframes briefing-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -5px; }
+}
+
+@media (max-width: 640px) {
+  .briefing-panel {
+    padding: 18px 14px 14px;
+    gap: 14px;
+  }
+
+  .briefing-tools {
+    gap: 10px;
+  }
+
+  .briefing-card {
+    min-height: 180px;
+    padding: 14px 8px 16px;
+  }
+
+  .briefing-card__art svg {
+    width: 84px;
+    height: 84px;
+  }
+
+  .briefing-detail {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .briefing-detail__art svg {
+    width: 130px;
+    height: 130px;
+  }
+
+  .briefing-pip {
+    flex-wrap: wrap;
+  }
+
+  .briefing-pip .pip-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .briefing-pip__text {
+    font-size: 1rem;
+  }
+
+  .briefing-cta,
+  .briefing-hint {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .briefing-cta,
+  .briefing-card.is-target,
+  .briefing-radar.is-animated .briefing-radar__turn,
+  .briefing-radar__halo,
+  .briefing-radar.is-animated .briefing-radar__signal,
+  .briefing-scanner__beam,
+  .briefing-scanner.is-animated .briefing-scanner__ring,
+  .cosmic-radar.is-briefing-focus,
+  .cosmic-radar.is-briefing-focus .cosmic-radar__map-wrap,
+  .cosmic-radar.is-briefing-focus::before,
+  .cosmic-radar.is-briefing-focus::after {
+    animation: none;
+  }
+}
+
+/* The in-game reduced-motion setting, too. */
+[data-reduced-motion='true'] .briefing-cta,
+[data-reduced-motion='true'] .briefing-card.is-target,
+[data-reduced-motion='true'] .briefing-radar.is-animated .briefing-radar__turn,
+[data-reduced-motion='true'] .briefing-radar__halo,
+[data-reduced-motion='true'] .briefing-radar.is-animated .briefing-radar__signal,
+[data-reduced-motion='true'] .briefing-scanner__beam,
+[data-reduced-motion='true'] .briefing-scanner.is-animated .briefing-scanner__ring,
+[data-reduced-motion='true'] .cosmic-radar.is-briefing-focus,
+[data-reduced-motion='true'] .cosmic-radar.is-briefing-focus .cosmic-radar__map-wrap,
+[data-reduced-motion='true'] .cosmic-radar.is-briefing-focus::before,
+[data-reduced-motion='true'] .cosmic-radar.is-briefing-focus::after {
+  animation: none;
+}

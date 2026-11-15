@@ -10,8 +10,8 @@
  */
 
 import { getMissionStage, type MissionStage } from '../store/journeyLogic'
-import { getSweepObjective } from './fullScanSweep'
-import type { MissionProgress } from '../store/journeySchema'
+import type { JourneySave, MissionProgress } from '../store/journeySchema'
+import type { MissionId } from './missions'
 import { SURVEY_ROUTE, WORLD } from '../game/worldConfig'
 import {
   CALIBRATION_SAMPLE,
@@ -19,7 +19,7 @@ import {
   type CalibrationSample,
 } from './calibrationSample'
 import type { WorldPosition } from './marsObjects'
-import type { ScannerLensId } from './scannerLenses'
+import { getBriefingTexts } from './marsBriefing'
 
 export const PROTOCOL_STEPS = [
   'M0',
@@ -27,7 +27,6 @@ export const PROTOCOL_STEPS = [
   'M2',
   'M3',
   'M4',
-  'M5',
   'M6',
   'M7',
 ] as const
@@ -38,12 +37,18 @@ export interface ProtocolFlags {
   walked: boolean
   stationReached: boolean
   calibrated: boolean
+  /** PIP presented the radar during the arrival briefing. */
+  radarShown: boolean
+  /** The arrival briefing (welcome + Radar/Scanner tutorial) is done. */
+  briefed: boolean
 }
 
 export const INITIAL_PROTOCOL_FLAGS: ProtocolFlags = {
   walked: false,
   stationReached: false,
   calibrated: false,
+  radarShown: false,
+  briefed: false,
 }
 
 /** Distance the player must walk to finish the landing step. */
@@ -70,6 +75,22 @@ export interface ProtocolContext {
   priorFieldWork: boolean
 }
 
+/**
+ * The child already knows the scanner: landscape readings, or another Mars
+ * explorer already found (second landing from orbit skips the briefing and
+ * the practice rock).
+ */
+export function hasPriorFieldWork(
+  save: Pick<JourneySave, 'environmentalDiscoveries' | 'missions'> | null | undefined,
+  missionId: MissionId,
+): boolean {
+  if (!save) return false
+  if ((save.environmentalDiscoveries?.length ?? 0) > 0) return true
+  return (['opportunity', 'spirit'] as const).some(
+    (id) => id !== missionId && Boolean(save.missions[id]?.discovered),
+  )
+}
+
 export function getProtocolStep(context: ProtocolContext): ProtocolStep {
   const stage: MissionStage = getMissionStage(context.progress)
   switch (stage) {
@@ -78,8 +99,9 @@ export function getProtocolStep(context: ProtocolContext): ProtocolStep {
     case 'memory_recovered':
     case 'smart_letter_ready':
       return 'M6'
+    // Legacy saves that stopped before the old full scan: the visit
+    // recovers the memory right away (MissionNarrativeController).
     case 'ready_for_full_scan':
-      return 'M5'
     case 'investigating':
     case 'discovered':
       return 'M4'
@@ -93,6 +115,14 @@ export function getProtocolStep(context: ProtocolContext): ProtocolStep {
   return 'M0'
 }
 
+/**
+ * The guided arrival briefing runs on a fresh landing (step M0) until the
+ * child finishes it. Saves with field work or a found explorer skip it.
+ */
+export function needsArrivalBriefing(context: ProtocolContext): boolean {
+  return !context.flags.briefed && getProtocolStep(context) === 'M0'
+}
+
 export function stepIndex(step: ProtocolStep): number {
   return PROTOCOL_STEPS.indexOf(step)
 }
@@ -103,12 +133,18 @@ export function isStepAtLeast(step: ProtocolStep, minimum: ProtocolStep) {
 
 // ---------------------------------------------------------------- gating
 
-/** M0 shows no radar; it appears (animated) in M1. */
-export function isRadarVisible(step: ProtocolStep): boolean {
-  return isStepAtLeast(step, 'M1')
+/**
+ * M0 shows no radar until PIP presents it in the arrival briefing; without
+ * a briefing (older saves) it appears, animated, in M1.
+ */
+export function isRadarVisible(
+  step: ProtocolStep,
+  flags: Pick<ProtocolFlags, 'radarShown'> = { radarShown: false },
+): boolean {
+  return flags.radarShown || isStepAtLeast(step, 'M1')
 }
 
-/** The scanner unlocks at the calibration station. */
+/** The scanner unlocks at the practice rock. */
 export function isScannerUnlocked(step: ProtocolStep): boolean {
   return isStepAtLeast(step, 'M2')
 }
@@ -118,7 +154,7 @@ export function areFreeScansAllowed(step: ProtocolStep): boolean {
   return step === 'M7'
 }
 
-/** The calibration sample is only a target while calibrating. */
+/** The practice rock is only a target during the practice step. */
 export function isCalibrationActive(step: ProtocolStep): boolean {
   return step === 'M2'
 }
@@ -211,10 +247,8 @@ export type ProtocolHighlight =
   | 'radar'
   | 'scanner-key'
   | 'sample'
-  | 'lens'
   | 'hold'
   | 'marker'
-  | 'lens-picker'
   | 'inspect'
   | 'trace'
   | null
@@ -224,22 +258,15 @@ export interface ObjectiveContext {
   coarsePointer: boolean
   scannerEquipped: boolean
   aimingAtSample: boolean
-  lens: ScannerLensId
   scannedCount: number
   nearSignal: boolean
   memoryRecovered: boolean
   /** The reticle rests on a recognizable part of the explorer. */
   aimingAtPart: boolean
-  /** The player has already switched lens this visit. */
-  lensTouched: boolean
   /** Next suggested marker (1 → 2 → 3), null when none is left. */
   nextMarker: number | null
-  /** In-world sweep of the full scan (M5). Optional: panel-only flow omits it. */
-  sweep?: {
-    active: boolean
-    revealed: number
-    aimingAtTrace: boolean
-  }
+  /** Short clue for the part to find now (parts hunt, M4). */
+  huntClue?: string | null
 }
 
 export interface Objective {
@@ -269,78 +296,57 @@ export function getObjective(ctx: ObjectiveContext): Objective {
       }
       if (!ctx.aimingAtSample) {
         return {
-          text: 'Aim at the glowing calibration sample',
+          text: 'Aim at the glowing practice rock',
           highlight: 'sample',
         }
       }
-      if (ctx.lens !== CALIBRATION_SAMPLE.lens) {
-        return {
-          text: 'This sample needs the Contact lens · press 2',
-          highlight: 'lens',
-        }
+      return {
+        text: ctx.coarsePointer
+          ? 'Hold the Scan button until the ring is full'
+          : 'Hold the left mouse button until the ring is full',
+        highlight: 'hold',
       }
-      return { text: 'Hold to scan the sample', highlight: 'hold' }
     }
     case 'M3':
       return ctx.nearSignal
         ? {
             text: ctx.coarsePointer
-              ? 'Tap Inspect to look closer'
-              : 'Press E to inspect it',
+              ? 'Tap Inspect to take a closer look'
+              : 'Press E to take a closer look',
             highlight: 'inspect',
           }
         : { text: 'Follow the signal · get closer', highlight: 'radar' }
     case 'M4': {
-      const marker = ctx.nextMarker ?? 1
-      // First part: a small guided sequence. The right lens is never named;
-      // only the rule is taught, and the picker pulses once.
-      if (ctx.scannedCount === 0) {
-        if (!ctx.scannerEquipped) {
-          return {
-            text: ctx.coarsePointer
-              ? 'Tap the scanner button · aim at marker 1'
-              : 'Press Q · aim at marker 1',
-            highlight: 'scanner-key',
-          }
-        }
-        if (!ctx.aimingAtPart) {
-          return { text: 'Aim at marker 1', highlight: 'marker' }
-        }
-        return ctx.lensTouched
-          ? { text: 'Hold to scan', highlight: 'hold' }
-          : {
-              text: 'Hold to scan · some tools look, some touch, some sense heat',
-              highlight: 'lens-picker',
-            }
-      }
-      if (ctx.scannerEquipped) {
+      // Parts hunt: one clue at a time, one action at a time.
+      if (!ctx.scannerEquipped) {
         return {
-          text: ctx.aimingAtPart
-            ? `Hold to scan · recognition ${ctx.scannedCount}/3`
-            : `Recognition ${ctx.scannedCount}/3 · aim at marker ${marker}`,
-          highlight: ctx.aimingAtPart ? 'hold' : 'marker',
+          text: ctx.coarsePointer
+            ? 'Tap the scanner button to take it out'
+            : 'Press Q to take out your scanner',
+          highlight: 'scanner-key',
+        }
+      }
+      // The clue stays put while aiming: the reticle itself says "hold".
+      if (ctx.aimingAtPart) {
+        return {
+          text:
+            ctx.huntClue ??
+            `Recognize the explorer's parts (${ctx.scannedCount}/3)`,
+          highlight: 'hold',
         }
       }
       return {
-        text: `Recognize the explorer's parts (${ctx.scannedCount}/3)`,
-        highlight: null,
+        text:
+          ctx.huntClue ??
+          `Recognize the explorer's parts (${ctx.scannedCount}/3)`,
+        highlight: 'marker',
       }
     }
-    case 'M5':
-      if (ctx.sweep?.active) {
-        return getSweepObjective({
-          equipped: ctx.scannerEquipped,
-          aiming: ctx.sweep.aimingAtTrace,
-          revealed: ctx.sweep.revealed,
-          coarsePointer: ctx.coarsePointer,
-        })
-      }
-      return { text: 'Run the full recognition scan', highlight: null }
     case 'M6':
       return {
         text: ctx.memoryRecovered
-          ? 'Prepare the smart letter, then deliver it from Mailwing'
-          : 'Return to Mailwing and deliver the letter',
+          ? 'Seal the letter on your tablet'
+          : 'Walk back to the ship and climb aboard',
         highlight: null,
       }
     case 'M7':
@@ -361,26 +367,26 @@ export const STEP_ENTRY_LINES: Readonly<
 > = {
   M1: {
     id: 'protocol:m1',
-    text: 'Radar online. The signal is faint, so follow the trail.',
+    text: 'Follow the orange star on your radar. It leads to our practice rock!',
   },
   M2: {
     id: 'protocol:m2',
-    text: 'Calibration station! Ready the scanner and try the sample.',
+    text: "Look, a glowing practice rock! Let's try your scanner on it.",
   },
   M3: {
     id: 'protocol:m3',
-    text: 'Calibrated! Now let us find where that signal is coming from.',
+    text: "Scan complete, you did it! Now let's follow the star to the signal.",
   },
-}
-
-export const SAMPLE_LENS_LINE: ProtocolLine = {
-  id: 'protocol:sample-lens',
-  text: 'Some tools look, some touch, some sense heat. This one needs touch.',
 }
 
 export const SCANNER_LOCKED_LINE: ProtocolLine = {
   id: 'protocol:scanner-locked',
-  text: 'The scanner needs calibrating first. Follow the radar.',
+  text: "Let's walk to the practice rock first. Follow the star!",
+}
+
+export const STATION_STAY_LINE: ProtocolLine = {
+  id: 'protocol:station-stay',
+  text: "Not yet, explorer! Let's find all three parts first, I'll help you!",
 }
 
 export const OFF_TRAIL_LINE: ProtocolLine = {
@@ -395,7 +401,7 @@ export const LATER_LINE: ProtocolLine = {
 
 export const CALIBRATE_FIRST_LINE: ProtocolLine = {
   id: 'protocol:calibrate-first',
-  text: 'Calibrate the scanner first, then we will take a closer look.',
+  text: "Let's practice with the scanner first, then we'll take a closer look.",
 }
 
 /** Inspecting the unknown signal opens once the scanner is calibrated. */
@@ -419,9 +425,11 @@ export function getProtocolHint(
         ? 'Drag the joystick to walk and drag the screen to look around.'
         : 'Walk with WASD and move the mouse to look around.'
     case 'M1':
-      return 'Watch the radar and head toward the bright dot.'
+      return 'Turn until the orange star is at the top of the radar, then walk.'
     case 'M2':
-      return 'Press Q, aim at the glowing rock and hold. The Contact lens is key 2.'
+      return coarsePointer
+        ? 'Tap the scanner button, aim at the glowing rock and hold Scan.'
+        : 'Press Q, aim at the glowing rock and hold the left mouse button.'
     case 'M3':
       return 'The signal is near. Walk up to the shape and press E.'
     default:
@@ -435,8 +443,8 @@ export function getPreDiscoveryTexts(): string[] {
   for (const line of Object.values(STEP_ENTRY_LINES)) {
     if (line) texts.push(line.text)
   }
+  texts.push(...getBriefingTexts())
   texts.push(
-    SAMPLE_LENS_LINE.text,
     SCANNER_LOCKED_LINE.text,
     OFF_TRAIL_LINE.text,
     LATER_LINE.text,
@@ -449,24 +457,20 @@ export function getPreDiscoveryTexts(): string[] {
       if (hint) texts.push(hint)
       for (const equipped of [false, true]) {
         for (const aiming of [false, true]) {
-          for (const lens of ['visual', 'contact', 'thermal'] as const) {
-            for (const nearSignal of [false, true]) {
-              texts.push(
-                getObjective({
-                  step,
-                  coarsePointer: coarse,
-                  scannerEquipped: equipped,
-                  aimingAtSample: aiming,
-                  lens,
-                  scannedCount: 0,
-                  nearSignal,
-                  memoryRecovered: false,
-                  aimingAtPart: false,
-                  lensTouched: false,
-                  nextMarker: 1,
-                }).text,
-              )
-            }
+          for (const nearSignal of [false, true]) {
+            texts.push(
+              getObjective({
+                step,
+                coarsePointer: coarse,
+                scannerEquipped: equipped,
+                aimingAtSample: aiming,
+                scannedCount: 0,
+                nearSignal,
+                memoryRecovered: false,
+                aimingAtPart: false,
+                nextMarker: 1,
+              }).text,
+            )
           }
         }
       }

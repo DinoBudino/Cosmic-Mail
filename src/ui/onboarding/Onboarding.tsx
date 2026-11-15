@@ -4,6 +4,7 @@ import { Cabin } from './Cabin'
 import { Hub } from './Hub'
 import { Intro } from './Intro'
 import { LaunchSequence } from './LaunchSequence'
+import { MarsOrbit } from './MarsOrbit'
 import { MainMenu } from './MainMenu'
 import { PostalRegistration } from './PostalRegistration'
 import './onboarding.css'
@@ -30,6 +31,14 @@ export function Onboarding() {
 
   const isMenu = phase === 'menu'
   const isLaunching = phase === 'launching'
+
+  if (phase === 'orbit') {
+    return (
+      <main className="onboarding" data-phase={phase} aria-label="Mars orbit">
+        <MarsOrbit />
+      </main>
+    )
+  }
 
   if (isLaunching) {
     return (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  getMinimapPoint,
   getRadarSnapshot,
   radarDirectionLabel,
   SPIRIT_RADAR_RANGE,
@@ -64,5 +65,36 @@ describe('getRadarSnapshot', () => {
     expect(radarDirectionLabel(Math.PI)).toBe('south')
     expect(radarDirectionLabel(-Math.PI / 2)).toBe('west')
     expect(radarDirectionLabel(Math.PI / 4)).toBe('north-east')
+  })
+})
+
+describe('getMinimapPoint (heading-up)', () => {
+  it('puts what the camera faces at the top of the map', () => {
+    // Yaw 0 looks north (-Z).
+    const ahead = getMinimapPoint(ORIGIN, { x: 0, z: -10 }, 0)
+    expect(ahead.y).toBeLessThan(0)
+    expect(ahead.x).toBeCloseTo(0)
+    const right = getMinimapPoint(ORIGIN, { x: 10, z: 0 }, 0)
+    expect(right.x).toBeGreaterThan(0)
+    expect(right.y).toBeCloseTo(0)
+  })
+
+  it('turns with the camera', () => {
+    // Facing east: forward = (-sin, -cos) = (1, 0) for yaw = -PI/2.
+    const yaw = -Math.PI / 2
+    const east = getMinimapPoint(ORIGIN, { x: 10, z: 0 }, yaw)
+    expect(east.y).toBeLessThan(0)
+    expect(east.x).toBeCloseTo(0)
+    const north = getMinimapPoint(ORIGIN, { x: 0, z: -10 }, yaw)
+    expect(north.x).toBeLessThan(0)
+  })
+
+  it('clamps far targets to the rim and centres colocated ones', () => {
+    const far = getMinimapPoint(ORIGIN, { x: 0, z: -SPIRIT_RADAR_RANGE * 3 }, 0)
+    expect(far.inRange).toBe(false)
+    expect(Math.hypot(far.x, far.y)).toBeCloseTo(1)
+    const here = getMinimapPoint(ORIGIN, ORIGIN, 1.2)
+    expect(here.x).toBe(0)
+    expect(here.y).toBe(0)
   })
 })

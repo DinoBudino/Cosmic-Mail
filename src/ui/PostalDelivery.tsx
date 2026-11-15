@@ -200,7 +200,7 @@ export function PostalDelivery({
 
         {(step === 'stamp' || step === 'done') && (
           <div className="postal__passport">
-            <span className="postal__passport-label">Passport</span>
+            <span className="postal__passport-label">Mission album</span>
             {step === 'done' ? (
               <div
                 className={`smart-letter__stamp${
@@ -225,7 +225,7 @@ export function PostalDelivery({
                   onAdvance('stamped')
                 }}
               >
-                Stamp your passport
+                Stamp your mission album
               </button>
             )}
           </div>

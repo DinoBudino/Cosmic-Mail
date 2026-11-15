@@ -1,0 +1,127 @@
+import {
+  hubDialogueSteps,
+  type HubAwait,
+  isHubTourActive,
+  type HubDialogueStep,
+  type HubTarget,
+} from '../data/onboardingNarrative'
+import { getSliceClosure } from '../data/sliceClosure'
+import { useGameStore } from './gameStore'
+import { useJourneyStore } from './journeyStore'
+import { useOnboardingStore } from './onboardingStore'
+
+export interface HubFocus {
+  /** Every dialogue step PIP has for the cabin right now. */
+  steps: HubDialogueStep[]
+  /** The step on screen (index clamped), or null when PIP is quiet. */
+  step: HubDialogueStep | null
+  /** Element PIP is pointing at, if any. */
+  target: HubTarget | null
+  /** First-visit tour running: elements other than the target are locked. */
+  tourActive: boolean
+}
+
+/**
+ * Shared by the DOM bubble, the 3D cabin and the keyboard mirrors so the
+ * guided tour highlights and unlocks exactly the same element everywhere.
+ */
+export function useHubFocus(): HubFocus {
+  const phase = useOnboardingStore((state) => state.phase)
+  const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
+  const hubVisited = useOnboardingStore((state) => state.hubVisited)
+  const hubTourDone = useOnboardingStore((state) => state.hubTourDone)
+  const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
+  const save = useJourneyStore((state) => state.save)
+  // PIP stays quiet while an archive dialog (letter, delivery) is open, so
+  // the slice-closing lines never talk over the delivery ceremony.
+  const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
+
+  if (phase !== 'hub' || archiveOpen) {
+    return { steps: [], step: null, target: null, tourActive: false }
+  }
+  const closure = getSliceClosure(save)
+  const options = {
+    routeConfirmed,
+    hubVisited,
+    hubTourDone,
+    restoredCount: closure.restored,
+    totalStories: closure.total,
+  }
+  const steps = hubDialogueSteps(options)
+  const step =
+    steps[Math.min(dialogueIndex, Math.max(0, steps.length - 1))] ?? null
+  return {
+    steps,
+    step,
+    target: step?.target ?? null,
+    tourActive: isHubTourActive(options),
+  }
+}
+
+/**
+ * Whether a cabin element may be used right now. During the first-visit
+ * tour only the element PIP points at answers (other ids, such as
+ * 'nav-back', stay locked until the tour ends).
+ */
+export function hubElementEnabled(
+  focus: HubFocus,
+  element: HubTarget | (string & {}),
+): boolean {
+  return !focus.tourActive || focus.target === element
+}
+
+/**
+ * Index the guided tour should move to, given what the child has done:
+ * forward when the awaited action happened, back to the opening step
+ * when the album or the navigation screen was closed mid-explanation.
+ */
+export function tourIndexFor(
+  steps: readonly HubDialogueStep[],
+  index: number,
+  state: {
+    albumOpen: boolean
+    routeOpen: boolean
+    albumTab: string
+    selectedDestination: string | null
+  },
+): number {
+  const step = steps[index]
+  if (!step) return index
+  switch (step.awaits) {
+    case 'album':
+      if (state.albumOpen) return index + 1
+      break
+    case 'album-close':
+      if (!state.albumOpen) return index + 1
+      return index
+    case 'tab-stamps':
+      if (state.albumTab === 'stamps') return index + 1
+      break
+    case 'tab-discoveries':
+      if (state.albumTab === 'discoveries') return index + 1
+      break
+    case 'nav':
+      if (state.routeOpen) return index + 1
+      break
+    case 'destination':
+      if (state.selectedDestination) return index + 1
+      break
+    default:
+      break
+  }
+  const opener = (awaits: HubAwait) =>
+    steps.findIndex((entry) => entry.awaits === awaits)
+  if (step.place === 'album' && !state.albumOpen) {
+    const at = opener('album')
+    if (at >= 0) return at
+  }
+  if (step.place === 'nav') {
+    if (!state.routeOpen) {
+      const at = opener('nav')
+      if (at >= 0) return at
+    }
+    const pick = opener('destination')
+    if (!state.selectedDestination && pick >= 0 && index > pick) return pick
+  }
+  return index
+}

@@ -7,7 +7,6 @@ export type ReticleStatus =
   | 'scanning'
   | 'out-of-range'
   | 'blocked'
-  | 'wrong-lens'
   | 'recorded'
   | 'ready'
   | null
@@ -16,7 +15,6 @@ export interface ReticleStatusInput {
   hasTarget: boolean
   physicalState: 'idle' | 'valid' | 'out-of-range' | 'occluded'
   triggerHeld: boolean
-  wrongLens: boolean
   recorded: boolean
 }
 
@@ -26,7 +24,6 @@ export function getReticleStatus(input: ReticleStatusInput): ReticleStatus {
   if (input.physicalState === 'occluded') return 'blocked'
   if (!input.hasTarget) return null
   if (input.recorded) return 'recorded'
-  if (input.wrongLens) return 'wrong-lens'
   if (input.triggerHeld) return 'scanning'
   return 'ready'
 }
@@ -37,7 +34,6 @@ export const RETICLE_STATUS_LABEL: Readonly<
   scanning: 'Scanning…',
   'out-of-range': 'Out of range',
   blocked: 'Blocked',
-  'wrong-lens': 'Wrong lens',
   recorded: 'Recorded',
   ready: 'Hold to scan',
 }

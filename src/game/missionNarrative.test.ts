@@ -6,11 +6,10 @@ import {
   inspectSpirit,
   requestDistractorNote,
   requestMissionHint,
-  requestWrongLensFeedback,
   resetMissionHintLadder,
 } from './missionNarrative'
 
-const SPIRIT = 'spirit'
+const SPIRIT = 'opportunity'
 
 beforeEach(() => {
   useJourneyStore.getState().startJourney('Tester')
@@ -48,109 +47,31 @@ describe('explicit explorer inspection', () => {
   })
 })
 
-describe('scanner lenses and distractors', () => {
-  it('climbs panel → one PIP line → pulse, with a cooldown and no penalty', () => {
-    inspectSpirit()
-    // Attempt 1 is panel-only: PIP stays quiet.
-    expect(
-      requestWrongLensFeedback('spirit-pancam', 'spirit', 1, 10_000),
-    ).toBe(false)
-    expect(useNarrativeStore.getState().current).toBeNull()
-    // Attempt 2: one soft PIP line that never names a lens.
-    expect(
-      requestWrongLensFeedback('spirit-pancam', 'spirit', 2, 10_500),
-    ).toBe(true)
-    const first = useNarrativeStore.getState().current
-    expect(first?.priority).toBe('hint')
-    expect(first?.text).not.toMatch(/visual lens|contact lens|thermal lens/i)
-    // Same kind of hint inside the cooldown: nothing is added.
-    useNarrativeStore.getState().clearDialogue()
-    expect(
-      requestWrongLensFeedback('spirit-pancam', 'spirit', 2, 11_000),
-    ).toBe(false)
-    // Attempt 3+: the lens button pulses instead; PIP does not speak.
-    expect(
-      requestWrongLensFeedback('spirit-pancam', 'spirit', 3, 40_000),
-    ).toBe(false)
-    expect(useNarrativeStore.getState().current).toBeNull()
-    expect(
-      useJourneyStore.getState().save?.missions[SPIRIT].scannedComponentIds,
-    ).toEqual([])
-  })
-
-  it('describes the instrument function on the PIP line', () => {
-    inspectSpirit()
-    expect(
-      requestWrongLensFeedback('spirit-pancam', 'spirit', 2, 20_000),
-    ).toBe(true)
-    expect(useNarrativeStore.getState().current?.text).toMatch(/looking/i)
-  })
-
-  it('never talks over PIP and never repeats the same line back to back', () => {
-    inspectSpirit()
-    useNarrativeStore.getState().enqueue({
-      id: 'other',
-      text: 'Something else.',
-      priority: 'mission',
-    })
-    expect(
-      requestWrongLensFeedback('spirit-pancam', 'spirit', 2, 20_000),
-    ).toBe(false)
-    expect(useNarrativeStore.getState().queue).toHaveLength(0)
-  })
-
-  it('counts wrong-lens presses per component and remembers a lens change', () => {
-    const game = useGameStore.getState()
-    expect(game.registerWrongLensAttempt('spirit-pancam')).toBe(1)
-    expect(game.registerWrongLensAttempt('spirit-pancam')).toBe(2)
-    expect(game.registerWrongLensAttempt('spirit-mini-tes')).toBe(1)
-    expect(useGameStore.getState().lensTouched).toBe(false)
-    game.setScannerLens('contact')
-    expect(useGameStore.getState().lensTouched).toBe(true)
-    useGameStore.setState({ wrongLensAttempts: {}, lensTouched: false })
-    game.setScannerLens('visual')
-  })
-
-  it('orients Ask PIP toward the lens only after discovery and in levels', () => {
-    // Before discovery: no lens cue at all.
+describe('single scan mode and distractors', () => {
+  it('never mentions scanner lenses in Ask PIP, before or after discovery', () => {
     requestMissionHint()
     requestMissionHint()
-    const before = useNarrativeStore.getState()
-    const beforeTexts = [before.current, ...before.queue].map((l) => l?.text)
-    expect(beforeTexts.join(' ')).not.toMatch(/lens|camera|infrared/i)
-
-    useNarrativeStore.getState().reset()
-    useNarrativeStore.getState().markProtocol('calibrated')
-    resetMissionHintLadder()
     inspectSpirit()
-    requestMissionHint() // level 0: no lens cue
-    requestMissionHint() // level 1: function, not the lens name
-    const mid = useNarrativeStore.getState()
-    const midTexts = [mid.current, ...mid.queue]
+    requestMissionHint()
+    requestMissionHint()
+    requestMissionHint()
+    const state = useNarrativeStore.getState()
+    const texts = [state.current, ...state.queue]
       .map((l) => l?.text ?? '')
       .join(' ')
-    expect(midTexts).toMatch(/look|touch|heat/i)
-    expect(midTexts).not.toMatch(/visual lens|contact lens|thermal lens/i)
-
-    useNarrativeStore.getState().reset()
-    requestMissionHint() // level 2: may name the lens
-    const last = useNarrativeStore.getState()
-    const lastTexts = [last.current, ...last.queue]
-      .map((l) => l?.text ?? '')
-      .join(' ')
-    expect(lastTexts).toMatch(/lens/i)
+    expect(texts).not.toMatch(/\blens\b/i)
   })
 
   it('plays a distractor note only after discovery and adds no progress', () => {
-    expect(requestDistractorNote('spirit-wheels', 'spirit', 10_000)).toBe(false)
+    expect(requestDistractorNote('opportunity-wheels', 'opportunity', 10_000)).toBe(false)
     inspectSpirit()
-    expect(requestDistractorNote('spirit-wheels', 'spirit', 10_000)).toBe(true)
+    expect(requestDistractorNote('opportunity-wheels', 'opportunity', 10_000)).toBe(true)
     expect(useNarrativeStore.getState().current?.text).toMatch(/wheels/i)
-    expect(requestDistractorNote('unknown-part', 'spirit', 30_000)).toBe(false)
+    expect(requestDistractorNote('unknown-part', 'opportunity', 30_000)).toBe(false)
     const mission = useJourneyStore.getState().save?.missions[SPIRIT]
     expect(mission?.scannedComponentIds).toEqual([])
     expect(
-      useJourneyStore.getState().scan(SPIRIT, 'spirit-wheels')?.status,
+      useJourneyStore.getState().scan(SPIRIT, 'opportunity-wheels')?.status,
     ).toBe('invalid-component')
   })
 })
@@ -169,7 +90,7 @@ describe('arrival protocol', () => {
     ).toBe(false)
     // One short line points the player back to the protocol, never a name.
     const text = useNarrativeStore.getState().current?.text ?? ''
-    expect(text).toMatch(/calibrate/i)
+    expect(text).toMatch(/practice/i)
     expect(text).not.toMatch(/spirit|rover/i)
   })
 

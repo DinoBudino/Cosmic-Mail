@@ -5,7 +5,7 @@ import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { scannerAim } from './scannerAim'
 import { approachAlpha, computeBeamSegment } from './scannerBeamSegment'
 
-const BEAM_RADIUS = 0.006
+const BEAM_RADIUS = 0.014
 const BEAM_UP = new THREE.Vector3(0, 1, 0)
 const BEAM_START = new THREE.Vector3()
 const BEAM_DIR = new THREE.Vector3()
@@ -13,6 +13,16 @@ const BEAM_CENTER = new THREE.Vector3()
 const BEAM_SCALE = new THREE.Vector3()
 const BEAM_QUAT = new THREE.Quaternion()
 const BEAM_END = { x: 0, y: 0, z: 0 }
+
+/** True while `object` is still part of `scene` (not a removed subtree). */
+function isInScene(object: THREE.Object3D, scene: THREE.Object3D): boolean {
+  let node: THREE.Object3D | null = object
+  while (node) {
+    if (node === scene) return true
+    node = node.parent
+  }
+  return false
+}
 
 interface SharedBeam {
   mesh: THREE.Mesh
@@ -46,7 +56,7 @@ function getSharedBeam(): SharedBeam {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 
   const material = new THREE.MeshBasicMaterial({
-    color: '#E3D9FF',
+    color: '#FFB37A',
     vertexColors: true,
     transparent: true,
     opacity: 0,
@@ -92,8 +102,7 @@ export function ScannerBeam() {
       Boolean(
         store.scannerSelectedComponentId ||
           store.scannerEnvironmentalId ||
-          store.scannerDistractorId ||
-          store.scannerTraceKind,
+          store.scannerDistractorId,
       ) &&
       store.scannerPhysicalState === 'valid' &&
       scannerAim.valid &&
@@ -106,13 +115,20 @@ export function ScannerBeam() {
       : 0.5 + Math.sin(state.clock.elapsedTime * 14) * 0.5
     mesh.visible = alpha.current > 0.01
 
-    const firstPerson = store.scannerCamera === 'first-person'
+    const firstPerson =
+      store.scannerCamera === 'first-person' || store.scanStation
     const name = firstPerson ? 'FP_ScannerEmitter' : 'ScannerEmitter'
     if (emitterName.current !== name) {
       emitterName.current = name
       emitter.current = null
     }
-    if (!emitter.current) emitter.current = scene.getObjectByName(name) ?? null
+    // Putting the scanner away unmounts the device, and taking it out again
+    // builds a new one: a cached emitter from before is detached from the
+    // scene and frozen where the gun used to be (the beam then came "from
+    // somewhere else"). Look it up again whenever it is no longer attached.
+    if (!emitter.current || !isInScene(emitter.current, scene)) {
+      emitter.current = scene.getObjectByName(name) ?? null
+    }
   })
 
   useEffect(() => {

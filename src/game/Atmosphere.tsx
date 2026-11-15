@@ -4,9 +4,7 @@ import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
 import { mulberry32 } from './random'
 import { makeGlowTexture } from './textures'
-import { Starfield } from './Starfield'
 import {
-  MOON_DIRECTION,
   PALETTE,
   QUALITY_PRESETS,
   SUN_DIRECTION,
@@ -20,7 +18,9 @@ interface AtmosphereProps {
 }
 
 // Direction-based gradients avoid UV banding and stay coherent when orbiting.
-// This is an artistic dusk atmosphere, not a physical model of the Martian sky.
+// A stylized daytime Martian sky: dusty butterscotch overhead, pale peach at
+// the horizon, no stars and no big moon (Phobos and Deimos look tiny from the
+// ground). Not a physical model, but faithful to how NASA images show it.
 const SKY_VERTEX = /* glsl */ `
   varying vec3 vDirection;
   void main() {
@@ -54,7 +54,7 @@ const SKY_FRAGMENT = /* glsl */ `
     sky += uWarm * upperWash * pow(sunFacing, 1.5) * 0.045;
     float opposite = max(dot(direction.xz, -normalize(uSun.xz)), 0.0);
     sky = mix(sky, uCool, horizon * pow(opposite, 1.4) * 0.24);
-    // A cool violet wash keeps the anti-sun side from turning uniformly pink.
+    // A soft, deeper dust tone on the side away from the Sun.
     float coolWash = smoothstep(0.7, 0.0, height);
     sky = mix(sky, uCool, coolWash * pow(opposite, 1.3) * 0.1);
     // A pale luminous seam where the terrain meets the sky.
@@ -70,57 +70,6 @@ const SKY_FRAGMENT = /* glsl */ `
   }
 `
 
-
-function makeMoonTexture(): THREE.CanvasTexture | null {
-  const size = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const context = canvas.getContext('2d')
-  if (!context) return null
-
-  const center = size / 2
-  const radius = size / 2 - 4
-  const gradient = context.createRadialGradient(
-    size * 0.36,
-    size * 0.3,
-    2,
-    center,
-    center,
-    radius,
-  )
-  gradient.addColorStop(0, '#FFF4E8')
-  gradient.addColorStop(0.55, '#E8D2C2')
-  gradient.addColorStop(0.86, '#C2A69E')
-  gradient.addColorStop(1, '#8A707E')
-
-  context.beginPath()
-  context.arc(center, center, radius, 0, Math.PI * 2)
-  context.fillStyle = gradient
-  context.fill()
-
-  context.save()
-  context.beginPath()
-  context.arc(center, center, radius, 0, Math.PI * 2)
-  context.clip()
-
-  const random = mulberry32(0x90a)
-  for (let index = 0; index < 11; index += 1) {
-    const craterX = center + (random() - 0.5) * radius * 1.5
-    const craterY = center + (random() - 0.5) * radius * 1.5
-    const craterRadius = 2 + random() * 7
-    context.beginPath()
-    context.arc(craterX, craterY, craterRadius, 0, Math.PI * 2)
-    context.fillStyle = `rgba(92, 58, 96, ${0.08 + random() * 0.14})`
-    context.fill()
-  }
-  context.restore()
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
-}
 
 export function Atmosphere({ quality }: AtmosphereProps) {
   const preset = QUALITY_PRESETS[quality]
@@ -140,7 +89,6 @@ export function Atmosphere({ quality }: AtmosphereProps) {
     uSun: { value: new THREE.Vector3(SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z).normalize() },
   }), [])
   const glowTexture = useMemo(() => makeGlowTexture(), [])
-  const moonTexture = useMemo(() => makeMoonTexture(), [])
   const sunDirection = useMemo(
     () =>
       new THREE.Vector3(
@@ -157,19 +105,6 @@ export function Atmosphere({ quality }: AtmosphereProps) {
   const lightPosition = useMemo(
     () => sunDirection.clone().multiplyScalar(70),
     [sunDirection],
-  )
-  const moonDirection = useMemo(
-    () =>
-      new THREE.Vector3(
-        MOON_DIRECTION.x,
-        MOON_DIRECTION.y,
-        MOON_DIRECTION.z,
-      ).normalize(),
-    [],
-  )
-  const moonPosition = useMemo(
-    () => moonDirection.clone().multiplyScalar(350),
-    [moonDirection],
   )
   // Three parallax layers of drifting dust: fine near motes, mid haze and
   // large far motes. Total points stay at preset.dustCount (cheap).
@@ -198,9 +133,8 @@ export function Atmosphere({ quality }: AtmosphereProps) {
   useEffect(() => {
     return () => {
       glowTexture?.dispose()
-      moonTexture?.dispose()
     }
-  }, [glowTexture, moonTexture])
+  }, [glowTexture])
 
   useEffect(() => {
     return () => dustLayers.forEach((layer) => layer.geometry.dispose())
@@ -249,36 +183,6 @@ export function Atmosphere({ quality }: AtmosphereProps) {
             toneMapped={false}
           />
         </mesh>
-
-        <Starfield count={preset.starCount} reducedMotion={reducedMotion} />
-
-        <sprite
-          position={moonPosition}
-          scale={[36, 36, 1]}
-          renderOrder={-17}
-        >
-          <spriteMaterial
-            map={glowTexture ?? undefined}
-            color={PALETTE.moonGlow}
-            transparent
-            opacity={0.22}
-            depthWrite={false}
-            fog={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
-        </sprite>
-
-        <sprite position={moonPosition} scale={[13, 13, 1]} renderOrder={-16}>
-          <spriteMaterial
-            map={moonTexture ?? undefined}
-            transparent
-            opacity={0.95}
-            depthWrite={false}
-            fog={false}
-            toneMapped={false}
-          />
-        </sprite>
 
         <sprite
           position={sunPosition}

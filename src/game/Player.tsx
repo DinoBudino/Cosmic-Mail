@@ -1,22 +1,23 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { MARS_OBJECTS, REGION_INFO } from '../data/marsObjects'
-import { lensForKey } from '../data/scannerLenses'
-import { SPIRIT_SITE } from '../data/spiritSite'
+import { MARS_WORLD_SITES, REGION_INFO } from '../data/marsObjects'
+import { SCAN_STATION_VIEW, SPIRIT_SITE } from '../data/spiritSite'
 import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
-import { emitAudio, emitFootstep } from './audio/audioEvents'
+import { emitFootstep } from './audio/audioEvents'
 import { AstronautModel } from './AstronautModel'
 import { resolveEnvironmentalCollision } from './environmentCollision'
-import { isFlightUnlocked } from './flight'
 import { resolveBoulderCollision } from './landscape'
 import {
   inspectSpirit,
-  requestFlightRestrictedNotice,
   requestProtocolLine,
 } from './missionNarrative'
-import { SCANNER_LOCKED_LINE, areFreeScansAllowed } from '../data/arrivalProtocol'
+import {
+  SCANNER_LOCKED_LINE,
+  STATION_STAY_LINE,
+  areFreeScansAllowed,
+} from '../data/arrivalProtocol'
 import { getCurrentProtocolStep } from './protocolStep'
 import { useNarrativeStore } from '../store/narrativeStore'
 import { ScannerFirstPersonView } from './ScannerFirstPersonView'
@@ -29,18 +30,21 @@ import {
 } from './cameraRig'
 import {
   consumeInteract,
-  consumeScannerLensKey,
   consumeScannerToggle,
-  isBootHeld,
   isRunHeld,
   readMoveAxes,
   type MoveAxes,
 } from './input'
 import { findNearbyRegion, findNearbySite, getAutoMove, resolveSiteCollision } from './interaction'
-import { stepVertical, type VerticalState } from './marsGravity'
 import { markFirstControl } from './pacing'
 import { playerPosition } from './playerPosition'
 import { findNearbySpirit, resolveSpiritCollision } from './spiritSite'
+import {
+  boardShip,
+  canBoardShip,
+  isNearShip,
+  resolveShipCollision,
+} from './landedShip'
 import {
   getTerrainHeight,
   getTerrainSlope,
@@ -75,7 +79,7 @@ function resolveCameraClearance(
 
 /** Pushes the camera out of the four large Mars models when it gets too close. */
 function resolveObjectClearance(desired: THREE.Vector3): void {
-  for (const object of MARS_OBJECTS) {
+  for (const object of MARS_WORLD_SITES) {
     const objectTop =
       getTerrainHeight(object.position.x, object.position.z) + 4.6
     if (desired.y > objectTop) continue
@@ -95,8 +99,8 @@ function resolveObjectClearance(desired: THREE.Vector3): void {
     desired.z = object.position.z + dz * push
   }
 
-  // Spirit is rendered outside MARS_OBJECTS so the four original sites,
-  // their flatten zones and the painted route stay untouched.
+  // The explorer is rendered outside MARS_WORLD_SITES so its site,
+  // flatten zone and the survey trail stay independent.
   const spiritTop =
     getTerrainHeight(SPIRIT_SITE.position.x, SPIRIT_SITE.position.z) + 3.2
   if (desired.y <= spiritTop) {
@@ -115,6 +119,17 @@ function resolveObjectClearance(desired: THREE.Vector3): void {
   }
 }
 
+/** Where the astronaut stands at the scan station (world x/z). */
+function getScanStationPoint(out: THREE.Vector3): THREE.Vector3 {
+  const { direction, distance } = SCAN_STATION_VIEW
+  const length = Math.hypot(direction.x, direction.z) || 1
+  return out.set(
+    SPIRIT_SITE.position.x + (direction.x / length) * distance,
+    0,
+    SPIRIT_SITE.position.z + (direction.z / length) * distance,
+  )
+}
+
 export function Player() {
   const group = useRef<THREE.Group>(null)
 
@@ -124,14 +139,8 @@ export function Player() {
   const right = useRef(new THREE.Vector2())
   const yaw = useRef(0)
   const motionRef = useRef(0)
-  /** Boot thrust + vertical velocity, read by AstronautModel for glow/pose. */
-  const flightRef = useRef({ thrust: 0, vy: 0, airborne: 0 })
   /** Signed yaw intent, read by AstronautModel for Turn_Left/Turn_Right. */
   const turnRef = useRef(0)
-  const verticalRef = useRef<VerticalState>({ y: 0, vy: 0, grounded: true })
-  const prevBoot = useRef(false)
-  const wasGrounded = useRef(true)
-  const thrusterLoopActive = useRef(false)
   const stepDistance = useRef(0)
   const stepVariant = useRef(0)
   const cameraTarget = useRef(new THREE.Vector3())
@@ -141,14 +150,17 @@ export function Player() {
   const firstPersonDesired = useRef(new THREE.Vector3())
   const firstPersonLook = useRef(new THREE.Vector3())
   const cinematicLook = useRef(new THREE.Vector3())
+  const stationPoint = useRef(new THREE.Vector3())
   const astronautRef = useRef<THREE.Group>(null)
 
   const { camera } = useThree()
   const quality = useGameStore((state) => state.quality)
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
   const scannerCamera = useGameStore((state) => state.scannerCamera)
+  const scanStation = useGameStore((state) => state.scanStation)
+  // The scan station always looks through the visor (the gun in hand).
   const firstPersonScanner =
-    scannerEquipped && scannerCamera === 'first-person'
+    scannerEquipped && (scannerCamera === 'first-person' || scanStation)
 
   const spawn = useMemo(
     () =>
@@ -187,7 +199,6 @@ export function Player() {
     const player = group.current
     if (!player) return
     player.position.copy(spawn)
-    verticalRef.current = { y: spawn.y, vy: 0, grounded: true }
 
     cameraTarget.current.set(
       spawn.x,
@@ -209,12 +220,7 @@ export function Player() {
     if (paused) {
       velocity.current.set(0, 0, 0)
       motionRef.current = 0
-      flightRef.current.thrust = 0
       stepDistance.current = 0
-      if (thrusterLoopActive.current) {
-        thrusterLoopActive.current = false
-        emitAudio('thrusterStopped')
-      }
       return
     }
 
@@ -222,7 +228,10 @@ export function Player() {
 
     if (consumeScannerToggle()) {
       if (store.scannerEquipped) {
-        store.unequipScanner()
+        // At the scan station the scanner stays out until every part is
+        // found: PIP says so, kindly, instead of letting the child wander.
+        if (store.scanStation) requestProtocolLine(STATION_STAY_LINE, 8_000)
+        else store.unequipScanner()
       } else if (store.scannerLocked) {
         requestProtocolLine(SCANNER_LOCKED_LINE)
       } else if (playerPosition.airborne < 0.25) {
@@ -231,17 +240,17 @@ export function Player() {
       store = useGameStore.getState()
     }
 
-    const lensKey = consumeScannerLensKey()
-    if (lensKey && store.scannerEquipped) {
-      const lens = lensForKey(lensKey)
-      if (lens) store.setScannerLens(lens)
-    }
-
     if (consumeInteract()) {
       const spiritProgress =
         useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]
       if (store.nearbySpirit && !spiritProgress?.discovered) {
         inspectSpirit()
+      } else if (
+        store.nearbyShip &&
+        canBoardShip(useJourneyStore.getState().save, SPIRIT_SITE.missionId)
+      ) {
+        boardShip()
+        return
       } else if (!store.scannerEquipped) {
         if (store.nearbySpirit) {
           // E is contextual inspection/review, never a quick scan menu.
@@ -258,27 +267,21 @@ export function Player() {
       store = useGameStore.getState()
     }
 
-    // Equipping the scanner never freezes locomotion: the astronaut walks,
-    // runs and boosts exactly as before while the device stays in hand.
+    // Equipping the scanner never freezes locomotion: the astronaut walks
+    // and runs exactly as before while the device stays in hand.
     readMoveAxes(axes.current)
     getMovementBasis(forward.current, right.current)
-
-    // Jet boots: press edge jumps, hold sustains thrust. Only an assisted
-    // trip disables the boots; the scanner stays compatible with flight.
-    const traveling = Boolean(store.travelTargetId)
-    const missionProgress =
-      useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]
-    // Ground survey rule: flight unlocks after the memory is recovered. It is
-    // a level-design decision, not a broken jetpack, and movement stays free.
-    const flightUnlocked = isFlightUnlocked(missionProgress)
-    const rawBoot = traveling ? false : isBootHeld()
-    const bootHeld = rawBoot && flightUnlocked
-    const jumpPressed = bootHeld && !prevBoot.current
-    if (rawBoot && !flightUnlocked && !prevBoot.current) {
-      requestFlightRestrictedNotice()
+    // Scan station: no walking away from the explorer until the hunt ends.
+    if (store.scanStation) {
+      axes.current.x = 0
+      axes.current.y = 0
+      getScanStationPoint(stationPoint.current)
+      const pull = 1 - Math.exp(-6 * dt)
+      player.position.x += (stationPoint.current.x - player.position.x) * pull
+      player.position.z += (stationPoint.current.z - player.position.z) * pull
     }
-    prevBoot.current = rawBoot
 
+    // On foot only: the astronaut walks and runs on Mars (no jet boots).
     const runHeld = isRunHeld()
     const topSpeed = runHeld
       ? PLAYER.moveSpeed * PLAYER.runSpeedMultiplier
@@ -308,9 +311,7 @@ export function Player() {
 
     const targetX = moveX * speed
     const targetZ = moveZ * speed
-    const groundedNow = verticalRef.current.grounded
-    const accel = groundedNow ? PLAYER.moveAccel : PLAYER.airAccel
-    const blend = 1 - Math.exp(-accel * dt)
+    const blend = 1 - Math.exp(-PLAYER.moveAccel * dt)
     velocity.current.x += (targetX - velocity.current.x) * blend
     velocity.current.z += (targetZ - velocity.current.z) * blend
 
@@ -331,6 +332,7 @@ export function Player() {
 
     resolveSiteCollision(player.position)
     resolveSpiritCollision(player.position)
+    resolveShipCollision(player.position)
     const playerAir = Math.max(
       0,
       player.position.y - getTerrainHeight(player.position.x, player.position.z),
@@ -342,45 +344,19 @@ export function Player() {
     )
     resolveEnvironmentalCollision(player.position, playerAir)
 
-    // Mars gravity: long arcs on takeoff, soft capped falls on landing.
-    const groundY = getTerrainHeight(player.position.x, player.position.z)
-    const vertical = stepVertical(verticalRef.current, groundY, dt, {
-      jumpPressed,
-      bootHeld,
-    })
-    verticalRef.current = vertical
-    player.position.y = vertical.y
-    const heightAboveGround = Math.max(0, vertical.y - groundY)
-    flightRef.current = {
-      thrust: bootHeld && !vertical.grounded ? 1 : 0,
-      vy: vertical.vy,
-      airborne: heightAboveGround,
-    }
+    // Always on foot: the feet follow the terrain.
+    player.position.y = getTerrainHeight(player.position.x, player.position.z)
+    const heightAboveGround = 0
     playerPosition.x = player.position.x
     playerPosition.z = player.position.z
     playerPosition.airborne = heightAboveGround
 
-    // Jet-boot bed + landing. Only real flight edges trigger sound;
-    // holding the key never restarts the loop every frame.
-    const thrusting = bootHeld && !vertical.grounded
-    if (thrusting && !thrusterLoopActive.current) {
-      thrusterLoopActive.current = true
-      emitAudio('thrusterStarted')
-    } else if (!thrusting && thrusterLoopActive.current) {
-      thrusterLoopActive.current = false
-      emitAudio('thrusterStopped')
-    }
-    if (!wasGrounded.current && vertical.grounded) {
-      emitAudio('landing')
-    }
-    wasGrounded.current = vertical.grounded
-
-    // Rings + PIP only count close to the ground, so a high boot flight
-    // over a site never triggers inspection mid-air.
+    // Rings + PIP only count close to the ground.
     if (heightAboveGround <= PLAYER.inspectMaxHeight) {
       const nearSpirit = findNearbySpirit(player.position)
       store.setNearbySpirit(nearSpirit)
       store.setNearbySite(nearSpirit ? null : findNearbySite(player.position))
+      store.setNearbyShip(isNearShip(player.position))
     } else {
       store.setNearbySpirit(false)
       store.setNearbySite(null)
@@ -436,7 +412,7 @@ export function Player() {
     )
 
     // Footsteps follow travelled distance, never frame count.
-    if (vertical.grounded && horizontalSpeed > 0.35) {
+    if (horizontalSpeed > 0.35) {
       stepDistance.current += horizontalSpeed * dt
       const stride = runHeld ? 1.08 : 0.82
       if (stepDistance.current >= stride) {
@@ -470,7 +446,26 @@ export function Player() {
       useGameStore.getState().endCinematic()
     }
 
-    if (store.scannerEquipped && store.scannerCamera === 'first-person') {
+    if (store.scanStation) {
+      // Scan station: a still, framed view of the explorer. Only the
+      // reticle moves (it follows the pointer), so nothing else competes.
+      getScanStationPoint(stationPoint.current)
+      const groundY = getTerrainHeight(stationPoint.current.x, stationPoint.current.z)
+      firstPersonDesired.current.set(
+        stationPoint.current.x,
+        groundY + SCAN_STATION_VIEW.eyeHeight,
+        stationPoint.current.z,
+      )
+      firstPersonLook.current.set(
+        SPIRIT_SITE.position.x,
+        getTerrainHeight(SPIRIT_SITE.position.x, SPIRIT_SITE.position.z) +
+          SCAN_STATION_VIEW.lookHeight,
+        SPIRIT_SITE.position.z,
+      )
+      camera.position.lerp(firstPersonDesired.current, 1 - Math.exp(-3.5 * dt))
+      cameraTarget.current.lerp(firstPersonLook.current, 1 - Math.exp(-5 * dt))
+      camera.lookAt(cameraTarget.current)
+    } else if (store.scannerEquipped && store.scannerCamera === 'first-person') {
       // First person: camera at the visor, forward from the orbit yaw/pitch.
       const orbit = getOrbit()
       const cosPitch = Math.cos(orbit.pitch)
@@ -555,7 +550,8 @@ export function Player() {
 
     if (astronautRef.current) {
       const firstPersonActive =
-        store.scannerEquipped && store.scannerCamera === 'first-person'
+        store.scannerEquipped &&
+        (store.scannerCamera === 'first-person' || store.scanStation)
       const cameraDistance = camera.position.distanceTo(player.position)
       astronautRef.current.visible =
         !firstPersonActive &&
@@ -568,6 +564,7 @@ export function Player() {
       <Companion playerRef={group} motionRef={motionRef} />
       <group
         ref={group}
+        name="Player"
         position={spawn}
         userData={{ scannerIgnore: true }}
       >
@@ -593,7 +590,6 @@ export function Player() {
           <Suspense fallback={null}>
             <AstronautModel
               motionRef={motionRef}
-              flightRef={flightRef}
               turnRef={turnRef}
             />
           </Suspense>

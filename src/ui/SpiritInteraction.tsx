@@ -36,18 +36,15 @@ export function SpiritInteraction() {
 
   return (
     <div className="spirit-interaction" role="status">
-      <p className="spirit-interaction__label">Unidentified explorer</p>
+      <p className="spirit-interaction__label">Something is here!</p>
       <button
         type="button"
         className="spirit-interaction__action"
         onClick={() => inspectSpirit()}
       >
-        <span className="desktop-interact">E — Inspect</span>
-        <span className="touch-interact">Tap to inspect</span>
+        <span className="desktop-interact">E · Take a closer look</span>
+        <span className="touch-interact">Inspect</span>
       </button>
-      <p className="spirit-interaction__hint">
-        Take a close look before using the scanner.
-      </p>
     </div>
   )
 }

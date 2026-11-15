@@ -63,3 +63,45 @@ export function getRadarSnapshot(
     inRange: distance <= range,
   }
 }
+
+export interface MinimapPoint {
+  /** Position inside the unit disc: +x right, -y ahead (screen up). */
+  x: number
+  y: number
+  distance: number
+  inRange: boolean
+}
+
+/**
+ * Heading-up minimap: the map turns with the camera, so "up" is always
+ * where the child is looking. If the target is at the top, walking
+ * forward (W / joystick up) heads straight for it. `cameraYaw` follows
+ * the orbit convention: forward = (-sin yaw, -cos yaw) on XZ.
+ */
+export function getMinimapPoint(
+  player: WorldPosition,
+  target: WorldPosition,
+  cameraYaw: number,
+  range: number = SPIRIT_RADAR_RANGE,
+): MinimapPoint {
+  const dx = target.x - player.x
+  const dz = target.z - player.z
+  const distance = Math.hypot(dx, dz)
+  if (distance < 1e-6 || range <= 0) {
+    return { x: 0, y: 0, distance, inRange: distance <= range }
+  }
+  const sin = Math.sin(cameraYaw)
+  const cos = Math.cos(cameraYaw)
+  // Project on the camera's right (cos, -sin) and forward (-sin, -cos).
+  const right = dx * cos - dz * sin
+  const ahead = -dx * sin - dz * cos
+  // Square-root spacing: nearby targets stay clear of the arrow in the
+  // middle, far ones still glide in smoothly from the rim.
+  const scale = Math.sqrt(Math.min(1, distance / range)) / distance
+  return {
+    x: right * scale,
+    y: -ahead * scale,
+    distance,
+    inRange: distance <= range,
+  }
+}

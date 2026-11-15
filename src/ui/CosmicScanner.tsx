@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { findMission } from '../data/missions'
-import { lensMatchesComponent } from '../data/scannerLenses'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { emitAudio } from '../game/audio/audioEvents'
 import { playerPosition } from '../game/playerPosition'
@@ -13,7 +12,6 @@ import {
   scannedComponentCount,
 } from './missionStage'
 import { PipAvatar } from './PipSpeech'
-import { ScannerLensPicker } from './ScannerLensPicker'
 
 function SpiritSchematic() {
   return (
@@ -187,23 +185,6 @@ export function CosmicScanner() {
       )
       return
     }
-    const alreadyRecorded = Boolean(
-      useJourneyStore.getState().save?.missions[mission.id]?.scannedComponentIds.includes(componentId),
-    )
-    const component = mission.components.find((c) => c.id === componentId)
-    const lens = useGameStore.getState().scannerLens
-    if (
-      !alreadyRecorded &&
-      component &&
-      !lensMatchesComponent(component, lens)
-    ) {
-      // Assisted review still teaches: the right lens is part of recognizing.
-      selectComponent(componentId)
-      setStatus(
-        'This lens finds nothing on that part. Think about what the instrument does, pick another lens above and try again.',
-      )
-      return
-    }
     selectComponent(componentId)
     if (!save) {
       setStatus('Start the journey to record this scan.')
@@ -294,12 +275,10 @@ export function CosmicScanner() {
           <span className="cosmic-scanner__count">{scannedCount}/3</span>
         </div>
 
-        {discovered && <ScannerLensPicker />}
-
         <div className="scanner-stage">
           <div className="scanner-stage__scanline" aria-hidden="true" />
           <div className="scanner-stage__target" aria-hidden="true">
-            {discovered && mission.id === 'spirit' ? (
+            {discovered && (mission.id === 'opportunity' || mission.id === 'spirit') ? (
               <SpiritSchematic />
             ) : (
               <GenericSchematic />
@@ -430,12 +409,7 @@ export function CosmicScanner() {
               type="button"
               className="settings-resume scanner-archive-cta"
               onClick={() =>
-                openArchive(
-                  stage === 'ready_for_full_scan'
-                    ? 'full-scan'
-                    : 'smart-letter',
-                  mission.id,
-                )
+                openArchive('smart-letter', mission.id)
               }
             >
               {archiveCta}

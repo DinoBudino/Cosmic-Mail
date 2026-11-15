@@ -141,6 +141,8 @@ export class AudioManager {
 
   private preferences: AudioPreferences = { ...DEFAULT_AUDIO_PREFERENCES }
   private focusDucked = false
+  /** A story video with its own soundtrack is playing: beds go quiet. */
+  private videoActive = false
   private pageHidden = false
   private unlocked = false
   private disposed = false
@@ -237,6 +239,12 @@ export class AudioManager {
     if (this.focusDucked === active) return
     this.focusDucked = active
     this.applyVolumes(0.35)
+  }
+
+  setVideoActive(active: boolean): void {
+    if (this.videoActive === active) return
+    this.videoActive = active
+    this.applyVolumes(0.6)
   }
 
   setPageHidden(hidden: boolean): void {
@@ -695,7 +703,7 @@ export class AudioManager {
     if (this.musicGain) {
       this.rampNodeGain(
         this.musicGain,
-        busGain(state, 'music'),
+        this.videoActive ? 0 : busGain(state, 'music'),
         fadeSeconds,
         now,
       )
@@ -703,7 +711,7 @@ export class AudioManager {
     if (this.ambienceGain) {
       this.rampNodeGain(
         this.ambienceGain,
-        busGain(state, 'ambience'),
+        this.videoActive ? 0 : busGain(state, 'ambience'),
         fadeSeconds,
         now,
       )

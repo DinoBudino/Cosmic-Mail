@@ -34,7 +34,8 @@ function completeSpirit(store: ReturnType<typeof createJourneyStore>) {
   for (const component of mission.components) {
     expect(state().scan('spirit', component.id)?.status).toBe('scanned')
   }
-  expect(state().completeFullScan('spirit')?.status).toBe('memory-recovered')
+  // The third part recovers the memory on its own: no extra full scan.
+  expect(state().save?.missions.spirit.memoryRecoveredAt).not.toBeNull()
   expect(state().prepareSmartLetter('spirit')?.status).toBe('created')
 }
 
@@ -292,14 +293,9 @@ describe('reload at every intermediate point of the Mars cycle', () => {
     state().scan('spirit', ids[2])
     reload()
     expect(mission().scannedComponentIds).toHaveLength(3)
-    expect(mission().memoryRecoveredAt).toBeNull()
-    // 3/3 never goes straight to a letter or a delivery.
-    expect(state().prepareSmartLetter('spirit')?.status).toBe('locked')
-    expect(state().transmit('spirit')?.status).toBe('letter-missing')
-
-    state().completeFullScan('spirit')
-    reload()
+    // The third part recovers the memory, but never jumps to a delivery.
     expect(mission().fullScanCompletedAt).not.toBeNull()
+    expect(state().transmit('spirit')?.status).toBe('letter-missing')
     expect(mission().memoryRecoveredAt).toBe(mission().fullScanCompletedAt)
     expect(mission().transmittedAt).toBeNull()
 

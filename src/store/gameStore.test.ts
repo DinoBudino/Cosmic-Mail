@@ -333,7 +333,7 @@ describe('site interaction state', () => {
     expect(readMoveAxes({ x: 0, y: 0 })).toEqual({ x: 1, y: 0 })
   })
 
-  it('only changes target and trigger while equipped and resets hold progress', () => {
+  it('only changes target and trigger while equipped and resets hold progress on a new target', () => {
     const state = useGameStore.getState()
     state.setScannerTarget('spirit-pancam')
     state.setScannerTrigger(true)
@@ -355,7 +355,8 @@ describe('site interaction state', () => {
     state.setScannerScanProgress(0.8)
     state.setScannerTrigger(false)
     expect(useGameStore.getState().scannerTriggerHeld).toBe(false)
-    expect(useGameStore.getState().scannerScanProgress).toBe(0)
+    // Letting go early keeps the ring where it was (no penalty).
+    expect(useGameStore.getState().scannerScanProgress).toBe(0.8)
 
     state.setScannerScanProgress(2)
     expect(useGameStore.getState().scannerScanProgress).toBe(1)
@@ -393,33 +394,29 @@ describe('scanner accessibility settings', () => {
   })
 })
 
-describe('scanner lens and distractor state', () => {
+describe('scanner hold and distractor state', () => {
   beforeEach(() => {
     useGameStore.getState().unequipScanner()
-    useGameStore.setState({ scannerLens: 'visual' })
   })
 
-  it('switches lens without unequipping or blocking the scanner', () => {
+  it('keeps scan progress when the trigger is released early', () => {
     const store = useGameStore.getState()
     store.equipScanner('spirit')
-    expect(useGameStore.getState().scannerEquipped).toBe(true)
-
+    store.setScannerTrigger(true)
     useGameStore.setState({ scannerScanProgress: 0.6 })
-    store.setScannerLens('thermal')
-    const next = useGameStore.getState()
-    expect(next.scannerLens).toBe('thermal')
-    expect(next.scannerEquipped).toBe(true)
-    // A lens switch restarts any in-flight hold.
-    expect(next.scannerScanProgress).toBe(0)
+    store.setScannerTrigger(false)
+    expect(useGameStore.getState().scannerScanProgress).toBe(0.6)
   })
 
-  it('keeps the chosen lens when putting the scanner away and back', () => {
+  it('shows one celebration per finished scan and dismisses it', () => {
     const store = useGameStore.getState()
-    store.equipScanner('spirit')
-    store.setScannerLens('contact')
-    store.unequipScanner()
-    store.equipScanner('spirit')
-    expect(useGameStore.getState().scannerLens).toBe('contact')
+    const at = { x: 0, y: 0, z: 0 }
+    store.celebrateScan({ kind: 'practice', title: 'A', detail: 'a', at })
+    store.celebrateScan({ kind: 'practice', title: 'B', detail: 'b', at })
+    expect(useGameStore.getState().scanCelebration?.seq).toBe(2)
+    expect(useGameStore.getState().scanCelebration?.title).toBe('B')
+    store.dismissScanCelebration()
+    expect(useGameStore.getState().scanCelebration).toBeNull()
   })
 
   it('tracks a distractor target exclusively and clears it on component target', () => {
@@ -479,42 +476,13 @@ describe('touch scan latch', () => {
   })
 })
 
-describe('full scan sweep (ephemeral)', () => {
-  beforeEach(() => {
-    useGameStore.getState().resetFullScan()
-    useGameStore.getState().unequipScanner()
-    useGameStore.getState().closeArchive()
-  })
-
-  it('starts sweeping in the world with the scanner equipped', () => {
-    useGameStore.getState().openArchive('full-scan', 'spirit')
-    useGameStore.getState().startFullScanSweep('spirit')
-    const state = useGameStore.getState()
-    expect(state.archiveView).toBe('none')
-    expect(state.fullScanSweepActive).toBe(true)
-    expect(state.scannerEquipped).toBe(true)
-  })
-
-  it('opens the rebuild step only after the fourth trace, once each', () => {
-    const game = useGameStore.getState()
-    game.startFullScanSweep('spirit')
-    expect(game.revealFullScanTrace('identity', 'spirit')).toBe(true)
-    expect(game.revealFullScanTrace('identity', 'spirit')).toBe(false)
-    game.revealFullScanTrace('trajectory', 'spirit')
-    game.revealFullScanTrace('discoveries', 'spirit')
-    expect(useGameStore.getState().archiveView).toBe('none')
-    game.revealFullScanTrace('missionEnd', 'spirit')
-    const state = useGameStore.getState()
-    expect(state.archiveView).toBe('full-scan')
-    expect(state.fullScanSweepActive).toBe(false)
-    expect(state.fullScanRecon.revealed).toHaveLength(4)
-  })
-
-  it('shares progress with the panel and never persists anything', () => {
-    const before = JSON.stringify(localStorage?.length ?? 0)
-    useGameStore.getState().revealFullScanTrace('identity', 'spirit')
-    useGameStore.getState().startFullScanSweep('spirit')
-    expect(useGameStore.getState().fullScanRecon.revealed).toEqual(['identity'])
-    expect(JSON.stringify(localStorage?.length ?? 0)).toBe(before)
+describe('scan station', () => {
+  it('locks the child in place only while active, and is never persisted', () => {
+    const before = localStorage?.length ?? 0
+    useGameStore.getState().setScanStation(true)
+    expect(useGameStore.getState().scanStation).toBe(true)
+    useGameStore.getState().setScanStation(false)
+    expect(useGameStore.getState().scanStation).toBe(false)
+    expect(localStorage?.length ?? 0).toBe(before)
   })
 })

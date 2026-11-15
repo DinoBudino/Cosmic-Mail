@@ -68,7 +68,7 @@ describe('recorded PIP voices', () => {
       const key = audioKeyForLine(text)
       expect(key).not.toBeNull()
       expect(key).toMatch(
-        /^(intro-\d{2}|registration|hub-assignment|hub-tour-\d|hub-return|route-ready|launch-cabin)$/,
+        /^(intro-\d{2}|registration|hub-assignment|hub-tour-\d{1,2}|hub-return|route-ready|launch-cabin)$/,
       )
     }
     expect(new Set(ONBOARDING_VOICE_LINES.map((line) => line.key)).size).toBe(
@@ -106,10 +106,10 @@ describe('recorded PIP voices', () => {
     }
   })
 
-  it('has a recording for every essential Spirit narrative beat', () => {
-    const mission = getMission('spirit')
+  it('has a recording for every essential Mars (Opportunity) narrative beat', () => {
+    const mission = getMission('opportunity')
     const narrative = mission.narrative
-    if (!narrative) throw new Error('Spirit narrative is missing')
+    if (!narrative) throw new Error('Opportunity narrative is missing')
     const texts = [
       narrative.entered,
       narrative.detected,
@@ -117,14 +117,9 @@ describe('recorded PIP voices', () => {
       narrative.identified,
       narrative.scannerPromptDesktop,
       narrative.scannerPromptTouch,
-      narrative.scannerEquipped,
-      narrative.targetDetected,
-      narrative.scanStarted,
-      narrative.scanInterrupted,
-      ...narrative.completed,
-      narrative.fullScanReady,
-      narrative.fullScanStarted,
-      ...narrative.fullScanComplete,
+      narrative.approachedTouch,
+      narrative.completed,
+      narrative.memoryRecovered,
       narrative.letterPrepared,
       narrative.returnToShip,
       narrative.hintOrientation,

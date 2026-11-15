@@ -1,135 +1,206 @@
 [
   {
     "key": "intro-01",
-    "text": "Hi, I'm PIP! Welcome aboard Mailwing!",
-    "speed": 1.06,
-    "category": "onboarding"
+    "text": "Hi there! I'm PIP, and this is Mailwing, our mail ship.",
+    "speed": 1.08,
+    "category": "onboarding",
+    "pitch": 1.07
   },
   {
     "key": "intro-02",
-    "text": "We’re part of Cosmic Mail. We carry important stories across the stars!",
+    "text": "We work for Cosmic Mail. We carry the stories of space explorers all the way home to Earth.",
     "speed": 1.06,
-    "category": "onboarding"
+    "category": "onboarding",
+    "pitch": 1.05
   },
   {
     "key": "intro-03",
-    "text": "Every explorer has a file in the Cosmic Archive. See how their records connect?",
-    "speed": 1.02,
-    "category": "onboarding"
+    "text": "Every explorer has a file in the Cosmic Archive. Look how they're all connected.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
   },
   {
     "key": "intro-04",
-    "text": "Wait... one of the records just lost its connection.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "Oh! That file just lost its connection.",
+    "speed": 1.02,
+    "category": "onboarding",
+    "pitch": 1.06
   },
   {
     "key": "intro-05",
-    "text": "Another one... and now the third!",
-    "speed": 0.98,
-    "category": "onboarding"
+    "text": "And another one, and another. They're all going dark!",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.07
   },
   {
     "key": "intro-06",
-    "text": "Huh? That’s strange...",
+    "text": "Hmm, that's strange. Let me take a closer look.",
     "speed": 0.96,
-    "category": "onboarding"
+    "category": "onboarding",
+    "pitch": 1.04
   },
   {
     "key": "intro-07",
-    "text": "The archive is trying to reconnect them, but the pieces don’t match.",
-    "speed": 0.94,
-    "category": "onboarding"
+    "text": "The Archive is trying to fix them, but the pieces don't fit together.",
+    "speed": 0.98,
+    "category": "onboarding",
+    "pitch": 1.03
   },
   {
     "key": "intro-08",
-    "text": "Wait... these records aren’t connecting anymore!",
+    "text": "Oh no. Now none of the files can connect.",
     "speed": 0.94,
-    "category": "onboarding"
+    "category": "onboarding",
+    "pitch": 1.02
   },
   {
     "key": "intro-09",
-    "text": "I know these explorers... but some of my own records are missing.",
-    "speed": 0.92,
-    "category": "onboarding"
+    "text": "And some of my own memories are missing too.",
+    "speed": 0.9,
+    "category": "onboarding",
+    "pitch": 1.0
   },
   {
     "key": "intro-10",
-    "text": "I can’t remember everything they discovered.",
-    "speed": 0.92,
-    "category": "onboarding"
+    "text": "I know these explorers, but I can't remember what they discovered.",
+    "speed": 0.94,
+    "category": "onboarding",
+    "pitch": 1.02
   },
   {
     "key": "intro-11",
-    "text": "But wait! I still have some old locations!",
-    "speed": 1.04,
-    "category": "onboarding"
+    "text": "Wait, I still remember two places where their signals came from!",
+    "speed": 1.1,
+    "category": "onboarding",
+    "pitch": 1.08
   },
   {
     "key": "intro-12",
-    "text": "Maybe we can find them and put their stories back together!",
-    "speed": 1.05,
-    "category": "onboarding"
+    "text": "If we fly there, we can find the explorers and fix their stories.",
+    "speed": 1.08,
+    "category": "onboarding",
+    "pitch": 1.06
   },
   {
     "key": "intro-13",
-    "text": "Three incomplete files. Three silent signals.",
-    "speed": 1.02,
-    "category": "onboarding"
+    "text": "Lots of files are waiting, and their signals have gone quiet.",
+    "speed": 1.0,
+    "category": "onboarding",
+    "pitch": 1.04
   },
   {
     "key": "intro-14",
-    "text": "Will you help me bring their stories back?",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "So, will you help me bring their stories home?",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.06
   },
   {
     "key": "registration",
-    "text": "Then let's make it official! Every Cosmic Mail Carrier needs a name.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "Let's make your Carrier ID! Type your name on the screen.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.06
   },
   {
     "key": "hub-assignment",
-    "text": "Your passport is ready. Let me show you around the cabin.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "Your Carrier ID is saved in your mission album. Come on, I'll show you the cabin.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.06
   },
   {
     "key": "hub-tour-1",
-    "text": "This is your Cosmic Passport. It keeps every history we bring back to Earth.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "That book on the console is your mission album. Tap it to open it.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
   },
   {
     "key": "hub-tour-2",
-    "text": "The navigation screen shows approximate signals. Mars is the closest one.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "This first page is your Carrier ID. It shows your name and how many stories we've restored.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
   },
   {
     "key": "hub-tour-3",
-    "text": "Pick the signal, confirm the route, then press the red button.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "The Record page shows every explorer story and what we need to do next.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
   },
   {
     "key": "hub-tour-4",
-    "text": "When you find the explorer, use the scanner. I'll help you recognize its parts.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "Now tap Stamps.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.06
+  },
+  {
+    "key": "hub-tour-5",
+    "text": "Every story we deliver to Earth earns a stamp here.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-tour-6",
+    "text": "Now tap Discoveries.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.06
+  },
+  {
+    "key": "hub-tour-7",
+    "text": "Discoveries keeps the facts you find while exploring.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-tour-8",
+    "text": "You can open your album any time. Tap Back to cabin to close it.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-tour-9",
+    "text": "Now tap the navigation screen. It shows where the signals are coming from.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.06
+  },
+  {
+    "key": "hub-tour-10",
+    "text": "These are the places we can fly to. Tap one with a signal.",
+    "speed": 1.04,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-tour-11",
+    "text": "Great choice! Now tap Confirm route to set our course.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.07
   },
   {
     "key": "hub-return",
-    "text": "Welcome back, carrier. The archive is waiting for your next delivery.",
-    "speed": 1,
-    "category": "onboarding"
+    "text": "Welcome back, carrier! The Archive is waiting for our next delivery.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.06
   },
   {
     "key": "route-ready",
-    "text": "Route ready! Press the red button when you're set!",
-    "speed": 1.04,
-    "category": "onboarding"
+    "text": "Route ready! Now press the big red button to take off.",
+    "speed": 1.1,
+    "category": "onboarding",
+    "pitch": 1.08
   },
   {
     "key": "launch-cabin",
@@ -139,308 +210,443 @@
   },
   {
     "key": "mars-arrival",
-    "text": "We're here! The signal is somewhere ahead, so let's take a look.",
+    "text": "We're here, explorer! The signal is somewhere ahead, let's go take a peek!",
     "speed": 1.06,
-    "category": "mars"
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-arrival",
+    "text": "We made it to Mars! You flew like a real space carrier.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-signal",
+    "text": "Listen! My antenna hears a tiny signal, and something out there needs our help.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-radar",
+    "text": "To find it, we have a radar. It shows us where to go next.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-tools",
+    "text": "Before we go, you need to know two tools. Tap the Radar card first.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-radar-detail",
+    "text": "The orange star shows where to go. Turn until it is at the top, then walk straight ahead!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-tools-scanner",
+    "text": "Great job! Now tap the Scanner card.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-scanner-detail",
+    "text": "The scanner looks at things up close. Aim at something that glows and hold to scan.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-briefing-ready",
+    "text": "You're ready, carrier! Let's follow the signal together.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-practice-follow",
+    "text": "Follow the orange star on your radar. It leads to our practice rock!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-practice-start",
+    "text": "Look, a glowing practice rock! Let's try your scanner on it.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-practice-done",
+    "text": "Scan complete, you did it! Now let's follow the star to the signal.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-practice-first",
+    "text": "Let's walk to the practice rock first. Follow the star!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-practice-before-inspect",
+    "text": "Let's practice with the scanner first, then we'll take a closer look.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-detected",
-    "text": "Look, something's over there! Could that be our missing explorer?",
-    "speed": 1.03,
-    "category": "mars"
+    "text": "Whoa, look over there! Could that be our missing explorer?",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-approached",
-    "text": "It looks like an old rover, resting in the dust. Its tools might tell us what it studied.",
-    "speed": 0.99,
-    "category": "mars"
+    "text": "Shh, it's an old rover napping in the dust! Press E to take a closer look.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-approached-touch",
+    "text": "Shh, it's an old rover napping in the dust! Tap Inspect to take a closer look.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-clue-pancam",
+    "text": "Clue one: find the rover's eyes! They're way up at the top of its tall mast.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-clue-rat",
+    "text": "Clue two: find the rock tool! It's on the arm, down low at the front.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-clue-mini-tes",
+    "text": "Last clue: find the heat reader! It peeked out through the mast, just below the eyes.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-identified",
-    "text": "My archive reconnected a record: this is Spirit, a Mars Exploration Rover! It was sent to study rocks and soil for clues about ancient water.",
-    "speed": 1,
-    "category": "mars"
+    "text": "Beep boop, I remember now! This is Opportunity, a rover that hunted for clues about ancient water.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-scanner-prompt-desktop",
-    "text": "Press Q to take out your Cosmic Scanner.",
-    "speed": 1,
-    "category": "mars"
+    "text": "Let's help it remember! Press Q to grab your scanner.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-scanner-prompt-touch",
-    "text": "Tap the scanner button to take out your Cosmic Scanner.",
-    "speed": 1,
-    "category": "mars"
-  },
-  {
-    "key": "mars-scanner-equipped",
-    "text": "Aim at one of the rover's tools and hold the scan button. I'll explain what we find.",
-    "speed": 1.01,
-    "category": "mars"
-  },
-  {
-    "key": "mars-target-detected",
-    "text": "Something on the explorer is responding. Hold the scan to recognize this part.",
-    "speed": 0.99,
-    "category": "mars"
-  },
-  {
-    "key": "mars-scan-started",
-    "text": "Keep holding... the scanner is reading this part.",
-    "speed": 1,
-    "category": "mars"
-  },
-  {
-    "key": "mars-scan-interrupted",
-    "text": "The reading stopped. Hold the scan button a little longer when you're ready.",
-    "speed": 0.96,
-    "category": "mars"
+    "text": "Let's help it remember! Tap the scanner button to grab it.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-pancam",
-    "text": "These are Spirit's panoramic cameras! They helped scientists see the landscape and choose where to explore.",
-    "speed": 1.02,
-    "category": "mars"
+    "text": "Yes, the eyes! Opportunity's cameras took giant pictures, so scientists could pick where to drive.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-rat",
-    "text": "This tool brushed and ground away the rock's outer surface. Scientists could then study the material underneath!",
-    "speed": 1,
-    "category": "mars"
+    "text": "Grind, grind! This tool scraped off a rock's dusty skin, so scientists could study the fresh rock inside.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-mini-tes",
-    "text": "This instrument studied infrared light to help scientists learn what Martian materials were made of!",
-    "speed": 1,
-    "category": "mars"
+    "text": "This one could see invisible heat light! It found minerals that showed water was once here.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-hint-pancam",
-    "text": "Look at the cameras near the top of Spirit!",
-    "speed": 1,
-    "category": "mars"
+    "text": "Psst! Look up high, at the top of the mast!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-hint-rat",
-    "text": "There's an interesting tool near its robotic arm!",
-    "speed": 1,
-    "category": "mars"
+    "text": "Psst! Check the arm, down low at the front!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-hint-mini-tes",
-    "text": "One more instrument is waiting beside the cameras!",
-    "speed": 1,
-    "category": "mars"
+    "text": "Psst! Look at the tall mast, just below the eyes!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-direct-pancam",
-    "text": "The Pancam is still missing. Aim at the cameras at the top of the mast and hold the scan button.",
-    "speed": 1,
-    "category": "mars"
+    "text": "The eyes are still missing! Aim at the top of the mast and hold the scan button.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-direct-rat",
-    "text": "The RAT is still missing. Aim at the tool on the robotic arm and hold the scan button.",
-    "speed": 1,
-    "category": "mars"
+    "text": "The rock tool is still missing! Aim at the arm, down low, and hold the scan button.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-direct-mini-tes",
-    "text": "Mini-TES is still missing. Aim at the instrument beside the cameras and hold the scan button.",
-    "speed": 1,
-    "category": "mars"
+    "text": "The heat reader is still missing! Aim at the mast, below the eyes, and hold the scan button.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-completed-1",
-    "text": "We've found all the clues! Let's scan the whole explorer!",
-    "speed": 1.07,
-    "category": "mars"
-  },
-  {
-    "key": "mars-completed-2",
-    "text": "The archive needs a full recognition scan of the complete explorer before its memory can be recovered.",
-    "speed": 1,
-    "category": "mars"
-  },
-  {
-    "key": "mars-full-scan-ready",
-    "text": "All three parts are recognized. The Cosmic Archive can now study the complete explorer.",
-    "speed": 1,
-    "category": "mars"
-  },
-  {
-    "key": "mars-full-scan-started",
-    "text": "Hold still... I'm linking the three fragments into one record.",
-    "speed": 1,
-    "category": "mars"
-  },
-  {
-    "key": "mars-full-scan-1",
-    "text": "OBJETO COMPLETO — MEMORIA RECUPERADA.",
-    "speed": 0.98,
-    "category": "mars"
-  },
-  {
-    "key": "mars-full-scan-2",
-    "text": "The memory is safe! Now we can create a smart letter and bring this story back to Earth.",
+    "text": "Woohoo, all three parts! Its memory is coming back!",
     "speed": 1.06,
-    "category": "mars"
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-letter-prepared",
-    "text": "The smart letter is ready. It carries Spirit's identity, journey, discoveries and the end of its mission.",
-    "speed": 1.03,
-    "category": "mars"
+    "text": "Sealed! Opportunity's story is ready to fly home.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-return-to-ship",
-    "text": "We did it! Return to Mailwing and transmit the letter to bring this story back to Earth.",
+    "text": "Follow the star back to our ship, explorer! The letter rides with us.",
     "speed": 1.06,
-    "category": "mars"
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-hint-orientation",
-    "text": "Our job is to recognize this explorer's parts, recover its memory and send its story to Earth. The Cosmic Radar points toward the signal.",
-    "speed": 1,
-    "category": "mars"
+    "text": "We're helping this explorer remember its parts. Follow the star on your radar!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-hint-context",
-    "text": "The tools that helped it study the landscape are usually on the mast and the robotic arm. Aim there and hold the scan.",
-    "speed": 1,
-    "category": "mars"
+    "text": "Its tools are on the tall mast and on the arm. Aim there and hold to scan!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-generic-hint",
-    "text": "Use your Cosmic Scanner on the explorer's tools. Look closely at the mast and the robotic arm.",
-    "speed": 1,
-    "category": "mars"
+    "text": "Try your scanner on the mast and the arm, explorer!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-revisit-in-progress",
-    "text": "We still have fragments missing. The explorer is waiting for another scan.",
-    "speed": 1.01,
-    "category": "mars"
+    "text": "Some parts are still missing. The explorer is waiting for us!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-revisit-letter-ready",
-    "text": "The smart letter is ready in the cabin archive. Return to Mailwing to transmit it.",
-    "speed": 1.02,
-    "category": "mars"
+    "text": "The letter is ready! Let's walk back to our ship.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-revisit-transmitted",
-    "text": "This history is restored. The archive on Earth has its copy.",
-    "speed": 1,
-    "category": "mars"
-  },
-  {
-    "key": "mars-hint-full-scan",
-    "text": "Every part is recognized. Open the full recognition scan when you are ready; it studies the complete explorer, not a single part.",
-    "speed": 1,
-    "category": "mars"
+    "text": "This story is safe on Earth now. Great job, explorer!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-hint-letter",
-    "text": "The memory is recovered. Prepare the smart letter and carry it back to Mailwing to transmit it to Earth.",
-    "speed": 1.02,
-    "category": "mars"
+    "text": "Its memory is back! Seal the letter, then let's walk back to our ship.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-hint-restored",
-    "text": "This history is restored. You can review it in the passport at any time.",
-    "speed": 1,
-    "category": "mars"
+    "text": "This story is safe now! You can see it in your mission album anytime.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-ambient-1",
-    "text": "The wind here is very thin. Every dust grain has been waiting a long time.",
-    "speed": 0.96,
-    "category": "mars"
+    "text": "The air here is super thin. Every dust grain has been waiting a looong time!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-ambient-2",
-    "text": "Those rocks look ancient. I wonder what stories they could tell us.",
-    "speed": 1,
-    "category": "mars"
+    "text": "Those rocks look ancient. I bet they have amazing stories!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-completion-story",
-    "text": "We did it! Spirit may be silent now, but what it discovered will never be forgotten.",
-    "speed": 1.04,
-    "category": "mars"
-  },
-  {
-    "key": "mars-env-tutorial-desktop",
-    "text": "The Cosmic Scanner can read the landscape too. Press Q and try it on a rock or a patch of soil.",
-    "speed": 1.02,
-    "category": "mars"
-  },
-  {
-    "key": "mars-env-tutorial-touch",
-    "text": "The Cosmic Scanner can read the landscape too. Tap the scanner button and try it on a rock or a patch of soil.",
-    "speed": 1.02,
-    "category": "mars"
+    "text": "We did it! Opportunity is quiet now, but its discoveries will never be forgotten.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
     "key": "mars-env-first-scan",
-    "text": "The Cosmic Scanner can read the landscape too. Aim at a rock, a soil patch or a formation and hold the scan.",
-    "speed": 1.02,
-    "category": "mars"
+    "text": "The Cosmic Scanner can read the landscape too. Aim at a big rock or a layered outcrop and hold the scan.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-volcanic-quick",
-    "text": "This dark rock looks volcanic. I am comparing its shape and tone with Martian basalt references.",
-    "speed": 1,
-    "category": "mars"
+    "key": "spirit-identified",
+    "text": "Beep boop, I remember now! This is Spirit, a rover that read the rocks for clues about ancient water.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-volcanic-detail",
-    "text": "Volcanic rocks like this can preserve the story of ancient lava. The scanner sees a match in texture, but only a laboratory can confirm the minerals.",
-    "speed": 0.98,
-    "category": "mars"
+    "key": "spirit-pancam",
+    "text": "Yes, the eyes! Spirit's cameras took giant pictures, so scientists could pick where to drive.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-soil-quick",
-    "text": "This looks like fine Martian dust over broken rock. The surface is loose and easy for the wind to move.",
-    "speed": 1,
-    "category": "mars"
+    "key": "mars-memory-recovered",
+    "text": "Its memory is back! Tap Seal the letter to keep its story safe.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-soil-detail",
-    "text": "The scanner sees a mix of dust and grains. Regolith covers much of Mars, and its patterns can hide the rock underneath.",
-    "speed": 0.98,
-    "category": "mars"
+    "key": "spirit-letter-prepared",
+    "text": "Sealed! Spirit's story is ready to fly home.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-wind-quick",
-    "text": "These streaks look shaped by the wind. The scanner is reading the ripple pattern, not the weather.",
-    "speed": 1.01,
-    "category": "mars"
+    "key": "spirit-completion-story",
+    "text": "We did it! Spirit is quiet now, but its discoveries will never be forgotten.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-wind-detail",
-    "text": "Wind moves sand and dust into ripples and long streaks. The scanner compares the pattern with reference dunes. It is an observation, not a measurement of today's wind.",
-    "speed": 0.97,
-    "category": "mars"
+    "key": "mars-station-stay",
+    "text": "Not yet, explorer! Let's find all three parts first, I'll help you!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-outcrop-quick",
-    "text": "This layered outcrop may record ancient changes. The scanner sees stacked layers worth a closer look.",
-    "speed": 1,
-    "category": "mars"
+    "key": "mars-ship-board-desktop",
+    "text": "There's our ship! Press E to climb aboard.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-env-outcrop-detail",
-    "text": "Layered rocks can preserve evidence of past water or changing environments. The scanner compares the visible layers with reference geology; the full story needs more data.",
-    "speed": 0.97,
-    "category": "mars"
+    "key": "mars-ship-board-touch",
+    "text": "There's our ship! Tap Board to climb aboard.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   },
   {
-    "key": "mars-flight-restricted",
-    "text": "Let's keep our boots on the ground for now. I need a clear ground survey before we fly over the site.",
-    "speed": 1,
-    "category": "mars"
+    "key": "orbit-intro",
+    "text": "Look, it's Mars! Two old explorers are hiding down there, tap a glowing spot to pick one!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-meridiani",
+    "text": "That's Meridiani Planum, a wide flat plain. Someone is waiting there!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-gusev",
+    "text": "That's Gusev Crater, a giant bowl in the ground. Someone is waiting there!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-landing",
+    "text": "Hold on tight, we're going down!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-deliver",
+    "text": "We have a letter aboard! Let's send it to Earth first.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-next",
+    "text": "One story saved! Let's visit the other explorer, tap the glowing spot!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-done-site",
+    "text": "We already saved this story! Let's try the other spot.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-all-done",
+    "text": "Both stories are safe! Let's fly home to the cabin, explorer.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
   }
 ]

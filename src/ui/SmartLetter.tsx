@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   TRANSMISSION_DESTINATION,
-  TRANSMISSION_SUCCESS_LINE,
 } from '../data/onboardingNarrative'
 import { findMission } from '../data/missions'
 import { getArchiveCue } from '../data/missionNarrative'
@@ -18,9 +17,11 @@ import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import { useOnboardingStore } from '../store/onboardingStore'
-import { getMissionStage } from './missionStage'
 import { PipAvatar } from './PipSpeech'
 import { PostalDelivery } from './PostalDelivery'
+import { HuntIconGlyph } from './HuntTracker'
+
+type TimelineKey = 'launch' | 'landing' | 'discovery' | 'end'
 
 /**
  * The Proposal A smart letter: a digital capsule with the recovered memory
@@ -96,13 +97,13 @@ function SmartLetter({
   const reducedMotion = useGameStore((state) => state.reducedMotion)
 
   const [message, setMessage] = useState<string | null>(null)
+  const [openStep, setOpenStep] = useState<TimelineKey | null>(null)
   const [delivery, setDelivery] = useState<DeliveryState | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
   const previousFocus = useRef<Element | null>(null)
 
   const progress = save?.missions[mission.id] ?? null
-  const stage = getMissionStage(progress)
   const memoryRecovered = progress?.memoryRecoveredAt != null
   const hasLetter = progress?.smartLetterCreatedAt != null
   const transmitted = progress?.transmittedAt != null
@@ -110,7 +111,10 @@ function SmartLetter({
   // carrier actually stamps the passport, not the moment the data commits.
   const ceremonyRunning = isDeliveryInProgress(delivery)
   const showDelivered = transmitted && !ceremonyRunning
-  const isAboardMailwing = phase === 'hub'
+  const isAboardMailwing = phase === 'hub' || phase === 'orbit'
+  // Last step on Mars: the letter is sealed, so the only thing left on the
+  // tablet is its story (the video). Closing happens from the story.
+  const storyOnly = hasLetter && !transmitted && !isAboardMailwing
   const cue = getArchiveCue(mission, progress)
   const activeCue = archiveLine?.missionId === mission.id ? archiveLine : cue
   const pipLine = activeCue.text
@@ -141,7 +145,7 @@ function SmartLetter({
   }, [pipLine, activeCue.id, voiceName, voiceEnabled])
 
   const handleDialogClick = (event: React.MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) onClose()
+    if (event.target === event.currentTarget && !storyOnly) onClose()
   }
 
   const handlePrepare = () => {
@@ -204,240 +208,214 @@ function SmartLetter({
     openArchive('reconstruction', mission.id)
   }
 
-  const handleReturnToShip = () => {
-    onClose()
-    useOnboardingStore.getState().returnToShip()
-  }
+  const parts = mission.components
+  const timeline = mission.smartLetter.timeline
+  const chips: { key: TimelineKey; label: string; glyph: string; short: string; long: string }[] = [
+    { key: 'launch', label: 'Launch', glyph: '↑', short: timeline?.launch ?? 'Launch', long: mission.smartLetter.trajectory },
+    { key: 'landing', label: 'Landing', glyph: '◎', short: timeline?.landing ?? 'Landing', long: mission.smartLetter.identity },
+    { key: 'discovery', label: 'Discovery', glyph: '✦', short: timeline?.discovery ?? 'Discoveries', long: mission.smartLetter.discoveries },
+    { key: 'end', label: 'Mission end', glyph: '☾', short: timeline?.end ?? 'Mission end', long: mission.smartLetter.missionEnd },
+  ]
+  const openChip = chips.find((chip) => chip.key === openStep) ?? null
+  const status = showDelivered
+    ? 'Delivered'
+    : hasLetter
+      ? 'Letter sealed'
+      : memoryRecovered
+        ? 'Memory back'
+        : `${recovered.size}/3 parts`
 
   return (
     <dialog
       ref={dialogRef}
       className="smart-letter-dialog"
       aria-labelledby="smart-letter-title"
-      aria-describedby="smart-letter-summary"
       onCancel={(event) => {
         event.preventDefault()
         onClose()
       }}
       onClick={handleDialogClick}
     >
-      <article className="smart-letter">
-        <header className="smart-letter__header">
-          <div className="smart-letter__heading">
-            <p className="smart-letter__eyebrow">
-              Cosmic Archive · Smart letter
-            </p>
-            <h2 id="smart-letter-title">
-              {progress?.discovered ? mission.machineName : 'Unidentified explorer'}
-            </h2>
-            <p id="smart-letter-summary" className="smart-letter__meta">
-              {mission.missionName} · {mission.yearLabel}
-            </p>
+      <article className="archive-tablet" data-state={showDelivered ? 'delivered' : hasLetter ? 'sealed' : memoryRecovered ? 'recovered' : 'locked'}>
+        <span className="archive-tablet__camera" aria-hidden="true" />
+        <div className="archive-tablet__screen">
+          <header className="archive-tablet__bar">
+            <span className="archive-tablet__app">
+              <span aria-hidden="true">✦</span> Cosmic Archive
+            </span>
+            <span className="archive-tablet__status">{status}</span>
+            {!storyOnly && (
+              <button
+                type="button"
+                className="archive-tablet__close"
+                aria-label="Close the archive tablet"
+                onClick={onClose}
+              >
+                ×
+              </button>
+            )}
+          </header>
+
+          <div className="archive-tablet__hero">
+            <div className="archive-tablet__badge" aria-hidden={!showDelivered}>
+              {showDelivered ? (
+                <Stamp
+                  label={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
+                  transmitted
+                  animate={false}
+                />
+              ) : (
+                <span className="archive-tablet__badge-glyph">
+                  {progress?.discovered ? '✉' : '?'}
+                </span>
+              )}
+            </div>
+            <div>
+              <h2 id="smart-letter-title">
+                {progress?.discovered ? mission.machineName : 'Unknown explorer'}
+              </h2>
+              <p className="archive-tablet__meta">
+                {progress?.discovered ? mission.yearLabel : 'Find it to learn its story'}
+              </p>
+            </div>
           </div>
-          <div className="smart-letter__stamp-slot">
-            <Stamp
-              label={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
-              transmitted={showDelivered}
-              animate={false}
-            />
-          </div>
-          <button
-            type="button"
-            className="settings-close smart-letter__close-x"
-            aria-label="Close smart letter"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </header>
 
-        <div className="smart-letter__postal">
-          <span>To: {TRANSMISSION_DESTINATION}</span>
-          <span className="smart-letter__postmark" aria-hidden="true">
-            ✦
-          </span>
-          <span>{showDelivered ? 'Delivered' : 'Awaiting transmission'}</span>
-        </div>
-
-        <p className="smart-letter__summary">{mission.summary}</p>
-
-        <section
-          className="smart-letter__records"
-          aria-labelledby="smart-letter-records-title"
-        >
-          <h3 id="smart-letter-records-title">
-            Recognized fragments · {recovered.size}/3
-          </h3>
-          <ul>
-            {mission.components.map((component) => {
-              const isRecovered = recovered.has(component.id)
+          <ul className="archive-tablet__parts" aria-label={`Parts found: ${recovered.size} of 3`}>
+            {parts.map((component) => {
+              const found = recovered.has(component.id)
               return (
-                <li
-                  key={component.id}
-                  className={`smart-letter__record${
-                    isRecovered ? ' is-recovered' : ''
-                  }`}
-                >
-                  <span
-                    className="smart-letter__record-mark"
-                    aria-hidden="true"
-                  >
-                    {isRecovered ? '✓' : '·'}
+                <li key={component.id} className="archive-tablet__part" data-found={found}>
+                  <span className="archive-tablet__part-icon">
+                    {found && component.huntClue ? (
+                      <HuntIconGlyph name={component.huntClue.icon} />
+                    ) : (
+                      <span aria-hidden="true">{found ? '✓' : '?'}</span>
+                    )}
                   </span>
-                  <span className="smart-letter__record-copy">
-                    <strong>{component.shortName}</strong>
-                    <small>{component.pipLine}</small>
-                  </span>
+                  <strong>{found ? (component.huntClue?.label ?? component.shortName) : '???'}</strong>
+                  {found && component.howItWorks && (
+                    <small>{component.howItWorks.verb}</small>
+                  )}
                 </li>
               )
             })}
           </ul>
-        </section>
 
-        <div
-          className={`smart-letter__pip${
-            transmitted ? ' is-success' : ''
-          }`}
-        >
-          <PipAvatar />
-          <div>
-            <p className="pip-name">PIP</p>
-            <p className="smart-letter__pip-line">{pipLine}</p>
+          {hasLetter && (
+            <section className="archive-tablet__story" aria-label="Its story">
+              <ol className="archive-tablet__timeline">
+                {chips.map((chip) => (
+                  <li key={chip.key}>
+                    <button
+                      type="button"
+                      className="archive-tablet__chip"
+                      aria-expanded={openStep === chip.key}
+                      onClick={() =>
+                        setOpenStep((current) => (current === chip.key ? null : chip.key))
+                      }
+                    >
+                      <span className="archive-tablet__chip-glyph" aria-hidden="true">
+                        {chip.glyph}
+                      </span>
+                      <span className="archive-tablet__chip-label">{chip.label}</span>
+                      <span className="archive-tablet__chip-short">{chip.short}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              {openChip ? (
+                <p className="archive-tablet__detail" role="status">{openChip.long}</p>
+              ) : (
+                <p className="archive-tablet__detail archive-tablet__detail--hint">Tap a step to read more.</p>
+              )}
+            </section>
+          )}
+
+          <div className={`archive-tablet__pip${transmitted ? ' is-success' : ''}`}>
+            <PipAvatar />
+            <p className="archive-tablet__pip-line">{pipLine}</p>
           </div>
-        </div>
 
-        {!memoryRecovered ? (
-          <div className="smart-letter__locked" role="status">
-            <p>This smart letter is still locked.</p>
-            <p>
-              Recognize all three fragments and complete the full recognition
-              scan before the Archive can recover the memory.
+          {progress?.legacySealAt != null && hasLetter && (
+            <p className="archive-tablet__legacy">
+              Older record kept as history.
             </p>
-            <p className="smart-letter__locked-count">
-              {recovered.size}/3 fragments recognized
-            </p>
-            {stage === 'ready_for_full_scan' && (
-              <button
-                type="button"
-                className="archive-action archive-action--primary"
-                onClick={() => openArchive('full-scan', mission.id)}
-              >
-                Open full recognition scan
-              </button>
-            )}
-          </div>
-        ) : !hasLetter ? (
-          <div className="smart-letter__locked" role="status">
-            <p>Memory recovered.</p>
-            <p>
-              The Archive can now prepare the smart letter with the identity,
-              trajectory, discoveries and mission end.
-            </p>
-            <button
-              ref={primaryRef}
-              type="button"
-              className="archive-action archive-action--primary"
-              onClick={handlePrepare}
-            >
-              Prepare smart letter
-            </button>
-          </div>
-        ) : (
-          <>
-            <dl className="smart-letter__sections">
-              <div className="smart-letter__section">
-                <dt>Identity</dt>
-                <dd>{mission.smartLetter.identity}</dd>
-              </div>
-              <div className="smart-letter__section">
-                <dt>Trajectory</dt>
-                <dd>{mission.smartLetter.trajectory}</dd>
-              </div>
-              <div className="smart-letter__section">
-                <dt>Discoveries</dt>
-                <dd>{mission.smartLetter.discoveries}</dd>
-              </div>
-              <div className="smart-letter__section">
-                <dt>End of mission</dt>
-                <dd>{mission.smartLetter.missionEnd}</dd>
-              </div>
-            </dl>
+          )}
 
-            {progress?.legacySealAt != null && (
-              <p className="smart-letter__legacy">
-                Legacy record: this carrier sealed an older version of this
-                story before the Archive fault. It is kept as history, not as
-                an Archive delivery.
-              </p>
-            )}
-
-            <p className="smart-letter__status" role="status">
-              {showDelivered
-                ? TRANSMISSION_SUCCESS_LINE
-                : ceremonyRunning
-                  ? 'Delivery in progress.'
-                  : 'Smart letter prepared. It must be transmitted from Mailwing to the Earth Cosmic Archive.'}
-            </p>
-
-            <div className="archive-actions">
+          <div className="archive-tablet__actions">
+            {memoryRecovered && !hasLetter && (
               <button
                 ref={primaryRef}
                 type="button"
-                className="archive-action"
+                className="archive-tablet__action archive-tablet__action--primary archive-tablet__action--seal"
+                onClick={handlePrepare}
+              >
+                <span aria-hidden="true">✉</span> Seal the letter
+              </button>
+            )}
+            {hasLetter && !transmitted && isAboardMailwing && !delivery && (
+              <button
+                ref={primaryRef}
+                type="button"
+                className="archive-tablet__action archive-tablet__action--primary"
+                onClick={handleBeginDelivery}
+              >
+                Send to Earth
+              </button>
+            )}
+            {hasLetter && (
+              <button
+                ref={storyOnly || transmitted || ceremonyRunning ? primaryRef : undefined}
+                type="button"
+                className={`archive-tablet__action${storyOnly ? ' archive-tablet__action--primary' : ''}`}
                 onClick={handleReconstruction}
               >
-                {progress?.reconstructionWatchedAt != null
-                  ? 'Replay historical reconstruction'
-                  : 'View historical reconstruction'}
+                {progress?.reconstructionWatchedAt != null ? 'Replay its story' : 'Watch its story'}
               </button>
-              {!transmitted && isAboardMailwing && !delivery && (
-                <button
-                  type="button"
-                  className="archive-action archive-action--primary"
-                  onClick={handleBeginDelivery}
-                >
-                  Prepare delivery to {TRANSMISSION_DESTINATION}
-                </button>
-              )}
-              {!transmitted && !isAboardMailwing && (
-                <button
-                  type="button"
-                  className="archive-action archive-action--primary"
-                  onClick={handleReturnToShip}
-                >
-                  Carry it to Mailwing
-                </button>
-              )}
-            </div>
-
-            {delivery && (
-              <PostalDelivery
-                delivery={delivery}
-                stampLabel={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
-                reducedMotion={reducedMotion}
-                onAdvance={handleAdvance}
-                onSend={handleSend}
-              />
             )}
-          </>
-        )}
+            {(!hasLetter || transmitted) && !(memoryRecovered && !hasLetter) && (
+              <button
+                ref={primaryRef}
+                type="button"
+                className="archive-tablet__action"
+                onClick={onClose}
+              >
+                {isAboardMailwing ? 'Close' : 'Keep exploring'}
+              </button>
+            )}
+          </div>
 
-        {message && (
-          <p className="smart-letter__message" role="status">
-            {message}
-          </p>
-        )}
+          {delivery && (
+            <PostalDelivery
+              delivery={delivery}
+              stampLabel={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
+              reducedMotion={reducedMotion}
+              onAdvance={handleAdvance}
+              onSend={handleSend}
+            />
+          )}
 
-        <footer className="smart-letter__footer">
-          <span className="smart-letter__barcode" aria-hidden="true" />
-          <button
-            type="button"
-            className="smart-letter__return"
-            onClick={onClose}
-          >
-            {phase === 'hub' ? 'Back to cabin' : 'Return to exploring'}
-          </button>
-        </footer>
+          {message && (
+            <p className="archive-tablet__message" role="status">
+              {message}
+            </p>
+          )}
+
+          {progress?.discovered && (
+            <details className="archive-tablet__sources">
+              <summary>NASA sources</summary>
+              <ul>
+                {mission.sources.map((source) => (
+                  <li key={source.url}>
+                    <a href={source.url} target="_blank" rel="noreferrer">
+                      {source.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
       </article>
     </dialog>
   )

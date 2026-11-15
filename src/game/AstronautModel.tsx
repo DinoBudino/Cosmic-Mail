@@ -8,19 +8,26 @@ import {
   type RefObject,
 } from 'react'
 import * as THREE from 'three'
-import { MARS_OBJECTS } from '../data/marsObjects'
+import { MARS_WORLD_SITES } from '../data/marsObjects'
 import { useGameStore } from '../store/gameStore'
 import { getOrbit } from './cameraRig'
 import { clampAimDirection, scannerAim } from './scannerAim'
 import { CosmicScannerDevice } from './CosmicScannerDevice'
-import { SCANNER } from './worldConfig'
+import { PLAYER, SCANNER } from './worldConfig'
 
-const MODEL_URL = 'models/astronaut.glb?v=astronaut-mensajero-3'
+const MODEL_URL = 'models/astronaut-v2.glb?v=astronaut-v2-gait-1'
 
 useGLTF.preload(MODEL_URL)
 
+/** Right-arm bones of the V2 rig (blender/AstronautV2, 18_export_web.py). */
+const ARM_BONES = {
+  upper: 'UPPER_ARM_R',
+  fore: 'FOREARM_R',
+  hand: 'HAND_R',
+} as const
+
 /**
- * Hand_R local axes:
+ * Hand bone local axes (while the scanner is held):
  * +Y is forward along the hand, +Z is up.
  * The scanner model is authored with +Z forward and +Y up, so this basis
  * maps scanner forward to hand +Y, scanner up to hand +Z, and flips the
@@ -48,65 +55,43 @@ const AIM_SHOULDER = new THREE.Vector3()
 const AIM_TARGET = new THREE.Vector3()
 const IDENTITY_QUATERNION = new THREE.Quaternion()
 
-interface FlightState {
-  thrust: number
-  vy: number
-  airborne: number
-}
-
 interface AstronautModelProps {
   motionRef: RefObject<number>
-  flightRef: RefObject<FlightState>
   turnRef: RefObject<number>
 }
 
-type FlightPhase = 'ground' | 'takeoff' | 'jump' | 'flying' | 'landing'
-
-interface BootEffect {
-  group: THREE.Group
-  flame: THREE.Mesh
-  glow: THREE.Mesh
-}
+/** Ground speed (m/s) at which each authored cycle's feet keep up best. */
+const WALK_REF_SPEED = 4.6
+const RUN_REF_SPEED = 6.6
 
 /**
- * Loads the Blender-authored astronaut and drives its authored clips.
- * Movement, camera, collision, gravity and boot physics remain in Player.tsx.
+ * Loads the Blender-authored astronaut (V2, one skinned mesh) and drives
+ * its clips. Movement, camera, collision and ground following stay in
+ * Player.tsx; the astronaut is always on foot (no jet boots).
  *
  * The GLB is authored facing Blender -Y, which becomes +Z after glTF Y-up
  * conversion. The controller expects -Z, so the imported scene sits inside a
  * documented 180 degree Y wrapper.
  *
- * Animation selection is a presentation layer over the existing controller:
- * - ground: Idle / Walk / Run
- * - Takeoff -> Flying -> Landing for the existing jet-boot flight
- * - existing site/region/turn events trigger Interact/PickUp/Celebrate/Turn
- * - a long idle triggers Wave
- * Jump remains available as the authored ballistic-jump clip.
- *
- * Thruster flames are runtime-only children of ThrusterSocket_L/R; the GLB
- * contains the integrated nozzles, emissive cores and the sockets themselves.
+ * Animation selection is a presentation layer over the controller:
+ * - Idle / Walk / Run. Walk and Run are authored cycles (blender/AstronautV2/
+ *   scripts/gait.py): a springy Mars lope with knee bend, heel-toe roll,
+ *   hip bob and twist, and arm swing. Their playback speed follows the real
+ *   ground speed so the feet slide as little as possible;
+ * - site/region/turn events trigger Interact/PickUp/Celebrate/Turn;
+ * - no ambient Wave on Mars: standing still stays in a calm Idle.
  */
 export function AstronautModel({
   motionRef,
-  flightRef,
   turnRef,
 }: AstronautModelProps) {
   const modelRef = useRef<THREE.Group>(null)
-  const effectsRef = useRef<{ L: BootEffect | null; R: BootEffect | null }>({
-    L: null,
-    R: null,
-  })
   const currentAction = useRef('')
-  const flightPhase = useRef<FlightPhase>('ground')
-  const phaseStart = useRef(0)
   const gesture = useRef<string | null>(null)
   const gestureStart = useRef(0)
-  const wasAirborne = useRef(false)
   const pendingCelebrate = useRef(false)
   const previousSite = useRef<string | null>(null)
   const previousVisitedCount = useRef(0)
-  const idleSince = useRef(0)
-  const lastWave = useRef(-100)
   const lastTurn = useRef(-100)
   const equipWeight = useRef(0)
   const scannerMount = useRef<THREE.Group>(null)
@@ -118,9 +103,9 @@ export function AstronautModel({
   const actionsRef = useRef(actions)
 
   const rig = useMemo(() => {
-    const upperArm = scene.getObjectByName('UpperArm_R')
-    const forearm = scene.getObjectByName('Forearm_R')
-    const handBone = scene.getObjectByName('Hand_R')
+    const upperArm = scene.getObjectByName(ARM_BONES.upper)
+    const forearm = scene.getObjectByName(ARM_BONES.fore)
+    const handBone = scene.getObjectByName(ARM_BONES.hand)
     return {
       hand: handBone ?? null,
       upperArm: upperArm instanceof THREE.Bone ? upperArm : null,
@@ -139,68 +124,6 @@ export function AstronautModel({
         object.receiveShadow = true
       }
     })
-  }, [scene])
-
-  // Runtime-only exhaust effects attached to the exported socket bones.
-  useEffect(() => {
-    const leftSocket = scene.getObjectByName('ThrusterSocket_L')
-    const rightSocket = scene.getObjectByName('ThrusterSocket_R')
-    if (!leftSocket || !rightSocket) {
-      console.warn('Astronaut thruster sockets are missing from the GLB')
-      return
-    }
-
-    const flameGeometry = new THREE.ConeGeometry(0.045, 0.28, 12)
-    flameGeometry.rotateX(-Math.PI / 2)
-    flameGeometry.translate(0, 0, -0.14)
-    const glowGeometry = new THREE.SphereGeometry(0.021, 10, 8)
-
-    const createEffect = (socket: THREE.Object3D): BootEffect => {
-      const group = new THREE.Group()
-      group.position.set(0, 0, -0.004)
-      const glow = new THREE.Mesh(
-        glowGeometry,
-        new THREE.MeshBasicMaterial({
-          color: '#FFBA70',
-          toneMapped: false,
-          transparent: true,
-          opacity: 0.92,
-          depthWrite: false,
-        }),
-      )
-      glow.position.set(0, 0, -0.006)
-      glow.visible = false
-      const flame = new THREE.Mesh(
-        flameGeometry,
-        new THREE.MeshBasicMaterial({
-          color: '#FFBA70',
-          toneMapped: false,
-          transparent: true,
-          opacity: 0.75,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        }),
-      )
-      flame.visible = false
-      group.add(glow, flame)
-      socket.add(group)
-      return { group, flame, glow }
-    }
-
-    const left = createEffect(leftSocket)
-    const right = createEffect(rightSocket)
-    effectsRef.current = { L: left, R: right }
-
-    return () => {
-      for (const effect of [left, right]) {
-        effect.group.removeFromParent()
-        ;(effect.flame.material as THREE.Material).dispose()
-        ;(effect.glow.material as THREE.Material).dispose()
-      }
-      flameGeometry.dispose()
-      glowGeometry.dispose()
-      effectsRef.current = { L: null, R: null }
-    }
   }, [scene])
 
   const playClip = useCallback(
@@ -244,15 +167,10 @@ export function AstronautModel({
 
   useFrame((state, delta) => {
     const motion = motionRef.current
-    const flight = flightRef.current
     const turn = turnRef.current
     const actionSet = actionsRef.current
     const now = state.clock.elapsedTime
     const store = useGameStore.getState()
-    const reducedMotion = store.reducedMotion
-    const airborne = flight.airborne > 0.08
-    const thrust = airborne && flight.thrust > 0 ? 1 : 0
-    const grounded = !airborne
 
     const duration = (name: string) =>
       actionSet[name]?.getClip().duration ?? 0
@@ -260,13 +178,8 @@ export function AstronautModel({
     // Existing site interaction: Interact for inspectable artifacts, PickUp
     // for places still under construction.
     const siteId = store.activeSiteId
-    if (
-      siteId &&
-      siteId !== previousSite.current &&
-      grounded &&
-      flightPhase.current === 'ground'
-    ) {
-      const site = MARS_OBJECTS.find((item) => item.id === siteId)
+    if (siteId && siteId !== previousSite.current) {
+      const site = MARS_WORLD_SITES.find((item) => item.id === siteId)
       startGesture(
         site?.state === 'coming-soon' ? 'PickUp' : 'Interact',
         now,
@@ -282,156 +195,57 @@ export function AstronautModel({
       previousVisitedCount.current = visitedCount
     }
 
-    // Idle timer used by the ambient wave.
-    if (!grounded || motion > 0.05 || gesture.current) {
-      idleSince.current = now
+    if (gesture.current) {
+      const gestureDuration = duration(gesture.current)
+      const finished = now - gestureStart.current >= gestureDuration + 0.02
+      const movingCancel =
+        gesture.current !== 'Turn_Left' &&
+        gesture.current !== 'Turn_Right' &&
+        motion > 0.12
+      if (finished || movingCancel) gesture.current = null
     }
 
-    if (airborne) {
-      gesture.current = null
-      if (!wasAirborne.current) {
-        if (thrust) {
-          flightPhase.current = 'takeoff'
-          phaseStart.current = now
-          playClip('Takeoff', 'once', 0.12)
-        } else {
-          flightPhase.current = 'jump'
-          phaseStart.current = now
-          playClip('Jump', 'once', 0.12)
-        }
-      } else if (flightPhase.current === 'takeoff') {
-        if (now - phaseStart.current >= duration('Takeoff') - 0.02) {
-          flightPhase.current = 'flying'
-          phaseStart.current = now
-          playClip('Flying', 'loop', 0.18)
-        }
-      } else if (flightPhase.current === 'jump') {
-        if (
-          now - phaseStart.current >= duration('Jump') - 0.02 ||
-          thrust
-        ) {
-          flightPhase.current = 'flying'
-          phaseStart.current = now
-          playClip('Flying', 'loop', 0.18)
-        }
-      } else {
-        flightPhase.current = 'flying'
-        playClip('Flying', 'loop', 0.18)
-      }
-      wasAirborne.current = true
-    } else {
-      if (wasAirborne.current) {
-        flightPhase.current = 'landing'
-        phaseStart.current = now
-        gesture.current = null
-        playClip('Landing', 'once', 0.12)
-      } else if (flightPhase.current === 'landing') {
-        if (now - phaseStart.current >= duration('Landing') - 0.02) {
-          flightPhase.current = 'ground'
-        }
-      } else {
-        flightPhase.current = 'ground'
-      }
-
-      if (flightPhase.current === 'ground') {
-        if (gesture.current) {
-          const gestureDuration = duration(gesture.current)
-          const finished = now - gestureStart.current >= gestureDuration + 0.02
-          const movingCancel =
-            gesture.current !== 'Turn_Left' &&
-            gesture.current !== 'Turn_Right' &&
-            motion > 0.12
-          if (finished || movingCancel) gesture.current = null
-        }
-
-        if (
-          !gesture.current &&
-          !store.scannerEquipped &&
-          pendingCelebrate.current &&
-          motion < 0.08
-        ) {
-          pendingCelebrate.current = false
-          startGesture('Celebrate', now, true)
-        }
-
-        if (
-          !gesture.current &&
-          !reducedMotion &&
-          !store.settingsOpen &&
-          !store.activeSiteId &&
-          !store.scannerEquipped &&
-          motion < 0.04 &&
-          now - idleSince.current > 7 &&
-          now - lastWave.current > 15
-        ) {
-          lastWave.current = now
-          startGesture('Wave', now, true)
-        }
-
-        if (
-          !gesture.current &&
-          !store.scannerEquipped &&
-          motion > 0.15 &&
-          Math.abs(turn) > 0.1 &&
-          now - lastTurn.current > 0.9
-        ) {
-          lastTurn.current = now
-          startGesture(turn > 0 ? 'Turn_Left' : 'Turn_Right', now, true)
-        }
-
-        if (!gesture.current && flightPhase.current === 'ground') {
-          const desired =
-            motion > 0.92 ? 'Run' : motion > 0.08 ? 'Walk' : 'Idle'
-          playClip(desired, 'loop', 0.18)
-          if (desired === 'Walk' || desired === 'Run') {
-            const action = actionSet[desired]
-            if (action) {
-              action.setEffectiveTimeScale(
-                0.85 + Math.min(motion, 1) * 0.35,
-              )
-            }
-          }
-        }
-      }
-      wasAirborne.current = false
+    if (
+      !gesture.current &&
+      !store.scannerEquipped &&
+      pendingCelebrate.current &&
+      motion < 0.08
+    ) {
+      pendingCelebrate.current = false
+      startGesture('Celebrate', now, true)
     }
 
-    // Runtime exhaust follows the sockets and is visible only under thrust.
-    const flicker = reducedMotion ? 1 : 1 + Math.sin(now * 23) * 0.18
-    const flameScale =
-      thrust * (0.9 + flight.airborne * 0.15) * flicker
-    for (const effect of [effectsRef.current.L, effectsRef.current.R]) {
-      if (!effect) continue
-      effect.flame.visible = thrust > 0
-      effect.glow.visible = thrust > 0
-      effect.flame.scale.set(
-        1 + thrust * 0.4,
-        1 + thrust * 0.4,
-        Math.max(0.001, flameScale),
-      )
-      effect.glow.scale.setScalar(1 + thrust * 0.25)
+    if (
+      !gesture.current &&
+      !store.scannerEquipped &&
+      motion > 0.15 &&
+      Math.abs(turn) > 0.1 &&
+      now - lastTurn.current > 0.9
+    ) {
+      lastTurn.current = now
+      startGesture(turn > 0 ? 'Turn_Left' : 'Turn_Right', now, true)
     }
 
-    // Existing procedural air lean, kept independent of the authored clips.
-    if (modelRef.current) {
-      const lean = reducedMotion
-        ? 0
-        : airborne
-          ? -0.1 -
-            thrust * 0.22 +
-            THREE.MathUtils.clamp(flight.vy * 0.02, -0.06, 0.08)
-          : 0
-      modelRef.current.rotation.x = THREE.MathUtils.damp(
-        modelRef.current.rotation.x,
-        lean,
-        6,
-        Math.min(delta, 0.05),
-      )
+    if (!gesture.current) {
+      const desired = motion > 0.86 ? 'Run' : motion > 0.06 ? 'Walk' : 'Idle'
+      playClip(desired, 'loop', desired === 'Idle' ? 0.25 : 0.2)
+      if (desired === 'Walk' || desired === 'Run') {
+        const action = actionSet[desired]
+        if (action) {
+          // Cadence follows the real ground speed (motion is speed / top run
+          // speed), clamped so a slow start never looks like slow motion.
+          const speed = motion * PLAYER.moveSpeed * PLAYER.runSpeedMultiplier
+          const reference = desired === 'Run' ? RUN_REF_SPEED : WALK_REF_SPEED
+          action.setEffectiveTimeScale(
+            THREE.MathUtils.clamp(speed / reference, 0.55, 1.35),
+          )
+        }
+      }
     }
 
     // Physical Cosmic Scanner. The mixer has already updated the authored
     // arm pose, so this layer blends the right arm into a stable aim pose
-    // without touching the other bones, boots or thruster sockets.
+    // without touching the other bones.
     equipWeight.current = THREE.MathUtils.damp(
       equipWeight.current,
       store.scannerEquipped ? 1 : 0,

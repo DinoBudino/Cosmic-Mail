@@ -1,7 +1,11 @@
 import { useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
-import { attachCameraControls, clampOrbitPitch } from './cameraRig'
+import {
+  attachCameraControls,
+  clampOrbitPitch,
+  isMouseLookFirstPerson,
+} from './cameraRig'
 import { setScannerPointerCenter } from './scannerPointer'
 
 export function CameraControls() {
@@ -12,8 +16,7 @@ export function CameraControls() {
   useEffect(() => {
     const sync = () => {
       const state = useGameStore.getState()
-      const firstPerson =
-        state.scannerEquipped && state.scannerCamera === 'first-person'
+      const firstPerson = isMouseLookFirstPerson(state)
       const modalOpen =
         state.settingsOpen ||
         state.scannerOpen ||

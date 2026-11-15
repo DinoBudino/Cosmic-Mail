@@ -1,7 +1,8 @@
 /**
  * Cosmic Mail destinations. Navigation content only: names and clues,
  * never the identity of the historical machine before discovery.
- * Moon and Deep Space are visible but not playable in this block.
+ * Two destinations: the Moon and Mars. Deep Space is out of scope (its
+ * id stays in the save schema only for older saves).
  */
 
 import type { DestinationId, MissionId } from './missions'
@@ -14,9 +15,17 @@ export interface Destination {
   glyph: string
   accent: string
   missionId: MissionId
+  /** One-line description of the place for the navigation screen. */
+  kind: string
   /** Child-friendly clue, with no machine name. */
   clue: string
-  /** Only Mars has a playable world today. */
+  /**
+   * What the ground looks like, in the game's own words. The navigation
+   * screen deliberately shows no scientific figures (distances, gravity,
+   * day length): only in-game, descriptive information.
+   */
+  terrain: string
+  /** Whether the destination has a playable world yet. */
   available: boolean
 }
 
@@ -27,6 +36,8 @@ export const DESTINATIONS: readonly Destination[] = [
     glyph: '🌕',
     accent: '#d9c7c2',
     missionId: 'surveyor-3',
+    kind: "Earth's natural satellite",
+    terrain: 'Gray dust and craters',
     clue: 'A clue on the lunar surface.',
     available: false,
   },
@@ -35,18 +46,11 @@ export const DESTINATIONS: readonly Destination[] = [
     name: 'Mars',
     glyph: '🔴',
     accent: '#f2b28c',
-    missionId: 'spirit',
+    missionId: 'opportunity',
+    kind: 'The red planet',
+    terrain: 'Red dust and rocks',
     clue: 'A mystery among the red rocks.',
     available: true,
-  },
-  {
-    id: 'deep-space',
-    name: 'Deep Space',
-    glyph: '✨',
-    accent: '#b8a6d9',
-    missionId: 'pioneer-10',
-    clue: 'A story traveling beyond the planets.',
-    available: false,
   },
 ]
 

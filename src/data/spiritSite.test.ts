@@ -1,23 +1,36 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { getMission } from './missions'
-import { SPIRIT_SCAN_ANCHORS, SPIRIT_SITE, findScanAnchor } from './spiritSite'
+import {
+  MARS_EXPLORER_IDS,
+  SPIRIT_SITE,
+  findScanAnchor,
+  getScanAnchors,
+  setActiveExplorer,
+} from './spiritSite'
 
-describe('Spirit scan anchors', () => {
-  it('define exactly one anchor per mission component', () => {
-    const componentIds = getMission('spirit').components.map((c) => c.id)
-    expect(SPIRIT_SCAN_ANCHORS.map((a) => a.componentId).sort()).toEqual(
-      [...componentIds].sort(),
-    )
-  })
+describe('Mars explorer scan anchors', () => {
+  afterEach(() => setActiveExplorer('opportunity'))
 
-  it('keep every anchor inside the interaction radius, with valid hit boxes', () => {
-    for (const anchor of SPIRIT_SCAN_ANCHORS) {
-      expect(findScanAnchor(anchor.componentId)).toBe(anchor)
-      expect(Math.hypot(anchor.position[0], anchor.position[2])).toBeLessThan(
-        SPIRIT_SITE.interactionRadius,
+  for (const explorer of MARS_EXPLORER_IDS) {
+    it(`define exactly one anchor per ${explorer} component`, () => {
+      setActiveExplorer(explorer)
+      expect(SPIRIT_SITE.missionId).toBe(explorer)
+      const componentIds = getMission(explorer).components.map((c) => c.id)
+      expect(getScanAnchors().map((a) => a.componentId).sort()).toEqual(
+        [...componentIds].sort(),
       )
-      expect(anchor.hitSize.every((size) => size > 0)).toBe(true)
-    }
-    expect(findScanAnchor('nope')).toBeUndefined()
-  })
+    })
+
+    it(`keeps every ${explorer} anchor inside the interaction radius`, () => {
+      setActiveExplorer(explorer)
+      for (const anchor of getScanAnchors()) {
+        expect(findScanAnchor(anchor.componentId)).toBe(anchor)
+        expect(
+          Math.hypot(anchor.position[0], anchor.position[2]),
+        ).toBeLessThan(SPIRIT_SITE.interactionRadius)
+        expect(anchor.hitSize.every((size) => size > 0)).toBe(true)
+      }
+      expect(findScanAnchor('nope')).toBeUndefined()
+    })
+  }
 })

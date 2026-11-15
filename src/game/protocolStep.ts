@@ -1,6 +1,7 @@
 import {
   getProtocolStep,
   type ProtocolStep,
+  hasPriorFieldWork,
 } from '../data/arrivalProtocol'
 import type { JourneySave } from '../store/journeySchema'
 import { useJourneyStore } from '../store/journeyStore'
@@ -19,6 +20,6 @@ export function getCurrentProtocolStep(
   return getProtocolStep({
     progress,
     flags: useNarrativeStore.getState().protocol,
-    priorFieldWork: (save?.environmentalDiscoveries?.length ?? 0) > 0,
+    priorFieldWork: hasPriorFieldWork(save, SPIRIT_SITE.missionId),
   })
 }

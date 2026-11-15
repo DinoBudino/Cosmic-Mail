@@ -84,9 +84,6 @@ describe('scene music', () => {
 
   it('lets Archive overlays take priority over the planet bed', () => {
     expect(
-      sceneMusicFor(scene({ phase: 'playing', archiveView: 'full-scan' })),
-    ).toBe('memory')
-    expect(
       sceneMusicFor(scene({ phase: 'playing', archiveView: 'smart-letter' })),
     ).toBe('smartLetter')
     expect(

@@ -42,6 +42,9 @@ LANDMARK_PHRASES = [
 ONBOARDING_PHRASES = [(line["key"], line["text"]) for line in ONBOARDING_LINES]
 ONBOARDING_KEYS = {line["key"] for line in ONBOARDING_LINES}
 ONBOARDING_SPEEDS = {line["key"]: float(line["speed"]) for line in ONBOARDING_LINES}
+# Optional per-line pitch lift (formant-preserving duration via atempo):
+# a slightly brighter PIP on cheerful lines, softer on sad ones.
+ONBOARDING_PITCHES = {line["key"]: float(line.get("pitch", 1.0)) for line in ONBOARDING_LINES}
 PHRASES = LANDMARK_PHRASES + ONBOARDING_PHRASES
 
 # Voice id -> folder name used by the game (see src/game/pipVoice.ts).
@@ -102,14 +105,15 @@ for voice_id, folder in VOICES:
             # keep the existing variation mechanism without changing timbre.
             speed1 = ONBOARDING_SPEEDS[key]
             speed2 = max(0.5, speed1 * 0.96)
-            pitch2 = 1.0
+            pitch1 = ONBOARDING_PITCHES[key]
+            pitch2 = pitch1
         else:
             # World orientation lines keep the original two takes.
-            speed1, speed2, pitch2 = 1.0, 0.92, 1.06
+            speed1, speed2, pitch1, pitch2 = 1.0, 0.92, 1.0, 1.06
 
         audio, sr = synth(text, voice_id, speed1)
         sf.write(TMP, audio, sr)
-        to_mp3(TMP, take1, 1.0)
+        to_mp3(TMP, take1, pitch1)
         audio2, sr2 = synth(text, voice_id, speed2)
         sf.write(TMP, audio2, sr2)
         to_mp3(TMP, take2, pitch2)

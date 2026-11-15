@@ -1,7 +1,4 @@
-import { SPIRIT_SITE } from '../data/spiritSite'
-import { isFlightUnlocked } from '../game/flight'
 import { useGameStore } from '../store/gameStore'
-import { useJourneyStore } from '../store/journeyStore'
 import { isStepAtLeast } from '../data/arrivalProtocol'
 import { useProtocol } from './useProtocol'
 
@@ -30,13 +27,9 @@ export function Hud() {
   const quality = useGameStore((state) => state.quality)
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
   const cinematicFocus = useGameStore((state) => state.cinematicFocus)
-  const progress = useJourneyStore(
-    (state) => state.save?.missions[SPIRIT_SITE.missionId] ?? null,
-  )
-  const flightLocked = progress != null && !isFlightUnlocked(progress)
   const { step } = useProtocol()
   // Show only the keys the current step needs: movement first, then the
-  // scanner, then inspect. Boots appear only once they work.
+  // scanner, then inspect.
   const showScanner = isStepAtLeast(step, 'M2')
   const showInspect = isStepAtLeast(step, 'M3')
 
@@ -54,12 +47,10 @@ export function Hud() {
               <span className="hud-key">Drag</span>
               <span className="hud-label">look</span>
             </span>
-            {!flightLocked && (
-              <span className="hud-control">
-                <span className="hud-key">Space</span>
-                <span className="hud-label">jet boots</span>
-              </span>
-            )}
+            <span className="hud-control">
+              <span className="hud-key">Shift</span>
+              <span className="hud-label">run</span>
+            </span>
             {showScanner && (
               <span className="hud-control">
                 <span className="hud-key">Q</span>

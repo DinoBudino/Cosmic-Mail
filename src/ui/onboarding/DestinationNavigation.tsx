@@ -8,11 +8,12 @@ import { NEW_SIGNAL_LINE } from '../../data/onboardingNarrative'
 import { useJourneyStore } from '../../store/journeyStore'
 import type { JourneySave } from '../../store/journeySchema'
 import { useOnboardingStore } from '../../store/onboardingStore'
+import { hubElementEnabled, useHubFocus } from '../../store/hubFocus'
 
 /**
- * Keyboard / screen-reader mirror of the cabin navigation screen. Mars is
- * the only playable destination; Moon and Deep Space are visible but
- * marked as missions in development.
+ * Keyboard / screen-reader mirror of the cabin navigation screen: every
+ * destination with its facts; places without a playable world yet are
+ * visible but marked as missions in development.
  */
 export function DestinationNavigation({
   saveOverride,
@@ -29,6 +30,7 @@ export function DestinationNavigation({
   const confirmRoute = useOnboardingStore((state) => state.confirmRoute)
   const clearSelection = useOnboardingStore((state) => state.clearSelection)
   const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
+  const focus = useHubFocus()
   const view = getPassportView(save)
   const closure = getSliceClosure(save)
   const selected = DESTINATIONS.find((entry) => entry.id === selectedId) ?? null
@@ -73,7 +75,7 @@ export function DestinationNavigation({
                 className={`choice-option destination-row${
                   destination.available ? '' : ' is-coming-soon'
                 }`}
-                disabled={!destination.available}
+                disabled={!destination.available || !hubElementEnabled(focus, 'nav-cards')}
                 aria-pressed={selectedId === destination.id}
                 aria-label={`${destination.name}: ${
                   destination.available
@@ -86,7 +88,10 @@ export function DestinationNavigation({
                   {destination.glyph} {destination.name}
                 </span>
                 <span className="destination-row__clue">
-                  {destination.clue}
+                  {destination.kind}. {destination.clue}
+                </span>
+                <span className="destination-row__clue">
+                  Terrain: {destination.terrain}
                 </span>
                 <span className="choice-option__hint">
                   {destination.available
@@ -102,6 +107,9 @@ export function DestinationNavigation({
           <div className="destination-summary" role="status">
             <p className="zone-objects__label">Destination clue</p>
             <p className="destination-summary__clue">{selected.clue}</p>
+            <p className="destination-summary__clue">
+              Terrain: {selected.terrain}
+            </p>
             <p className="destination-summary__machine">
               {selectedStory.machineName ?? 'Signal unidentified'}
             </p>
@@ -116,13 +124,14 @@ export function DestinationNavigation({
                 type="button"
                 className="menu__option"
                 onClick={confirmRoute}
-                disabled={routeConfirmed}
+                disabled={routeConfirmed || !hubElementEnabled(focus, 'nav-confirm')}
               >
                 {routeConfirmed ? 'Route ready' : 'Confirm route'}
               </button>
               <button
                 type="button"
                 className="onboarding__quiet"
+                disabled={!hubElementEnabled(focus, 'nav-back')}
                 onClick={clearSelection}
               >
                 Choose another destination

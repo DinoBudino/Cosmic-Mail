@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { WORLD } from '../game/worldConfig'
 import { getMission } from './missions'
 import { createJourney } from '../store/journeySchema'
 import {
   markMissionDiscovered,
   prepareSmartLetter,
   scanComponent,
-  completeFullScan,
   transmitLetter,
   getMissionProgress,
 } from '../store/journeyLogic'
@@ -66,8 +66,7 @@ describe('protocol step derivation', () => {
     for (const component of mission.components) {
       save = scanComponent(save, 'spirit', component.id).save
     }
-    expect(step(save)).toBe('M5')
-    save = completeFullScan(save, 'spirit').save
+    // The third part recovers the memory: straight to the letter step.
     expect(step(save)).toBe('M6')
     save = prepareSmartLetter(save, 'spirit').save
     expect(step(save)).toBe('M6')
@@ -102,7 +101,7 @@ describe('protocol gating', () => {
   })
 
   it('allows landscape scans only in free exploration (M7)', () => {
-    const steps: ProtocolStep[] = ['M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6']
+    const steps: ProtocolStep[] = ['M0', 'M1', 'M2', 'M3', 'M4', 'M6']
     for (const s of steps) expect(areFreeScansAllowed(s)).toBe(false)
     expect(areFreeScansAllowed('M7')).toBe(true)
   })
@@ -157,62 +156,53 @@ describe('objectives', () => {
     coarsePointer: false,
     scannerEquipped: false,
     aimingAtSample: false,
-    lens: 'visual' as const,
     scannedCount: 0,
     nearSignal: false,
     memoryRecovered: false,
     aimingAtPart: false,
-    lensTouched: false,
     nextMarker: 1,
   }
 
-  it('teaches equip → aim → lens → hold in M2', () => {
+  it('teaches equip → aim → hold in M2, with no lens step', () => {
     const at = (over: object) =>
       getObjective({ ...base, step: 'M2', ...over })
     expect(at({}).highlight).toBe('scanner-key')
     expect(at({ scannerEquipped: true }).highlight).toBe('sample')
-    expect(
-      at({ scannerEquipped: true, aimingAtSample: true }).highlight,
-    ).toBe('lens')
-    expect(
-      at({
-        scannerEquipped: true,
-        aimingAtSample: true,
-        lens: 'contact',
-      }).highlight,
-    ).toBe('hold')
+    expect(at({ scannerEquipped: true }).text).toMatch(/practice rock/i)
+    const hold = at({ scannerEquipped: true, aimingAtSample: true })
+    expect(hold.highlight).toBe('hold')
+    expect(hold.text).not.toMatch(/lens/i)
   })
 
-  it('guides the first part: equip → aim at marker 1 → hold, teaching the lens rule', () => {
+  it('runs the parts hunt: scanner out → follow the clue → hold', () => {
     const at = (over: object) => getObjective({ ...base, step: 'M4', ...over })
-    expect(at({}).text).toContain('marker 1')
-    expect(at({ scannerEquipped: true }).highlight).toBe('marker')
-    const aimed = at({ scannerEquipped: true, aimingAtPart: true })
-    expect(aimed.highlight).toBe('lens-picker')
-    expect(aimed.text).toMatch(/look.*touch.*heat/i)
-    // The rule is taught, the right lens is not named.
-    expect(aimed.text).not.toMatch(/visual|contact|thermal/i)
-    expect(
-      at({ scannerEquipped: true, aimingAtPart: true, lensTouched: true })
-        .highlight,
-    ).toBe('hold')
+    expect(at({}).text).toBe('Press Q to take out your scanner')
+    expect(at({}).highlight).toBe('scanner-key')
+    const clue = "Find the rover's eyes · top of the mast"
+    const searching = at({ scannerEquipped: true, huntClue: clue })
+    expect(searching.text).toBe(clue)
+    expect(searching.highlight).toBe('marker')
+    const aimed = at({ scannerEquipped: true, aimingAtPart: true, huntClue: clue })
+    expect(aimed.highlight).toBe('hold')
+    expect(aimed.text).not.toMatch(/lens|visual|contact|thermal/i)
   })
 
-  it('suggests the next marker for parts 2 and 3 without blocking', () => {
+  it('never asks for two things at once in M4', () => {
     const at = (over: object) => getObjective({ ...base, step: 'M4', ...over })
-    expect(
-      at({ scannerEquipped: true, scannedCount: 1, nextMarker: 2 }).text,
-    ).toContain('marker 2')
-    expect(
-      at({ scannerEquipped: true, scannedCount: 2, nextMarker: 3 }).text,
-    ).toContain('marker 3')
-  })
-
-  it('shows the recognition count in M4 and uses one short line each', () => {
-    expect(getObjective({ ...base, step: 'M4', scannedCount: 2 }).text).toBe(
+    for (const text of [
+      at({}).text,
+      at({ scannerEquipped: true }).text,
+      at({ scannerEquipped: true, aimingAtPart: true }).text,
+    ]) {
+      expect(text).not.toMatch(/inspect|press e/i)
+    }
+    expect(at({ scannerEquipped: true, scannedCount: 2 }).text).toBe(
       "Recognize the explorer's parts (2/3)",
     )
-    for (const s of ['M0', 'M1', 'M3', 'M4', 'M5', 'M6', 'M7'] as const) {
+  })
+
+  it('keeps every objective one short line', () => {
+    for (const s of ['M0', 'M1', 'M3', 'M4', 'M6', 'M7'] as const) {
       expect(getObjective({ ...base, step: s }).text.length).toBeLessThan(70)
     }
   })
@@ -239,6 +229,24 @@ describe('identity discipline', () => {
       for (const word of banned) {
         expect(text.toLowerCase()).not.toContain(word)
       }
+    }
+  })
+})
+
+describe('practice rock (single scan)', () => {
+  it('sits a few steps from the landing, inside the reach ring', () => {
+    const fromSpawn = Math.hypot(
+      CALIBRATION_SAMPLE.position.x - WORLD.spawn.x,
+      CALIBRATION_SAMPLE.position.z - WORLD.spawn.z,
+    )
+    expect(fromSpawn).toBeLessThan(12)
+    expect(fromSpawn).toBeGreaterThan(5)
+    expect(hasReachedStation(CALIBRATION_SAMPLE.position)).toBe(true)
+  })
+
+  it('never talks about lenses before discovery', () => {
+    for (const text of getPreDiscoveryTexts()) {
+      expect(text).not.toMatch(/\blens/i)
     }
   })
 })

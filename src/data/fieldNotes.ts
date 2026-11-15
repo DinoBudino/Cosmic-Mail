@@ -16,7 +16,7 @@
  */
 
 import type { EnvironmentalCategoryId } from './environmentalSites'
-import { ENVIRONMENTAL_SITES } from './environmentalSites'
+import { ENVIRONMENTAL_SITES, WORLD_ENVIRONMENTAL_SITES } from './environmentalSites'
 import type { MarsObjectId } from './marsObjects'
 
 export interface FieldNoteSource {
@@ -179,6 +179,10 @@ export function getFieldNotesView(save: FieldNotesInput): FieldNotesView {
   ][]) {
     const sites = ENVIRONMENTAL_SITES.filter((s) => s.category === category)
     const seen = sites.filter((s) => observed.has(s.id)).length
+    // Soil and wind marks are no longer on the ground: their notes only
+    // stay in the album for saves that already observed them.
+    const placed = WORLD_ENVIRONMENTAL_SITES.some((s) => s.category === category)
+    if (!placed && seen === 0) continue
     entries.push({
       note,
       unlocked: seen > 0,
@@ -189,7 +193,9 @@ export function getFieldNotesView(save: FieldNotesInput): FieldNotesView {
     MarsObjectId,
     FieldNote,
   ][]) {
-    entries.push({ note, unlocked: visited.has(id), detail: null })
+    // The memorials are not on this map any more; earlier visits stay.
+    if (!visited.has(id)) continue
+    entries.push({ note, unlocked: true, detail: null })
   }
   return {
     entries,

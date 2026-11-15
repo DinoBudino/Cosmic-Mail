@@ -1,10 +1,13 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef, useState, type RefObject } from 'react'
 import * as THREE from 'three'
-import { MARS_OBJECTS, REGION_APPROACH_RADIUS } from '../data/marsObjects'
-import { SPIRIT_SITE } from '../data/spiritSite'
+import { pipScreenAnchor } from './pipScreenAnchor'
+import { MARS_WORLD_SITES, REGION_APPROACH_RADIUS } from '../data/marsObjects'
+import { SPIRIT_SITE, getScanAnchors } from '../data/spiritSite'
+import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { useNarrativeStore } from '../store/narrativeStore'
+import { BRIEFING_STEPS } from '../data/marsBriefing'
 import { SITE_COLLISION_RADII } from './interaction'
 import { HubPip, type HubPipExpression } from './HubPipModel'
 import { scannerAim } from './scannerAim'
@@ -45,13 +48,15 @@ function pipExpressionFor(expression: Expression): HubPipExpression {
     case 'curious':
       return 'curious'
     case 'happy':
-    case 'excited':
-    case 'celebrating':
     case 'hopeful':
       return 'happy'
+    case 'excited':
+    case 'celebrating':
+      return 'excited'
     case 'thinking':
-    case 'focused':
       return 'thoughtful'
+    case 'focused':
+      return 'analyzing'
     case 'alert':
     case 'concerned':
       return 'worried'
@@ -106,6 +111,16 @@ export function Companion({
   const forwardRef = useRef<PipPoint>({ x: 0, z: -1 })
   const sideRef = useRef<1 | -1>(1)
   const yawRate = useRef(0)
+  const screenPos = useRef(new THREE.Vector3())
+  // Gestures: a happy spin on each find, a curious look-around when idle.
+  const lastReactionUntil = useRef(0)
+  const spinStart = useRef(-10)
+  const spinTurns = useRef(1)
+  const nextLookAround = useRef(9)
+  const lookAroundStart = useRef(-10)
+  // Scan station: PIP flies next to the part to find and peeks at it.
+  const partWorld = useRef(new THREE.Vector3())
+  const partTarget = useRef<THREE.Object3D | null>(null)
 
   const quality = useGameStore((state) => state.quality)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
@@ -114,7 +129,7 @@ export function Companion({
   const [talking, setTalking] = useState(false)
   const spokenRef = useRef(false)
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const player = playerRef.current
     const current = robot.current
     const shell = body.current
@@ -125,14 +140,14 @@ export function Companion({
     const narrative = useNarrativeStore.getState()
     const nearbyId = game.nearbySiteId
     const nearbySite = nearbyId
-      ? (MARS_OBJECTS.find((site) => site.id === nearbyId) ?? null)
+      ? (MARS_WORLD_SITES.find((site) => site.id === nearbyId) ?? null)
       : null
     // Region approach: nearest site inside the approach radius, even when the
     // player is not yet inside the small inspect ring — PIP leans in early.
     let regionSite = nearbySite
     if (!regionSite) {
       let best = Infinity
-      for (const site of MARS_OBJECTS) {
+      for (const site of MARS_WORLD_SITES) {
         const d = Math.hypot(
           player.position.x - site.position.x,
           player.position.z - site.position.z,
@@ -143,7 +158,7 @@ export function Companion({
         }
       }
     }
-    // Spirit lives outside MARS_OBJECTS; give PIP the same awareness and a
+    // The explorer lives outside MARS_WORLD_SITES; give PIP the same awareness and a
     // physical no-fly cylinder so it never passes through the rover.
     const spiritDistance = Math.hypot(
       player.position.x - SPIRIT_SITE.position.x,
@@ -188,7 +203,7 @@ export function Companion({
         lookTarget.current = pickLookTarget(
           { x: player.position.x, z: player.position.z },
           [
-            ...MARS_OBJECTS.map((site) => site.position),
+            ...MARS_WORLD_SITES.map((site) => site.position),
             SPIRIT_SITE.position,
           ],
           Math.random,
@@ -287,18 +302,67 @@ export function Companion({
       goal.current.z += (aimZ / aimLength) * 0.35
     }
 
+    // --- Scan station: show the child where the next part is ---
+    // PIP hovers beside the part (never in front of it), a bit closer to the
+    // camera, and looks at it with a curious face. After each find it moves
+    // on to the next part.
+    let pointingPart: THREE.Vector3 | null = null
+    if (game.scanStation) {
+      const scanned =
+        useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]
+          ?.scannedComponentIds ?? []
+      const next = getScanAnchors().find(
+        (anchor) => !scanned.includes(anchor.componentId),
+      )
+      const name = next ? `ScannerTarget_${next.componentId}` : null
+      if (name && partTarget.current?.name !== name) {
+        let root: THREE.Object3D = current
+        while (root.parent) root = root.parent
+        partTarget.current = root.getObjectByName(name) ?? null
+      }
+      if (next && partTarget.current) {
+        const part = partTarget.current.getWorldPosition(partWorld.current)
+        // View direction from the player (station camera) to the part.
+        let vx = part.x - player.position.x
+        let vz = part.z - player.position.z
+        const vl = Math.hypot(vx, vz) || 1
+        vx /= vl
+        vz /= vl
+        const sideX = -vz
+        const sideZ = vx
+        // Stay on the outer side of the explorer, so PIP never hides it.
+        const outward =
+          (part.x - SPIRIT_SITE.position.x) * sideX +
+          (part.z - SPIRIT_SITE.position.z) * sideZ
+        const sign = outward < -0.05 ? -1 : 1
+        goal.current.set(
+          part.x + sideX * 0.8 * sign - vx * 0.3,
+          part.y + 0.12,
+          part.z + sideZ * 0.8 * sign - vz * 0.3,
+        )
+        pointingPart = part
+      }
+    } else {
+      partTarget.current = null
+    }
+
     // --- Obstacle avoidance ---
     const siteCylinders = [
-      ...MARS_OBJECTS.map((site) => ({
+      ...MARS_WORLD_SITES.map((site) => ({
         x: site.position.x,
         z: site.position.z,
         radius: SITE_COLLISION_RADII[site.id] + 0.5,
       })),
-      {
-        x: SPIRIT_SITE.position.x,
-        z: SPIRIT_SITE.position.z,
-        radius: SPIRIT_SITE.collisionRadius + 0.5,
-      },
+      // Pointing at a part, PIP may hover right beside the explorer.
+      ...(pointingPart
+        ? []
+        : [
+            {
+              x: SPIRIT_SITE.position.x,
+              z: SPIRIT_SITE.position.z,
+              radius: SPIRIT_SITE.collisionRadius + 0.5,
+            },
+          ]),
     ]
     const avoided = pushOutOfCylinders(
       { x: goal.current.x, z: goal.current.z },
@@ -358,7 +422,20 @@ export function Companion({
 
     let targetX = player.position.x
     let targetZ = player.position.z
-    if (reactionActive && reactionTarget) {
+    // At the scan station PIP looks at the child while talking and, every
+    // few seconds, turns to point at the part ("here, here!"). When quiet it
+    // keeps peeking at the part.
+    const pointingGlance =
+      pointingPart != null && (!speaking || t % 4.6 > 3.1)
+    if (pointingPart && !(reactionActive && reaction?.kind === 'celebrate')) {
+      if (pointingGlance) {
+        targetX = pointingPart.x
+        targetZ = pointingPart.z
+      } else {
+        targetX = state.camera.position.x
+        targetZ = state.camera.position.z
+      }
+    } else if (reactionActive && reactionTarget) {
       targetX = reactionTarget.x
       targetZ = reactionTarget.z
     } else if (speaking) {
@@ -384,7 +461,29 @@ export function Companion({
       targetZ = current.position.z - Math.cos(player.rotation.y)
     }
 
-    const idleLook = reducedMotion ? 0 : Math.sin(t * 0.55) * 0.12
+    // A new find or the big celebration: PIP does a joyful spin.
+    if (reaction && reaction.until !== lastReactionUntil.current) {
+      lastReactionUntil.current = reaction.until
+      if (reaction.kind === 'scan' || reaction.kind === 'celebrate') {
+        spinStart.current = t
+        spinTurns.current = reaction.kind === 'celebrate' ? 2 : 1
+      }
+    }
+    // Idle and quiet: every so often PIP peeks left, then right.
+    const idleNow =
+      !reducedMotion && !speaking && !reactionActive && motion < 0.05 &&
+      !scannerAimTarget && !pointingPart
+    if (idleNow && t > nextLookAround.current) {
+      lookAroundStart.current = t
+      nextLookAround.current = t + 11 + Math.random() * 6
+    }
+    const lookAroundT = t - lookAroundStart.current
+    const lookAround =
+      idleNow && lookAroundT < 2.6
+        ? Math.sin((lookAroundT / 2.6) * Math.PI * 2) * 0.75
+        : 0
+    const idleLook =
+      (reducedMotion ? 0 : Math.sin(t * 0.55) * 0.12) + lookAround
     const yaw =
       Math.atan2(targetX - current.position.x, targetZ - current.position.z) +
       idleLook
@@ -405,7 +504,19 @@ export function Companion({
         if (nearbyId) surpriseUntil.current = t + 0.75
       }
 
-      if (reactionActive && reaction) {
+      // The arrival briefing acts out each of PIP's tutorial lines.
+      const briefingId = useGameStore.getState().marsBriefingStep
+      const briefing = briefingId
+        ? BRIEFING_STEPS.find((step) => step.id === briefingId)
+        : undefined
+      if (briefing) {
+        expression.current = briefing.expression
+      } else if (
+        pointingGlance &&
+        !(reactionActive && (reaction?.kind === 'scan' || reaction?.kind === 'celebrate'))
+      ) {
+        expression.current = 'curious'
+      } else if (reactionActive && reaction) {
         if (reaction.kind === 'detect') {
           expression.current = 'surprised'
         } else if (
@@ -500,7 +611,13 @@ export function Companion({
             ) * Math.PI,
           ) * 0.045
         : 0
-    shell.position.y = damp(shell.position.y, bob + bounce + pop, 10, dt)
+    const spinT = (t - spinStart.current) / (0.75 * spinTurns.current)
+    const spinning = !reducedMotion && spinT >= 0 && spinT < 1
+    const hop = spinning ? Math.sin(spinT * Math.PI) * 0.09 : 0
+    shell.position.y = damp(shell.position.y, bob + bounce + pop + hop, 10, dt)
+    shell.rotation.y = spinning
+      ? (1 - (1 - spinT) ** 3) * Math.PI * 2 * spinTurns.current
+      : 0
 
     let tiltX = 0
     let tiltZ = 0
@@ -517,11 +634,26 @@ export function Companion({
         tiltZ += 0.13
       }
       if (happy) tiltZ += Math.sin(t * 6) * 0.06
+      // Peeking: lean in toward the part the child is aiming at.
+      if ((scannerAimTarget && !speaking) || pointingGlance) tiltX += 0.16
+      // Curious little bob toward the part, as if saying "here, here!".
+      if (pointingGlance) tiltZ += Math.sin(t * 2.4) * 0.08
+      // Talking: a little lively wobble.
+      if (speaking) tiltZ += Math.sin(t * 9) * 0.035
       tiltZ += THREE.MathUtils.clamp(-yawRate.current * 0.05, -0.32, 0.32)
       tiltX += THREE.MathUtils.clamp(lastVel.current.y * 0.04, -0.16, 0.2)
     }
     shell.rotation.x = damp(shell.rotation.x, tiltX, 8, dt)
     shell.rotation.z = damp(shell.rotation.z, tiltZ, 8, dt)
+
+    // Where PIP is on screen, so the speech box can sit right beside it.
+    const screen = screenPos.current.copy(current.position)
+    screen.y += 0.2
+    screen.project(state.camera)
+    pipScreenAnchor.visible =
+      screen.z < 1 && Math.abs(screen.x) < 1 && Math.abs(screen.y) < 1
+    pipScreenAnchor.x = state.size.left + (screen.x * 0.5 + 0.5) * state.size.width
+    pipScreenAnchor.y = state.size.top + (-screen.y * 0.5 + 0.5) * state.size.height
   })
 
   return (

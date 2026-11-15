@@ -158,7 +158,7 @@ export function getMissionEntryCue(
   if (stage === 'memory_recovered') {
     return {
       id: `${mission.id}:revisit-memory`,
-      text: narrative.fullScanComplete[1],
+      text: pipLine('mars-hint-letter'),
       priority: 'mission',
       expression: 'hopeful',
     }
@@ -206,12 +206,13 @@ export function getDetectedCue(
 
 export function getApproachedCue(
   mission: MissionDefinition,
+  coarsePointer = false,
 ): NarrativeCue | null {
   const narrative = narrativeFor(mission)
   if (!narrative) return null
   return {
     id: `${mission.id}:approached`,
-    text: narrative.approached,
+    text: coarsePointer ? narrative.approachedTouch : narrative.approached,
     priority: 'discovery',
     expression: 'curious',
   }
@@ -237,52 +238,6 @@ export function getIdentifiedCue(
   }
 }
 
-export function getTargetDetectedCue(
-  mission: MissionDefinition,
-): NarrativeCue | null {
-  const narrative = narrativeFor(mission)
-  if (!narrative) return null
-  return {
-    id: `${mission.id}:target-detected`,
-    text: narrative.targetDetected,
-    priority: 'mission',
-    expression: 'curious',
-  }
-}
-
-export function getScanStartedCue(
-  mission: MissionDefinition,
-  componentId: string,
-): NarrativeCue | null {
-  const narrative = narrativeFor(mission)
-  if (!narrative) return null
-  return {
-    id: `${mission.id}:scan-start:${componentId}`,
-    text: narrative.scanStarted,
-    priority: 'mission',
-    expression: 'focused',
-    componentId,
-  }
-}
-
-/**
- * Not `once`: a player may interrupt several attempts, but the controller
- * adds a cooldown so it never becomes nagging feedback.
- */
-export function getScanInterruptedCue(
-  mission: MissionDefinition,
-): NarrativeCue | null {
-  const narrative = narrativeFor(mission)
-  if (!narrative) return null
-  return {
-    id: `${mission.id}:scan-interrupted`,
-    text: narrative.scanInterrupted,
-    priority: 'hint',
-    once: false,
-    expression: 'concerned',
-  }
-}
-
 export function getScannerPromptCue(
   mission: MissionDefinition,
   coarsePointer: boolean,
@@ -299,73 +254,51 @@ export function getScannerPromptCue(
   }
 }
 
-export function getScannerEquippedCue(
+/**
+ * Parts hunt: the part to find now, in the mission's order (eyes, rock tool,
+ * heat reader). Null before discovery or when every part is recorded.
+ */
+export function getHuntTarget(
   mission: MissionDefinition,
+  progress: NarrativeProgress | null,
+): MissionComponent | null {
+  if (!progress?.discovered) return null
+  return getPendingComponents(mission, progress)[0] ?? null
+}
+
+/**
+ * Parts hunt: PIP's clue for the part to find now. Only after discovery
+ * (the clue may name what the part does). Null without a clue.
+ */
+export function getHuntClueCue(
+  mission: MissionDefinition,
+  componentId: string,
 ): NarrativeCue | null {
-  const narrative = narrativeFor(mission)
-  if (!narrative) return null
+  const component = mission.components.find((c) => c.id === componentId)
+  if (!component?.huntClue) return null
   return {
-    id: `${mission.id}:scanner-equipped`,
-    text: narrative.scannerEquipped,
+    id: `${mission.id}:clue:${componentId}`,
+    text: component.huntClue.line,
     priority: 'mission',
-    expression: 'focused',
+    expression: 'curious',
+    componentId,
   }
 }
 
-/** Two lines after the third component is recognized. */
-export function getCompletionCues(
-  mission: MissionDefinition,
-): NarrativeCue[] {
-  const narrative = narrativeFor(mission)
-  if (!narrative) return []
-  return narrative.completed.map((text, index) => ({
-    id: `${mission.id}:completed:${index + 1}`,
-    text,
-    // Same rank as the component explanation so the third fragment is
-    // explained before "we found all the clues".
-    priority: 'discovery' as const,
-    expression: index === 0 ? ('celebrating' as const) : ('focused' as const),
-  }))
-}
-
-export function getFullScanReadyCue(
+/** PIP's celebration right after the third (last) part. */
+export function getCompletionCue(
   mission: MissionDefinition,
 ): NarrativeCue | null {
   const narrative = narrativeFor(mission)
   if (!narrative) return null
   return {
-    id: `${mission.id}:full-scan-ready`,
-    text: narrative.fullScanReady,
-    priority: 'mission',
-    expression: 'focused',
+    id: `${mission.id}:completed`,
+    text: narrative.completed,
+    // Same rank as the component explanation so the third part is
+    // explained before the celebration.
+    priority: 'discovery',
+    expression: 'celebrating',
   }
-}
-
-export function getFullScanStartedCue(
-  mission: MissionDefinition,
-): NarrativeCue | null {
-  const narrative = narrativeFor(mission)
-  if (!narrative) return null
-  return {
-    id: `${mission.id}:full-scan-started`,
-    text: narrative.fullScanStarted,
-    priority: 'archive',
-    expression: 'focused',
-  }
-}
-
-export function getFullScanCompleteCues(
-  mission: MissionDefinition,
-): NarrativeCue[] {
-  const narrative = narrativeFor(mission)
-  if (!narrative) return []
-  return narrative.fullScanComplete.map((text, index) => ({
-    id: `${mission.id}:full-scan-complete:${index + 1}`,
-    text,
-    priority: 'archive' as const,
-    expression:
-      index === 0 ? ('celebrating' as const) : ('hopeful' as const),
-  }))
 }
 
 export function getLetterPreparedCue(
@@ -408,37 +341,12 @@ export function getEnvironmentalCue(
   }
 }
 
-export function getEnvironmentalTutorialCue(
-  coarsePointer: boolean,
-): NarrativeCue {
-  return {
-    id: 'environment:tutorial',
-    text: pipLine(
-      coarsePointer
-        ? 'mars-env-tutorial-touch'
-        : 'mars-env-tutorial-desktop',
-    ),
-    priority: 'mission',
-    expression: 'curious',
-  }
-}
-
 export function getFirstEnvironmentalScanCue(): NarrativeCue {
   return {
     id: 'environment:first-scan',
     text: pipLine('mars-env-first-scan'),
     priority: 'mission',
     expression: 'curious',
-  }
-}
-
-export function getFlightRestrictedCue(): NarrativeCue {
-  return {
-    id: 'environment:flight-restricted',
-    text: pipLine('mars-flight-restricted'),
-    priority: 'mission',
-    once: false,
-    expression: 'focused',
   }
 }
 
@@ -486,17 +394,11 @@ export function getHintCue(
     }
   }
 
-  if (stage === 'ready_for_full_scan') {
-    return {
-      id: `${mission.id}:hint:full-scan`,
-      text: pipLine('mars-hint-full-scan'),
-      priority: 'hint',
-      once: false,
-      expression: 'focused',
-    }
-  }
-
-  if (stage === 'memory_recovered' || stage === 'smart_letter_ready') {
+  if (
+    stage === 'ready_for_full_scan' ||
+    stage === 'memory_recovered' ||
+    stage === 'smart_letter_ready'
+  ) {
     return {
       id: `${mission.id}:hint:letter`,
       text: pipLine('mars-hint-letter'),
@@ -513,6 +415,38 @@ export function getHintCue(
       priority: 'ambient',
       once: false,
       expression: 'hopeful',
+    }
+  }
+
+  // Parts hunt: the first answer repeats the clue (the part glows a little),
+  // the next ones say exactly where to aim.
+  const huntTarget = getHuntTarget(mission, progress)
+  if (huntTarget?.huntClue && safeLevel === 0) {
+    return {
+      id: `${mission.id}:hint:clue:${huntTarget.id}`,
+      text: huntTarget.huntClue.line,
+      priority: 'hint',
+      once: false,
+      expression: 'thinking',
+      componentId: huntTarget.id,
+    }
+  }
+  if (huntTarget?.huntClue) {
+    // Level 1: a gentle nudge that still names nothing; level 2: exactly
+    // which part and where.
+    const gentle = safeLevel === 1 ? huntTarget.pipHint : undefined
+    const text =
+      gentle ??
+      huntTarget.pipDirectHint ??
+      huntTarget.pipHint ??
+      `${narrative.genericHint} Look closely: ${huntTarget.scanHint}`
+    return {
+      id: `${mission.id}:hint:${huntTarget.id}:${gentle ? 'nudge' : 'direct'}`,
+      text,
+      priority: 'hint',
+      once: false,
+      expression: 'focused',
+      componentId: huntTarget.id,
     }
   }
 
@@ -605,67 +539,14 @@ export function getArchiveCue(
       id: `${mission.id}:archive:memory`,
       missionId: mission.id,
       kind: 'memory',
-      text:
-        narrative?.fullScanComplete[1] ??
-        'The memory core is ready to become a smart letter.',
+      text: narrative?.memoryRecovered ?? pipLine('mars-memory-recovered'),
     }
   }
   return {
     id: `${mission.id}:archive:locked`,
     missionId: mission.id,
     kind: 'locked',
-    text:
-      narrative?.fullScanReady ??
-      'The archive needs the complete recognition scan before it can recover this memory.',
-  }
-}
-
-/* ------------------------------------------------------------------ lenses */
-
-/**
- * Soft feedback when a component is scanned with the wrong lens. Never a
- * failure: no penalty, no lost progress. Level 0 is a gentle nudge;
- * level 1 points at the instrument's function without naming the lens.
- * Only reachable after discovery, so naming the part stays allowed.
- */
-export function getWrongLensCue(
-  mission: MissionDefinition,
-  component: MissionComponent,
-  level: number = 0,
-): NarrativeCue {
-  const useContext = level >= 1 && Boolean(component.lensHints)
-  return {
-    id: `${mission.id}:wrong-lens:${component.id}:${useContext ? 1 : 0}`,
-    text: useContext
-      ? component.lensHints!.context
-      : "Hmm, that lens isn't picking anything up here. Think about what this tool does, then try another lens.",
-    priority: 'hint',
-    once: false,
-    expression: 'thinking',
-    componentId: component.id,
-  }
-}
-
-/**
- * Ask PIP help about the lens for one pending component: level 1 describes
- * the function, level 2 may name the way of observing. Null before
- * discovery (identity discipline) or when the part has no lens content.
- */
-export function getLensHintCue(
-  mission: MissionDefinition,
-  component: MissionComponent,
-  progress: NarrativeProgress | null,
-  level: number,
-): NarrativeCue | null {
-  if (stageForProgress(progress) === 'unknown') return null
-  if (level < 1 || !component.lensHints) return null
-  return {
-    id: `${mission.id}:lens-hint:${component.id}:${level >= 2 ? 'direct' : 'context'}`,
-    text: level >= 2 ? component.lensHints.direct : component.lensHints.context,
-    priority: 'hint',
-    once: false,
-    expression: 'focused',
-    componentId: component.id,
+    text: narrative?.revisitInProgress ?? pipLine('mars-revisit-in-progress'),
   }
 }
 

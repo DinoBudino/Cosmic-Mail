@@ -6,18 +6,16 @@ import {
 } from './destinations'
 
 describe('destinations', () => {
-  it('lists Moon, Mars and Deep Space in order', () => {
+  it('lists only the Moon and Mars, in order', () => {
     expect(DESTINATIONS.map((entry) => entry.id)).toEqual([
       'moon',
       'mars',
-      'deep-space',
     ])
   })
 
   it('only enables Mars in this block', () => {
     expect(getDestination('mars').available).toBe(true)
     expect(getDestination('moon').available).toBe(false)
-    expect(getDestination('deep-space').available).toBe(false)
   })
 
   it('keeps machine identities out of navigation clues', () => {

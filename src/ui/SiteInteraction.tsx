@@ -134,7 +134,7 @@ export function SiteInteraction() {
           </p>
           {noteSaved && (
             <p className="settings-hint" role="status">
-              Field note added to your passport.
+              Field note added to your mission album.
             </p>
           )}
           <nav aria-label="NASA mission sources" className="site-sources">

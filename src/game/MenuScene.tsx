@@ -1,8 +1,10 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { PerformanceMonitor, useGLTF } from '@react-three/drei'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { mulberry32 } from './random'
+import { makeMarsCanvas } from './marsTexture'
+import { EarthSurface, RockySurface } from './PlanetGlobe'
 import {
   DESTINATIONS,
   destinationPlanetKind,
@@ -22,19 +24,26 @@ import { getPassportView, STORY_STATUS_LABEL, type PassportView } from '../data/
 import { introHologramSvg } from '../ui/onboarding/introHologramTexture'
 import { emitAudio } from './audio/audioEvents'
 import { WindowHologram } from './WindowHologram'
+import { CabinCM01, CabinEffects, CabinMonitor } from './CabinCM01'
+import { cabinPoint } from './cabinLayout'
 import { HubPip, type HubPipExpression } from './HubPipModel'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { useOnboardingStore } from '../store/onboardingStore'
+import { hubElementEnabled, useHubFocus } from '../store/hubFocus'
+import type { HubTarget } from '../data/onboardingNarrative'
 import {
   cruiseDistance,
   descentProgress,
   inCabinStage,
+  LAUNCH_PLANET_RADIUS,
   launchClock,
-  marsApproach,
+  launchPlanetPlacement,
+  launchShipPosition,
   shipPoseAt,
   speedShake,
   stageAt,
+  warpFactor,
 } from './launchTimeline'
 
 /**
@@ -46,14 +55,16 @@ import {
  */
 const MENU_POSITION = new THREE.Vector3(0, 0.4, 16)
 const APPROACH_POSITION = new THREE.Vector3(4.0, -0.2, 6.4)
-// The cabin is a fixed cube room (8 wide, 4.6 high, front wall at
-// z=-4.5). During the tutorial ritual the pilot's view is totally
-// straight-on (PIP and board dead ahead); once the tutorial is done,
-// the view glides to the slightly diagonal hub framing.
-const FRONTAL_POSITION = new THREE.Vector3(0, 0.35, 1.55)
-const FRONTAL_LOOK = new THREE.Vector3(0, -0.5, -2.4)
-const CABIN_POSITION = new THREE.Vector3(1.7, 0.3, 1.2)
-const ROUTE_POSITION = new THREE.Vector3(-0.5, -0.1, -0.35)
+// The cabin is the CM-01 Explorer model (see CabinCM01.tsx); camera
+// poses are authored in its Blender coordinates (Z up, +Y toward the
+// window) through cabinPoint(). During the tutorial ritual the pilot's
+// view is straight-on (PIP and the window dead ahead); once the
+// tutorial is done, the view glides to the hub framing beside the seat.
+const FRONTAL_POSITION = cabinPoint(0, -0.95, 0.38)
+const FRONTAL_LOOK = cabinPoint(0, 3.4, 0.3)
+const CABIN_POSITION = cabinPoint(0.35, -0.95, 0.42)
+// Leaning in over the navigation screen (ANCHOR_NAV, Blender -0.78, 1.91, -0.19).
+const ROUTE_POSITION = cabinPoint(-0.78, 1.18, 0.78)
 
 /**
  * Intro framing per narrative beat. Each shot keeps PIP and the Archive
@@ -70,16 +81,16 @@ const INTRO_CAMERA: Record<
     look: FRONTAL_LOOK,
   },
   archive: {
-    position: new THREE.Vector3(0.15, 0.24, 0.35),
-    look: new THREE.Vector3(0, 0.02, -4.4),
+    position: cabinPoint(0.1, -0.25, 0.42),
+    look: cabinPoint(0, 3.4, 0.62),
   },
   pip: {
-    position: new THREE.Vector3(0.55, 0.2, 0.3),
-    look: new THREE.Vector3(0.92, -0.08, -2.3),
+    position: cabinPoint(0.4, -0.35, 0.42),
+    look: cabinPoint(0.75, 3.0, 0.55),
   },
   invitation: {
-    position: new THREE.Vector3(-0.4, 0.22, 0.3),
-    look: new THREE.Vector3(-0.92, -0.06, -2.2),
+    position: cabinPoint(0.05, -0.3, 0.45),
+    look: cabinPoint(-0.35, 3.2, 0.55),
   },
 }
 const MENU_LOOK = new THREE.Vector3(0, 0, 0)
@@ -89,14 +100,16 @@ const LAUNCH_START_POSITION = new THREE.Vector3(0, 0.4, 16)
 const LAUNCH_END_POSITION = new THREE.Vector3(-1.2, -0.2, 11.5)
 const LAUNCH_LOOK = new THREE.Vector3(-3.2, -1.6, -2.5)
 const APPROACH_LOOK = new THREE.Vector3(5.4, -0.6, -0.5)
-const CABIN_LOOK = new THREE.Vector3(-0.5, -0.6, -2.3)
-const ROUTE_LOOK = new THREE.Vector3(-0.5, -0.92, -1.4)
+const CABIN_LOOK = cabinPoint(0.1, 3.4, -0.05)
+const ROUTE_LOOK = cabinPoint(-0.78, 1.98, -0.2)
 
 // Cabin <-> navigation-panel transition. `routeBlend` goes 0 (initial
 // cabin view) -> 1 (leaned into the navigation screen) over
 // ROUTE_BLEND_SECONDS, and back the same way. Both camera poses are
 // fixed points inside the cube, so the move is a plain interpolation.
 const ROUTE_BLEND_SECONDS = 1.5
+const MENU_FOV = 42
+const CABIN_FOV = 56
 const routeBlend = { value: 0 }
 
 function smoothstep(t: number): number {
@@ -132,7 +145,22 @@ function CameraRig() {
   }, [phase, boardingStage, reducedMotion, setBoardingStage])
 
   useFrame((state, delta) => {
-    const camera = state.camera
+    const camera = state.camera as THREE.PerspectiveCamera
+    // The CM-01 cockpit is framed with a wider lens than the title shot.
+    const inCabinView =
+      (phase !== 'menu' && phase !== 'launching' && boardingStage === 'cabin') ||
+      (phase === 'launching' && inCabinStage(launchClock.value, reducedMotion))
+    // Warp kick: the lens widens with speed during the exterior flight,
+    // so the dash to the planet feels fast.
+    const warpFov =
+      phase === 'launching' && !inCabinView && !reducedMotion
+        ? warpFactor(launchClock.value, reducedMotion) * 16
+        : 0
+    const targetFov = (inCabinView ? CABIN_FOV : MENU_FOV) + warpFov
+    if (Math.abs(camera.fov - targetFov) > 0.01) {
+      camera.fov = targetFov
+      camera.updateProjectionMatrix()
+    }
     // Launching starts INSIDE the cabin: the pilot is seated, PIP
     // talks, and the countdown plays from the seat. The camera
     // settles down into the seat during ignition (a small rumble
@@ -254,11 +282,24 @@ function CameraRig() {
   return null
 }
 
-const SHIP_URL = 'models/mail-ship.glb'
+/**
+ * CM-01 Mailwing, exported from blender/Spaceship/Spaceship.blend by
+ * blender/Spaceship/scripts/export_web.py: nose on +Y, engine bell on
+ * -Y, centred, in metres (12.1 m long, solar arrays 7.5 m across).
+ */
+const SHIP_URL = 'models/spaceship-cm01.glb'
 useGLTF.preload(SHIP_URL)
+/** Model metres -> ship-group units (about 2.4 units nose to bell). */
+const SHIP_MODEL_SCALE = 0.2
+/** Bell exit in ship-group units (-6.07 m * SHIP_MODEL_SCALE). */
+const SHIP_NOZZLE_Y = -1.2
+/** Bell exit radius in ship-group units (1.37 m * scale), for the plume. */
+const SHIP_NOZZLE_RADIUS = 0.27
+/** Spin about the long axis so the solar cells face the camera. */
+const SHIP_ROLL = 2.35
 
 const STAR_COUNT = 260
-const PLANET_RADIUS = 5.4
+const PLANET_RADIUS = LAUNCH_PLANET_RADIUS
 
 /* ------------------------------------------------------------------ */
 /* Stars                                                               */
@@ -399,105 +440,11 @@ function ShootingStar() {
 /* Mars with a painted surface texture, slowly rotating                */
 /* ------------------------------------------------------------------ */
 
-function makeMarsCanvas(): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
-  canvas.width = 1024
-  canvas.height = 512
-  const ctx = canvas.getContext('2d')!
-  const random = mulberry32(0x1a12)
-
-  // Base dusty gradient, lighter at the poles.
-  const gradient = ctx.createLinearGradient(0, 0, 0, 512)
-  gradient.addColorStop(0, '#D49A77')
-  gradient.addColorStop(0.25, '#C07A5E')
-  gradient.addColorStop(0.55, '#B77B65')
-  gradient.addColorStop(0.85, '#A66A55')
-  gradient.addColorStop(1, '#C98A6B')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, 1024, 512)
-
-  // Every surface element is drawn at x, x-1024 and x+1024 so the
-  // texture wraps seamlessly around the sphere (no UV seam cut).
-  const wrapped = (_x: number, draw: (offset: number) => void) => {
-    for (const offset of [0, -1024, 1024]) draw(offset)
-  }
-
-  // Dark maria patches (big soft blotches).
-  for (let i = 0; i < 42; i += 1) {
-    const x = random() * 1024
-    const y = 60 + random() * 392
-    const r = 28 + random() * 85
-    const squash = 0.45 + random() * 0.4
-    const rotation = random() * Math.PI
-    wrapped(x, (offset) => {
-      const g = ctx.createRadialGradient(x + offset, y, 0, x + offset, y, r)
-      g.addColorStop(0, 'rgba(122,72,58,0.5)')
-      g.addColorStop(1, 'rgba(122,72,58,0)')
-      ctx.fillStyle = g
-      ctx.beginPath()
-      ctx.ellipse(x + offset, y, r, r * squash, rotation, 0, Math.PI * 2)
-      ctx.fill()
-    })
-  }
-
-  // Light dusty patches.
-  for (let i = 0; i < 55; i += 1) {
-    const x = random() * 1024
-    const y = random() * 512
-    const r = 18 + random() * 60
-    wrapped(x, (offset) => {
-      const g = ctx.createRadialGradient(x + offset, y, 0, x + offset, y, r)
-      g.addColorStop(0, 'rgba(232,180,150,0.4)')
-      g.addColorStop(1, 'rgba(232,180,150,0)')
-      ctx.fillStyle = g
-      ctx.beginPath()
-      ctx.arc(x + offset, y, r, 0, Math.PI * 2)
-      ctx.fill()
-    })
-  }
-
-  // Small crater dots for extra relief.
-  for (let i = 0; i < 90; i += 1) {
-    const x = random() * 1024
-    const y = random() * 512
-    const r = 3 + random() * 9
-    wrapped(x, (offset) => {
-      ctx.fillStyle = 'rgba(90,52,42,0.4)'
-      ctx.beginPath()
-      ctx.arc(x + offset, y, r, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = 'rgba(253,244,236,0.28)'
-      ctx.beginPath()
-      ctx.arc(x + offset - r * 0.25, y - r * 0.25, r * 0.55, 0, Math.PI * 2)
-      ctx.fill()
-    })
-  }
-
-  // Fine speckle for grain.
-  for (let i = 0; i < 5200; i += 1) {
-    const x = random() * 1024
-    const y = random() * 512
-    const size = 1 + random() * 1.4
-    const dark = random() > 0.5
-    wrapped(x, (offset) => {
-      ctx.fillStyle = dark ? 'rgba(90,52,42,0.22)' : 'rgba(240,200,170,0.18)'
-      ctx.fillRect(x + offset, y, size, size)
-    })
-  }
-
-  // Pale polar cap.
-  const cap = ctx.createLinearGradient(0, 0, 0, 52)
-  cap.addColorStop(0, 'rgba(253,244,236,0.75)')
-  cap.addColorStop(1, 'rgba(253,244,236,0)')
-  ctx.fillStyle = cap
-  ctx.fillRect(0, 0, 1024, 52)
-
-  return canvas
-}
 
 
-/* Stylized planets for the menu and the cabin window: same flat,
-   indie, low-poly-friendly look as Mars — never NASA-realistic. */
+/* Painted planets for the menu and the cabin window. Earth itself now
+   comes from blender/Earth (EarthGlobe.tsx); this painted Earth is only
+   the instant placeholder while those textures load. */
 
 function makeEarthCanvas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
@@ -787,6 +734,17 @@ function makePlanetTexture(kind: PlanetKind): THREE.CanvasTexture {
   return texture
 }
 
+function PaintedPlanet({ texture }: { texture: THREE.Texture }) {
+  return (
+    <mesh>
+      <sphereGeometry args={[PLANET_RADIUS, 64, 48]} />
+      {/* Relief: the same painted texture as a bump map, so
+          continents, craters and grain catch the light. */}
+      <meshStandardMaterial map={texture} bumpMap={texture} bumpScale={0.12} roughness={0.95} metalness={0} />
+    </mesh>
+  )
+}
+
 const HALO_COLOR: Record<PlanetKind, string> = {
   earth: '#7FB8E8',
   mars: '#E5A49A',
@@ -795,7 +753,8 @@ const HALO_COLOR: Record<PlanetKind, string> = {
 }
 
 const MENU_PLANET = new THREE.Vector3(-8.2, -4.6, -5)
-const CABIN_PLANET = new THREE.Vector3(0.9, -1.4, -13)
+// Lower-right of the CM-01 window, as in the cabin reference sheet.
+const CABIN_PLANET = new THREE.Vector3(3.1, -3.3, -13.5)
 
 /**
  * The big backdrop planet. The main menu and the outside approach
@@ -848,21 +807,19 @@ function BackdropPlanet() {
       // far, small and ahead-left only near the end, then grows as
       // the ship approaches it linearly. (A future zone only swaps
       // this texture/position — the approach follows this timeline.)
-      const approach = marsApproach(launchClock.value, reducedMotion)
-      outer.visible = approach > 0.002
+      const placement = launchPlanetPlacement(launchClock.value, reducedMotion)
+      outer.visible = placement.visible
       if (!outer.visible) return
       // Fluid entrance: eased approach (slow at first) AND a fade-in,
       // so the planet grows into frame instead of popping in big.
-      const eased = approach * approach * (3 - 2 * approach)
-      const fade = Math.min(1, approach / 0.3)
-      targetPlanet.set(-14 + eased * 4.5, -0.8 - eased * 3, -10 + eased * 3.5)
-      outer.scale.setScalar(0.18 + eased * 1.05)
-      outer.position.copy(targetPlanet)
+      const fade = placement.fade
+      outer.scale.setScalar(placement.scale)
+      outer.position.set(placement.x, placement.y, placement.z)
       outer.traverse((child) => {
         const material = (child as THREE.Mesh).material as THREE.Material | undefined
         if (!material) return
         material.transparent = true
-        material.opacity = (child.scale.x > 1 ? 0.1 : 1) * fade
+        material.opacity = ((child.userData.baseOpacity as number | undefined) ?? 1) * fade
       })
       return
     }
@@ -872,12 +829,10 @@ function BackdropPlanet() {
     outer.traverse((child) => {
       const material = (child as THREE.Mesh).material as THREE.Material | undefined
       if (!material) return
-      if (child.scale.x > 1) {
-        material.opacity = 0.1
-      } else {
-        material.transparent = false
-        material.opacity = 1
-      }
+      // Halo and clouds keep their own see-through look.
+      const base = child.userData.baseOpacity as number | undefined
+      material.transparent = base != null
+      material.opacity = base ?? 1
     })
     targetPlanet.copy(phase === 'menu' ? MENU_PLANET : CABIN_PLANET)
     if (reducedMotion) {
@@ -892,7 +847,7 @@ function BackdropPlanet() {
   return (
     <group ref={outerRef} position={MENU_PLANET}>
       {/* Soft atmospheric halo, back-side only. */}
-      <mesh scale={1.03}>
+      <mesh scale={1.03} userData={{ baseOpacity: 0.1 }}>
         <sphereGeometry args={[PLANET_RADIUS, 48, 32]} />
         <meshBasicMaterial
           color={HALO_COLOR[kind]}
@@ -903,12 +858,18 @@ function BackdropPlanet() {
         />
       </mesh>
       <group ref={groupRef}>
-        <mesh>
-          <sphereGeometry args={[PLANET_RADIUS, 64, 48]} />
-          {/* Relief: the same painted texture as a bump map, so
-              continents, craters and grain catch the light. */}
-          <meshStandardMaterial map={texture} bumpMap={texture} bumpScale={0.12} roughness={0.95} metalness={0} />
-        </mesh>
+        {kind === 'deep-space' ? (
+          <PaintedPlanet texture={texture} />
+        ) : (
+          // The Blender planets; the light painted one shows while they load.
+          <Suspense fallback={<PaintedPlanet texture={texture} />}>
+            {kind === 'earth' ? (
+              <EarthSurface radius={PLANET_RADIUS} spin={!reducedMotion} />
+            ) : (
+              <RockySurface kind={kind} radius={PLANET_RADIUS} />
+            )}
+          </Suspense>
+        )}
       </group>
     </group>
   )
@@ -938,7 +899,7 @@ function ThrusterPlume() {
     const particleSeeds = Array.from({ length: PLUME_COUNT }, () => ({
       age: random(),
       angle: random() * Math.PI * 2,
-      radius: Math.sqrt(random()) * 0.1,
+      radius: Math.sqrt(random()) * SHIP_NOZZLE_RADIUS * 0.7,
       speed: 0.85 + random() * 0.3,
     }))
     const geo = new THREE.BufferGeometry()
@@ -949,8 +910,8 @@ function ThrusterPlume() {
 
   useEffect(() => () => geometry.dispose(), [geometry])
 
-  const hot = useMemo(() => new THREE.Color('#FFF3D0'), [])
-  const warm = useMemo(() => new THREE.Color('#FFBA70'), [])
+  const hot = useMemo(() => new THREE.Color('#FFF3D0').multiplyScalar(1.5), [])
+  const warm = useMemo(() => new THREE.Color('#FFBA70').multiplyScalar(1.25), [])
   const cool = useMemo(() => new THREE.Color('#C65A2E'), [])
   const tmpColor = useMemo(() => new THREE.Color(), [])
 
@@ -961,16 +922,11 @@ function ThrusterPlume() {
     let thrust = 1
     if (phase === 'launching') {
       const stage = stageAt(launchClock.value, reducedMotion).stage
+      // Longer, faster flame the harder the ship pushes.
       thrust =
-        stage === 'accelerate'
-          ? 1.6
-          : stage === 'arrive'
-            ? 0.9
-            : stage === 'space'
-              ? 0.8
-              : stage === 'ignition'
-                ? 0.35
-                : 1.1
+        stage === 'ignition'
+          ? 0.35
+          : 1 + warpFactor(launchClock.value, reducedMotion) * 1.8
     }
     for (let index = 0; index < PLUME_COUNT; index += 1) {
       const seed = seeds[index]
@@ -984,7 +940,7 @@ function ThrusterPlume() {
       positions.setXYZ(
         index,
         Math.cos(seed.angle) * spread,
-        -1.18 - age * PLUME_LENGTH * thrust,
+        SHIP_NOZZLE_Y + 0.04 - age * PLUME_LENGTH * thrust,
         Math.sin(seed.angle) * spread,
       )
       // Colour cools as the particle ages; the oldest fade to black.
@@ -995,11 +951,18 @@ function ThrusterPlume() {
     }
     positions.needsUpdate = true
     colors.needsUpdate = true
+    // Fatter, hotter sparks at warp speed (bloom picks them up).
+    const points = pointsRef.current
+    if (points) {
+      const material = points.material as THREE.PointsMaterial
+      material.size = 0.11 + Math.max(0, thrust - 1) * 0.05
+    }
   })
 
   return (
     <points ref={pointsRef} geometry={geometry} frustumCulled={false}>
       <pointsMaterial
+        toneMapped={false}
         size={0.11}
         vertexColors
         transparent
@@ -1085,18 +1048,10 @@ function MailShip() {
       group.visible = !inCabinStage(launchClock.value, reducedMotion)
       const distance = cruiseDistance(launchClock.value, reducedMotion)
       const descent = descentProgress(launchClock.value, reducedMotion)
-      // LINEAR cruise: we are already in space, so the ship travels
-      // in a straight line (mostly -X, slightly down/away) at a
-      // steady rate — no curving dive, no quadratic dash. In arrive
-      // it keeps closing in toward the planet (left) while it
-      // descends only gently, so it stays high in the frame — it is
-      // heading TO the planet, not falling past it.
-      const closingIn = Math.min(descent, 0.5) / 0.5
-      group.position.set(
-        5.4 - distance - closingIn * 1.4,
-        -0.6 - distance * 0.06 - descent * 1.1,
-        -0.5 - distance * 0.05,
-      )
+      const cruise = launchShipPosition(launchClock.value, reducedMotion)
+      // LINEAR cruise, then a gentle closing-in above the planet's
+      // limb that leaves room for the solar arrays (launchShipPosition).
+      group.position.set(cruise.x, cruise.y, cruise.z)
       // Orientation: flying pose (nose toward the destination) the
       // whole cruise — the name floats above as a tag, so the hull
       // never turns mid-flight. At arrive it first INCLINES toward
@@ -1161,8 +1116,8 @@ function MailShip() {
 
   return (
     <group ref={groupRef} position={[5.4, -0.6, -0.5]} rotation={[0.08, Math.PI - 0.5, -1.57]} scale={1.9}>
-      {/* Inner offset centres the ~2.5 m tall pod on the group origin. */}
-      <group position={[0, -1.05, 0]}>
+      {/* The GLB is already centred, nose up; only metres -> units. */}
+      <group scale={SHIP_MODEL_SCALE} rotation={[0, SHIP_ROLL, 0]}>
         <primitive object={scene} />
       </group>
       <ThrusterPlume />
@@ -1170,7 +1125,7 @@ function MailShip() {
           group's local -X points world-up, so the sprite sits
           overhead; sprites always face the camera, so it reads. */}
       {nameTagTexture && (
-        <sprite ref={nameTagRef} position={[-1.15, 0, 0]} scale={[1.9, 0.6, 1]}>
+        <sprite ref={nameTagRef} position={[-1.3, 0, 0]} scale={[1.9, 0.6, 1]}>
           <spriteMaterial map={nameTagTexture} transparent opacity={0} toneMapped={false} depthWrite={false} />
         </sprite>
       )}
@@ -1196,8 +1151,14 @@ interface PipPose {
   lambda: number
 }
 
-const TUTORIAL_POSE: PipPose = { x: 0.05, y: 0.18, z: -2.35, scale: 1.15, roll: 0.02, pitch: 0, yaw: 0, bob: 0.07, sway: 0.03, antenna: 0.05, lambda: 2 }
-const HUB_POSE: PipPose = { x: 0.9, y: 0.14, z: -2.2, scale: 0.85, roll: 0.02, pitch: 0, yaw: 0, bob: 0.07, sway: 0.03, antenna: 0.05, lambda: 2 }
+/** PIP placement in CM-01 Blender coordinates (see cabinPoint). */
+function cabinXYZ(x: number, y: number, z: number): { x: number; y: number; z: number } {
+  const p = cabinPoint(x, y, z)
+  return { x: p.x, y: p.y, z: p.z }
+}
+
+const TUTORIAL_POSE: PipPose = { ...cabinXYZ(0, 2.55, 0.72), scale: 1.25, roll: 0.02, pitch: 0, yaw: 0, bob: 0.07, sway: 0.03, antenna: 0.05, lambda: 2 }
+const HUB_POSE: PipPose = { ...cabinXYZ(-0.15, 2.75, 1.12), scale: 1.15, roll: 0.02, pitch: 0, yaw: 0, bob: 0.07, sway: 0.03, antenna: 0.05, lambda: 2 }
 
 /**
  * Staging anchors for the cinematic intro. The window's centre is a
@@ -1208,12 +1169,11 @@ const HUB_POSE: PipPose = { x: 0.9, y: 0.14, z: -2.2, scale: 0.85, roll: 0.02, p
  * the projection — never as obstacles in front of it.
  */
 const PIP_ANCHORS = {
-  centerFocus: { x: 0, y: 0.2, z: -2.12, scale: 1.28 },
-  // Side anchors sit just outside the window rim on screen (the
-  // window edge projects to ~75% of half-width), lower than the
-  // hologram band, so PIP never covers the projection.
-  leftPresenter: { x: -1.18, y: -0.35, z: -2.28, scale: 0.9 },
-  rightPresenter: { x: 1.18, y: -0.35, z: -2.28, scale: 0.9 },
+  centerFocus: { ...cabinXYZ(0, 2.5, 0.78), scale: 1.35 },
+  // Side anchors float over the console wings, just inside the window
+  // ring and lower than the hologram band, so PIP never covers it.
+  leftPresenter: { ...cabinXYZ(-1.42, 2.4, 0.5), scale: 1.0 },
+  rightPresenter: { ...cabinXYZ(1.42, 2.4, 0.5), scale: 1.0 },
 } as const
 
 type PipAnchorName = keyof typeof PIP_ANCHORS
@@ -1230,13 +1190,13 @@ const INTRO_POSES: Record<IntroMoment, PipPose> = {
   // Arrival: dead-centre, upright and directly facing the player.
   arrival: { ...PIP_ANCHORS.centerFocus, roll: 0, pitch: 0, yaw: 0, bob: 0.09, sway: 0, antenna: 0.07, lambda: 2 },
   // Archive: beside the window, presenting the records.
-  archive: { x: 1.06, y: -0.24, z: -2.22, scale: 0.96, roll: 0.05, pitch: 0.03, yaw: -0.28, bob: 0.07, sway: 0.035, antenna: 0.06, lambda: 1.8 },
+  archive: { ...cabinXYZ(1.42, 2.45, 0.52), scale: 1.02, roll: 0.05, pitch: 0.03, yaw: -0.28, bob: 0.07, sway: 0.035, antenna: 0.06, lambda: 1.8 },
   // Fault: moves slightly toward the player so the reaction reads.
-  fault: { x: 0.92, y: -0.16, z: -2.08, scale: 1.04, roll: 0.02, pitch: 0.02, yaw: -0.08, bob: 0.05, sway: 0.022, antenna: 0.05, lambda: 1.7 },
+  fault: { ...cabinXYZ(1.38, 2.3, 0.52), scale: 1.08, roll: 0.02, pitch: 0.02, yaw: -0.08, bob: 0.05, sway: 0.022, antenna: 0.05, lambda: 1.7 },
   // Hope: energy returns, leaning toward the recovered clue.
-  hope: { x: -1.02, y: -0.2, z: -2.1, scale: 1.0, roll: -0.04, pitch: 0.05, yaw: 0.12, bob: 0.09, sway: 0.04, antenna: 0.09, lambda: 1.8 },
+  hope: { ...cabinXYZ(-1.4, 2.3, 0.52), scale: 1.05, roll: -0.04, pitch: 0.05, yaw: 0.12, bob: 0.09, sway: 0.04, antenna: 0.09, lambda: 1.8 },
   // Invitation: a small approach toward the player, warm and direct.
-  invitation: { x: -0.9, y: -0.1, z: -1.96, scale: 1.06, roll: -0.02, pitch: 0.03, yaw: 0, bob: 0.08, sway: 0.03, antenna: 0.1, lambda: 1.8 },
+  invitation: { ...cabinXYZ(-1.3, 2.15, 0.55), scale: 1.1, roll: -0.02, pitch: 0.03, yaw: 0, bob: 0.08, sway: 0.03, antenna: 0.1, lambda: 1.8 },
 }
 
 function poseForIntro(moment: IntroMoment, lineIndex: number): PipPose {
@@ -1452,31 +1412,14 @@ function CabinPip() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Console local coordinate system                                     */
+/* Navigation screen local frame                                        */
 /*                                                                     */
-/* The console board is a 2.5 x 0.7 box centred on the (tilted)       */
-/* console group origin, so in board-local space its top face is the   */
-/* plane y = 0.225 spanning x in [-1.25, 1.25], z in [-0.35, 0.35].   */
-/* Every component on the board is positioned relative to that plane   */
-/* and to one of three zones along x:                                  */
-/*   left    navigation  centred at x = -0.6875 (frame -1.158..-0.218) */
-/*   centre  controls    centred on the board's total centre, x = 0:   */
-/*           the take-off button is the main action, so its axis is    */
-/*           the symmetry axis of the whole console.                   */
-/*   right   passport    centred at x = 0.725 (tray 0.485..0.965)      */
-/* Stacking on the top face (no coplanar faces, no floating parts):   */
-/*   board top 0.225 -> nav frame top 0.245 -> screen plane 0.252 ->  */
-/*   radar sweep 0.258..0.270; button bezels / trays sit on 0.225.     */
+/* NavScreenOnBoard / RadarSweep keep their original board-local       */
+/* layout (screen plane at y = NAV_SCREEN_Y, centred on                */
+/* NAV_ZONE_CENTER_X, 0.86 x 0.40). CabinInterior re-centres and       */
+/* scales that layout onto the ANCHOR_NAV recess of the CM-01 console. */
 /* ------------------------------------------------------------------ */
-const CONSOLE_TOP_Y = 0.225
-const CONSOLE_CENTER_X = 0
 const NAV_ZONE_CENTER_X = -0.6875
-// Passport card + support centre: shifted 0.15 left from the right
-// zone's centre so the tray (0.485..0.965) sits 0.29 from the
-// indicator cluster (x <= 0.195) and 0.285 from the board's right
-// edge — balanced on both sides. Both the card and its support
-// read this constant, so they move as one assembly.
-const CARD_ZONE_CENTER_X = 0.725
 const NAV_SCREEN_Y = 0.252
 
 /** Radar sweep bar gliding across the console screen. It only shows
@@ -1512,118 +1455,40 @@ function RadarSweep({ position }: { position: [number, number, number] }) {
 /* a hidden mirror for keyboard / screen-reader users (see Hub).       */
 /* ------------------------------------------------------------------ */
 
-function makePassportTexture(view: PassportView): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 660
-  const ctx = canvas.getContext('2d')!
-  const gradient = ctx.createLinearGradient(0, 0, 512, 660)
-  gradient.addColorStop(0, '#33204a')
-  gradient.addColorStop(1, '#1b1029')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, 512, 660)
-  const fit = (text: string, maxWidth: number): string => {
-    let value = text
-    while (value.length > 4 && ctx.measureText(value).width > maxWidth) {
-      value = value.slice(0, -1)
-    }
-    return value.length < text.length ? `${value}…` : value
-  }
-  ctx.strokeStyle = 'rgba(255,217,168,0.65)'
-  ctx.lineWidth = 4
-  ctx.strokeRect(14, 14, 484, 632)
-  ctx.fillStyle = '#FFD9A8'
-  ctx.font = '700 32px system-ui, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.fillText('✉ Cosmic Mail', 40, 66)
-  ctx.font = '600 20px ui-monospace, monospace'
-  ctx.textAlign = 'right'
-  ctx.fillText(view.carrierId, 472, 62)
-  ctx.textAlign = 'left'
-  ctx.strokeStyle = 'rgba(253,244,236,0.35)'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(40, 92)
-  ctx.lineTo(472, 92)
-  ctx.stroke()
-
-  ctx.fillStyle = 'rgba(253,244,236,0.55)'
-  ctx.font = '600 18px ui-monospace, monospace'
-  ctx.fillText('CARRIER', 40, 138)
-  ctx.fillStyle = '#FDF4EC'
-  ctx.font = '700 28px system-ui, sans-serif'
-  ctx.fillText(fit(view.carrierName, 430), 40, 174)
-
-  ctx.fillStyle = 'rgba(253,244,236,0.55)'
-  ctx.font = '600 18px ui-monospace, monospace'
-  ctx.fillText('HISTORIES RESTORED', 40, 222)
-  ctx.fillStyle = '#FFD9A8'
-  ctx.font = '700 26px system-ui, sans-serif'
-  ctx.fillText(
-    `${view.transmittedCount}/${view.totalStories}`,
-    40,
-    256,
-  )
-
-  view.stories.forEach((story, index) => {
-    const y = 300 + index * 108
-    ctx.fillStyle = 'rgba(253,244,236,0.08)'
-    roundRectPath(ctx, 36, y - 28, 440, 92, 12)
-    ctx.fill()
-    ctx.strokeStyle = story.stampEarned
-      ? 'rgba(255,217,168,0.7)'
-      : 'rgba(253,244,236,0.22)'
-    ctx.lineWidth = 2
-    roundRectPath(ctx, 36, y - 28, 440, 92, 12)
-    ctx.stroke()
-
-    ctx.fillStyle = '#FDF4EC'
-    ctx.font = '700 24px system-ui, sans-serif'
-    ctx.fillText(`${story.destination.glyph} ${story.destination.name}`, 52, y)
-    ctx.fillStyle = 'rgba(253,244,236,0.62)'
-    ctx.font = '600 17px ui-monospace, monospace'
-    ctx.fillText(
-      story.machineName ?? 'EXPLORER NOT IDENTIFIED',
-      52,
-      y + 24,
-    )
-    ctx.fillStyle = story.stampEarned ? '#FFD9A8' : 'rgba(253,244,236,0.62)'
-    ctx.font = '600 16px ui-monospace, monospace'
-    ctx.fillText(
-      `${STORY_STATUS_LABEL[story.status].toUpperCase()} · ${story.scanned}/${story.total}`,
-      52,
-      y + 48,
-    )
-    if (story.stampEarned) {
-      ctx.fillStyle = '#FFD9A8'
-      ctx.textAlign = 'right'
-      ctx.font = '700 22px system-ui, sans-serif'
-      ctx.fillText('✦', 456, y + 8)
-      ctx.textAlign = 'left'
-    }
-  })
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  return texture
-}
-
 /**
  * Navigation screen layout (canvas 860x400, matching the 0.86x0.40
- * screen on the console top). Three destination cards on the left,
- * PIP's talking column on the right. Fractions are shared by the
- * draw code and the click hit-test.
+ * screen on the console top). List view: one tall card per destination.
+ * Detail view: planet, facts and the route buttons. Rectangles are
+ * shared by the draw code, the click hit-test and PIP's tour highlight.
  */
 const NAV_W = 860
 const NAV_H = 400
-const NAV_CARD_X0 = 16
-const NAV_CARD_W = 268
-const NAV_CARD_GAP = 12
-const NAV_CARDS_Y = 64
-const NAV_CARDS_H = 196
-const NAV_CARDS_TOP_FRAC = NAV_CARDS_Y / NAV_H
-const NAV_CARDS_BOTTOM_FRAC = (NAV_CARDS_Y + NAV_CARDS_H) / NAV_H
+const NAV_PAD = 16
+const NAV_TOP = 64
+const NAV_CARD_GAP = 14
+// Cards share the screen width evenly (two destinations: Moon and Mars).
+const NAV_CARD_W =
+  (NAV_W - 2 * NAV_PAD - (DESTINATIONS.length - 1) * NAV_CARD_GAP) / DESTINATIONS.length
+const NAV_CARD_H = NAV_H - NAV_TOP - NAV_PAD
+
+interface NavRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+const NAV_RECT = {
+  cards: { x: NAV_PAD, y: NAV_TOP, w: NAV_W - 2 * NAV_PAD, h: NAV_CARD_H },
+  image: { x: NAV_PAD, y: NAV_TOP, w: 300, h: 250 },
+  facts: { x: 332, y: NAV_TOP, w: NAV_W - 332 - NAV_PAD, h: 250 },
+  back: { x: NAV_PAD, y: 330, w: 200, h: 54 },
+  confirm: { x: 232, y: 330, w: NAV_W - 232 - NAV_PAD, h: 54 },
+} satisfies Record<string, NavRect>
+
+function inNavRect(rect: NavRect, px: number, py: number): boolean {
+  return px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h
+}
 
 type NavDestination = Destination
 
@@ -1661,7 +1526,6 @@ function roundRectPath(
    the same painted surface as the 3D planet. */
 let marsImageCanvas: HTMLCanvasElement | null = null
 let moonImageCanvas: HTMLCanvasElement | null = null
-let deepSpaceImageCanvas: HTMLCanvasElement | null = null
 
 function makeMoonCanvas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
@@ -1680,58 +1544,56 @@ function makeMoonCanvas(): HTMLCanvasElement {
     ctx.fillRect(random() * 512, random() * 256, 1.6, 1.6)
   }
   ctx.globalAlpha = 1
-  // Cratered moon disc.
-  ctx.fillStyle = '#D9D9D9'
+  // Cratered moon disc: maria, small craters with lit rims and a soft
+  // terminator, so it reads as a sphere like the Mars card.
+  const cx = 256
+  const cy = 128
+  const r = 78
+  const halo = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 1.4)
+  halo.addColorStop(0, 'rgba(220,225,240,0.25)')
+  halo.addColorStop(1, 'rgba(220,225,240,0)')
+  ctx.fillStyle = halo
+  ctx.fillRect(0, 0, 512, 256)
+  ctx.save()
   ctx.beginPath()
-  ctx.arc(256, 128, 78, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = 'rgba(120,120,130,0.55)'
-  for (let i = 0; i < 16; i += 1) {
-    const a = random() * Math.PI * 2
-    const d = random() * 58
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.clip()
+  ctx.fillStyle = '#CFCFD4'
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
+  ctx.fillStyle = 'rgba(120,122,135,0.45)'
+  for (const [mx, my, mr] of [
+    [-24, -20, 26],
+    [10, -30, 18],
+    [22, 8, 22],
+    [-30, 22, 16],
+  ] as const) {
     ctx.beginPath()
-    ctx.arc(256 + Math.cos(a) * d, 128 + Math.sin(a) * d, 5 + random() * 13, 0, Math.PI * 2)
+    ctx.ellipse(cx + mx, cy + my, mr, mr * 0.8, 0.4, 0, Math.PI * 2)
     ctx.fill()
   }
-  return canvas
-}
-
-function makeDeepSpaceCanvas(): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#070512'
-  ctx.fillRect(0, 0, 512, 256)
-  const random = mulberry32(0xdec0)
-  // Nebula blobs.
-  for (const [x, y, r, color] of [
-    [140, 110, 110, 'rgba(120,90,200,0.35)'],
-    [330, 150, 130, 'rgba(60,120,200,0.30)'],
-    [420, 80, 80, 'rgba(230,120,180,0.22)'],
-  ] as const) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-    g.addColorStop(0, color)
-    g.addColorStop(1, 'rgba(0,0,0,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, 512, 256)
+  for (let i = 0; i < 26; i += 1) {
+    const a = random() * Math.PI * 2
+    const d = Math.sqrt(random()) * (r - 6)
+    const cr = 2 + random() * 6
+    const px = cx + Math.cos(a) * d
+    const py = cy + Math.sin(a) * d
+    ctx.fillStyle = 'rgba(95,96,108,0.55)'
+    ctx.beginPath()
+    ctx.arc(px, py, cr, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(245,245,250,0.55)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.arc(px, py, cr, Math.PI * 0.9, Math.PI * 1.7)
+    ctx.stroke()
   }
-  ctx.fillStyle = '#FDF4EC'
-  for (let i = 0; i < 160; i += 1) {
-    ctx.globalAlpha = 0.35 + random() * 0.65
-    ctx.fillRect(random() * 512, random() * 256, 1.7, 1.7)
-  }
-  ctx.globalAlpha = 1
-  // Ringed planet.
-  ctx.fillStyle = '#B8A6D9'
-  ctx.beginPath()
-  ctx.arc(360, 130, 42, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(253,244,236,0.75)'
-  ctx.lineWidth = 5
-  ctx.beginPath()
-  ctx.ellipse(360, 130, 78, 20, -0.35, 0, Math.PI * 2)
-  ctx.stroke()
+  const shade = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r)
+  shade.addColorStop(0, 'rgba(255,255,255,0.16)')
+  shade.addColorStop(0.55, 'rgba(0,0,0,0)')
+  shade.addColorStop(1, 'rgba(8,8,16,0.5)')
+  ctx.fillStyle = shade
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
+  ctx.restore()
   return canvas
 }
 
@@ -1782,8 +1644,7 @@ function makeMarsCardCanvas(): HTMLCanvasElement {
 
 function zoneImage(zoneId: string): HTMLCanvasElement {
   if (zoneId === 'mars') return (marsCardCanvas ??= makeMarsCardCanvas())
-  if (zoneId === 'moon') return (moonImageCanvas ??= makeMoonCanvas())
-  return (deepSpaceImageCanvas ??= makeDeepSpaceCanvas())
+  return (moonImageCanvas ??= makeMoonCanvas())
 }
 
 /** The navigation screen at rest: idle radar rings. */
@@ -1817,97 +1678,248 @@ function drawRadarIdle(ctx: CanvasRenderingContext2D): void {
   ctx.textAlign = 'left'
 }
 
+const NAV_FONT = 'system-ui, "Segoe UI", sans-serif'
+const NAV_MONO = 'ui-monospace, "DejaVu Sans Mono", monospace'
+const NAV_TEAL = '#8FE3D8'
+const NAV_CREAM = '#FDF4EC'
+const NAV_PEACH = '#FFD9A8'
+const NAV_LAVENDER = '#B8A6D9'
+
+/** Wraps text into at most `maxLines` lines that fit `maxWidth`. */
+function wrapCanvasText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+): string[] {
+  const words = text.split(/\s+/)
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word
+    if (ctx.measureText(next).width <= maxWidth || !current) {
+      current = next
+    } else {
+      lines.push(current)
+      current = word
+    }
+  }
+  if (current) lines.push(current)
+  if (lines.length <= maxLines) return lines
+  const kept = lines.slice(0, maxLines)
+  kept[maxLines - 1] = fitCanvasText(ctx, `${kept[maxLines - 1]} ${lines.slice(maxLines).join(' ')}`, maxWidth)
+  return kept
+}
+
+/** The planet picture fitted (never cropped) into a rounded frame. */
+function drawPlanetPanel(
+  ctx: CanvasRenderingContext2D,
+  destination: NavDestination,
+  rect: NavRect,
+  dim: boolean,
+): void {
+  const image = zoneImage(destination.id)
+  ctx.save()
+  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 12)
+  ctx.clip()
+  ctx.fillStyle = '#050309'
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h)
+  // The painted images are 512x256 with the planet centred: scale by
+  // height so the whole disc shows, and let the starfield fill the sides.
+  const scale = Math.max(rect.h / image.height, rect.w / image.width)
+  const drawW = image.width * scale
+  const drawH = image.height * scale
+  ctx.drawImage(image, rect.x + (rect.w - drawW) / 2, rect.y + (rect.h - drawH) / 2, drawW, drawH)
+  if (dim) {
+    ctx.fillStyle = 'rgba(5,3,9,0.55)'
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h)
+  }
+  ctx.restore()
+}
+
+function drawSignalPill(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  available: boolean,
+  text: string,
+): void {
+  ctx.font = `800 15px ${NAV_MONO}`
+  const w = ctx.measureText(text).width + 40
+  ctx.fillStyle = available ? 'rgba(255,217,168,0.16)' : 'rgba(184,166,217,0.12)'
+  roundRectPath(ctx, x, y, w, 30, 15)
+  ctx.fill()
+  ctx.strokeStyle = available ? 'rgba(255,217,168,0.8)' : 'rgba(184,166,217,0.5)'
+  ctx.lineWidth = 1.5
+  roundRectPath(ctx, x, y, w, 30, 15)
+  ctx.stroke()
+  ctx.fillStyle = available ? NAV_PEACH : NAV_LAVENDER
+  ctx.beginPath()
+  ctx.arc(x + 16, y + 15, 5, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.textAlign = 'left'
+  ctx.fillText(text, x + 28, y + 20)
+}
+
+interface NavRow {
+  label: string
+  value: string
+}
+
+/**
+ * In-game information rows for a place (no scientific figures, so the
+ * screen can never show a wrong number): terrain, signal and explorer.
+ */
+function navRows(destination: NavDestination, view: PassportView): NavRow[] {
+  const story = storyFor(view, destination)
+  return [
+    { label: 'Terrain', value: destination.terrain },
+    {
+      label: 'Signal',
+      value: !destination.available
+        ? 'Too weak for now'
+        : story?.stampEarned
+          ? 'Story restored'
+          : 'Detected',
+    },
+    { label: 'Explorer', value: story?.machineName ?? 'Not identified yet' },
+  ]
+}
+
+/** Info rows: label on the left, value on the right. */
+function drawInfoRows(
+  ctx: CanvasRenderingContext2D,
+  rows: readonly NavRow[],
+  x: number,
+  y: number,
+  w: number,
+  rowH: number,
+): void {
+  rows.forEach((fact, index) => {
+    const ry = y + index * rowH
+    ctx.fillStyle = index % 2 === 0 ? 'rgba(143,227,216,0.09)' : 'rgba(143,227,216,0.04)'
+    roundRectPath(ctx, x, ry, w, rowH - 4, 8)
+    ctx.fill()
+    ctx.textAlign = 'left'
+    ctx.fillStyle = NAV_TEAL
+    ctx.font = `700 14px ${NAV_MONO}`
+    ctx.fillText(fact.label.toUpperCase(), x + 12, ry + rowH / 2 + 3)
+    ctx.textAlign = 'right'
+    ctx.fillStyle = NAV_CREAM
+    ctx.font = `800 19px ${NAV_FONT}`
+    ctx.fillText(fitCanvasText(ctx, fact.value, w - 130), x + w - 12, ry + rowH / 2 + 5)
+  })
+  ctx.textAlign = 'left'
+}
+
+function storyFor(view: PassportView, destination: NavDestination) {
+  return view.stories.find((entry) => entry.destination.id === destination.id) ?? null
+}
+
+/** Status of the place's signal for the list cards. */
+function signalLabel(destination: NavDestination, view: PassportView): string {
+  if (!destination.available) return 'SIGNAL TOO WEAK · SOON'
+  const story = storyFor(view, destination)
+  if (story?.stampEarned) return 'STORY RESTORED'
+  return 'SIGNAL DETECTED'
+}
+
 function drawSummary(
   ctx: CanvasRenderingContext2D,
   destination: NavDestination,
   view: PassportView,
 ): void {
-  const story = view.stories.find(
-    (entry) => entry.destination.id === destination.id,
-  )
-  const imgX = 16
-  const imgY = NAV_CARDS_Y
-  const imgW = 460
-  const imgH = NAV_CARDS_H
-  const image = zoneImage(destination.id)
-  ctx.save()
-  roundRectPath(ctx, imgX, imgY, imgW, imgH, 14)
-  ctx.clip()
-  const srcAspect = imgW / imgH
-  const srcW = Math.min(image.width, image.height * srcAspect)
-  const srcH = Math.min(image.height, image.width / srcAspect)
-  ctx.drawImage(
-    image,
-    (image.width - srcW) / 2,
-    (image.height - srcH) / 2,
-    srcW,
-    srcH,
-    imgX,
-    imgY,
-    imgW,
-    imgH,
-  )
-  ctx.restore()
-  ctx.strokeStyle = '#8FE3D8'
-  ctx.lineWidth = 3
-  roundRectPath(ctx, imgX, imgY, imgW, imgH, 14)
-  ctx.stroke()
-
-  ctx.fillStyle = '#FDF4EC'
-  ctx.font = '800 40px system-ui, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.fillText(destination.name, 500, 104)
-  ctx.fillStyle = '#8FE3D8'
-  ctx.font = '700 20px ui-monospace, monospace'
-  ctx.fillText('DESTINATION CLUE', 500, 140)
-  ctx.fillStyle = '#FDF4EC'
-  ctx.font = '600 24px system-ui, sans-serif'
-  ctx.fillText(fitCanvasText(ctx, destination.clue, 330), 500, 174)
-  ctx.fillStyle = 'rgba(253,244,236,0.92)'
-  ctx.font = '700 25px system-ui, sans-serif'
-  ctx.fillText(
-    fitCanvasText(
-      ctx,
-      story?.machineName ?? 'Signal awaiting identification',
-      330,
-    ),
-    500,
-    212,
-  )
-  ctx.fillStyle = '#8FE3D8'
-  ctx.font = '600 21px ui-monospace, monospace'
-  ctx.fillText(
-    `${story ? STORY_STATUS_LABEL[story.status] : 'Unidentified signal'} · ${
-      story?.scanned ?? 0
-    }/${story?.total ?? 3}`,
-    500,
-    244,
-  )
-  if (story?.stampEarned) {
-    ctx.fillStyle = '#FFD9A8'
-    ctx.font = '700 22px system-ui, sans-serif'
-    ctx.fillText(`✦ ${story.stampLabel}`, 500, 274)
-  }
-
-  ctx.fillStyle = destination.available ? '#FFD9A8' : 'rgba(253,244,236,0.35)'
-  roundRectPath(ctx, 220, 312, 420, 56, 14)
-  ctx.fill()
-  ctx.fillStyle = destination.available ? '#1B1029' : '#6B6070'
-  ctx.font = '800 30px system-ui, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText(
-    destination.available ? 'SELECT' : 'IN DEVELOPMENT',
-    430,
-    350,
-  )
+  const story = storyFor(view, destination)
+  drawPlanetPanel(ctx, destination, NAV_RECT.image, false)
   ctx.strokeStyle = 'rgba(143,227,216,0.7)'
   ctx.lineWidth = 2
-  roundRectPath(ctx, 16, 312, 180, 56, 14)
+  roundRectPath(ctx, NAV_RECT.image.x, NAV_RECT.image.y, NAV_RECT.image.w, NAV_RECT.image.h, 12)
   ctx.stroke()
-  ctx.fillStyle = '#8FE3D8'
-  ctx.font = '700 24px ui-monospace, monospace'
-  ctx.fillText('← BACK', 106, 350)
+
+  const { x, w } = NAV_RECT.facts
   ctx.textAlign = 'left'
+  ctx.fillStyle = NAV_CREAM
+  ctx.font = `800 38px ${NAV_FONT}`
+  ctx.fillText(destination.name, x, NAV_TOP + 34)
+  ctx.fillStyle = 'rgba(253,244,236,0.75)'
+  ctx.font = `600 18px ${NAV_FONT}`
+  ctx.fillText(destination.kind, x, NAV_TOP + 58)
+
+  drawInfoRows(ctx, navRows(destination, view), x, NAV_TOP + 70, w, 32)
+
+  // The mission clue (game text, never a scientific claim).
+  ctx.fillStyle = NAV_PEACH
+  ctx.font = `800 14px ${NAV_MONO}`
+  ctx.fillText('★ MISSION CLUE', x, NAV_TOP + 184)
+  ctx.fillStyle = NAV_CREAM
+  ctx.font = `600 18px ${NAV_FONT}`
+  wrapCanvasText(ctx, destination.clue, w, 1).forEach((line) => {
+    ctx.fillText(line, x, NAV_TOP + 207)
+  })
+  ctx.fillStyle = NAV_TEAL
+  ctx.font = `700 14px ${NAV_MONO}`
+  const progress = story?.machineName
+    ? `${STORY_STATUS_LABEL[story.status]} · ${story.scanned}/${story.total} parts`
+    : 'Find the explorer and bring its story home'
+  ctx.fillText(fitCanvasText(ctx, progress.toUpperCase(), w), x, NAV_TOP + 240)
+
+  const back = NAV_RECT.back
+  ctx.strokeStyle = 'rgba(143,227,216,0.75)'
+  ctx.lineWidth = 2
+  roundRectPath(ctx, back.x, back.y, back.w, back.h, 14)
+  ctx.stroke()
+  ctx.fillStyle = NAV_TEAL
+  ctx.font = `800 22px ${NAV_FONT}`
+  ctx.textAlign = 'center'
+  ctx.fillText('← Back', back.x + back.w / 2, back.y + 35)
+
+  const confirm = NAV_RECT.confirm
+  ctx.fillStyle = destination.available ? '#FFC94A' : 'rgba(253,244,236,0.25)'
+  roundRectPath(ctx, confirm.x, confirm.y, confirm.w, confirm.h, 14)
+  ctx.fill()
+  ctx.fillStyle = destination.available ? '#1B1029' : '#6B6070'
+  ctx.font = `800 26px ${NAV_FONT}`
+  ctx.fillText(
+    destination.available ? 'Confirm route' : 'Signal too weak for now',
+    confirm.x + confirm.w / 2,
+    confirm.y + 36,
+  )
+  ctx.textAlign = 'left'
+}
+
+function drawDestinationCard(
+  ctx: CanvasRenderingContext2D,
+  destination: NavDestination,
+  view: PassportView,
+  x: number,
+): void {
+  const y = NAV_TOP
+  const w = NAV_CARD_W
+  const h = NAV_CARD_H
+  const on = destination.available
+  ctx.fillStyle = on ? 'rgba(216,244,240,0.07)' : 'rgba(10,6,20,0.5)'
+  roundRectPath(ctx, x, y, w, h, 14)
+  ctx.fill()
+  ctx.strokeStyle = on ? 'rgba(255,217,168,0.55)' : 'rgba(184,166,217,0.3)'
+  ctx.lineWidth = 2
+  roundRectPath(ctx, x, y, w, h, 14)
+  ctx.stroke()
+
+  drawPlanetPanel(ctx, destination, { x: x + 10, y: y + 10, w: w - 20, h: 100 }, !on)
+
+  ctx.globalAlpha *= on ? 1 : 0.7
+  ctx.textAlign = 'left'
+  ctx.fillStyle = NAV_CREAM
+  ctx.font = `800 28px ${NAV_FONT}`
+  ctx.fillText(destination.name, x + 14, y + 140)
+  ctx.fillStyle = 'rgba(253,244,236,0.72)'
+  ctx.font = `600 16px ${NAV_FONT}`
+  ctx.fillText(fitCanvasText(ctx, destination.kind, w - 28), x + 14, y + 162)
+
+  drawInfoRows(ctx, navRows(destination, view), x + 10, y + 174, w - 20, 32)
+  ctx.globalAlpha /= on ? 1 : 0.7
+
+  drawSignalPill(ctx, x + 10, y + h - 42, on, signalLabel(destination, view))
 }
 
 function drawDestinations(
@@ -1916,112 +1928,42 @@ function drawDestinations(
   selectedId: string | null,
   view: PassportView,
 ): void {
+  // Opaque: the idle radar must not show through the panel.
   const gradient = ctx.createLinearGradient(0, 0, NAV_W, NAV_H)
-  gradient.addColorStop(0, 'rgba(67,120,140,0.92)')
-  gradient.addColorStop(1, 'rgba(27,16,41,0.95)')
+  gradient.addColorStop(0, '#1C3F55')
+  gradient.addColorStop(1, '#1B1029')
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, NAV_W, NAV_H)
-  ctx.strokeStyle = 'rgba(143,227,216,0.7)'
+  ctx.strokeStyle = 'rgba(143,227,216,0.55)'
   ctx.lineWidth = 3
-  ctx.strokeRect(8, 8, NAV_W - 16, NAV_H - 16)
-  ctx.fillStyle = '#A8F0E4'
-  ctx.font = '700 34px ui-monospace, monospace'
-  ctx.textAlign = 'left'
-  ctx.fillText('NAVIGATION', 24, 52)
-  ctx.textAlign = 'right'
-  ctx.fillStyle = '#FDF4EC'
-  ctx.fillText(
-    selectedId
-      ? 'ROUTE SUMMARY'
-      : view.transmittedCount > 0
-        ? `${view.transmittedCount}/${view.totalStories} RESTORED`
-        : 'PICK A DESTINATION',
-    NAV_W - 24,
-    52,
-  )
-  ctx.textAlign = 'left'
+  roundRectPath(ctx, 6, 6, NAV_W - 12, NAV_H - 12, 12)
+  ctx.stroke()
 
   const selected = destinations.find((entry) => entry.id === selectedId)
+  ctx.textAlign = 'left'
+  ctx.fillStyle = NAV_TEAL
+  ctx.font = `800 24px ${NAV_FONT}`
+  ctx.fillText('NAVIGATION', NAV_PAD + 4, 44)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = 'rgba(253,244,236,0.85)'
+  ctx.font = `700 18px ${NAV_FONT}`
+  ctx.fillText(
+    selected
+      ? 'Route details'
+      : view.transmittedCount > 0
+        ? `${view.transmittedCount}/${view.totalStories} stories restored`
+        : 'Where shall we fly?',
+    NAV_W - NAV_PAD - 4,
+    44,
+  )
+  ctx.textAlign = 'left'
 
   if (selected) {
     drawSummary(ctx, selected, view)
     return
   }
-
   destinations.forEach((destination, index) => {
-    const x = NAV_CARD_X0 + index * (NAV_CARD_W + NAV_CARD_GAP)
-    const y = NAV_CARDS_Y
-    const story = view.stories.find(
-      (entry) => entry.destination.id === destination.id,
-    )
-    ctx.fillStyle = destination.available
-      ? 'rgba(216,244,240,0.06)'
-      : 'rgba(27,16,41,0.55)'
-    roundRectPath(ctx, x, y, NAV_CARD_W, NAV_CARDS_H, 14)
-    ctx.fill()
-    ctx.strokeStyle = destination.available
-      ? 'rgba(253,244,236,0.3)'
-      : 'rgba(184,166,217,0.35)'
-    ctx.lineWidth = 2
-    roundRectPath(ctx, x, y, NAV_CARD_W, NAV_CARDS_H, 14)
-    ctx.stroke()
-
-    const imgX = x + 10
-    const imgY = y + 10
-    const imgW = NAV_CARD_W - 20
-    const imgH = 98
-    const image = zoneImage(destination.id)
-    ctx.save()
-    roundRectPath(ctx, imgX, imgY, imgW, imgH, 10)
-    ctx.clip()
-    const srcAspect = imgW / imgH
-    const srcW = Math.min(image.width, image.height * srcAspect)
-    const srcH = Math.min(image.height, image.width / srcAspect)
-    ctx.drawImage(
-      image,
-      (image.width - srcW) / 2,
-      (image.height - srcH) / 2,
-      srcW,
-      srcH,
-      imgX,
-      imgY,
-      imgW,
-      imgH,
-    )
-    if (!destination.available) {
-      ctx.fillStyle = 'rgba(5,3,9,0.55)'
-      ctx.fillRect(imgX, imgY, imgW, imgH)
-    }
-    ctx.restore()
-
-    ctx.fillStyle = '#FDF4EC'
-    ctx.font = '700 29px system-ui, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.fillText(
-      `${destination.glyph} ${destination.name}`,
-      x + 12,
-      imgY + imgH + 35,
-    )
-    ctx.fillStyle = 'rgba(253,244,236,0.86)'
-    ctx.font = '600 18px system-ui, sans-serif'
-    ctx.fillText(
-      fitCanvasText(ctx, destination.clue, NAV_CARD_W - 24),
-      x + 12,
-      imgY + imgH + 60,
-    )
-    ctx.fillStyle = destination.available ? '#8FE3D8' : '#B8A6D9'
-    ctx.font = '700 17px ui-monospace, monospace'
-    ctx.fillText(
-      fitCanvasText(
-        ctx,
-        destination.available
-          ? story?.machineName ?? 'SIGNAL DETECTED'
-          : 'MISSION IN DEVELOPMENT',
-        NAV_CARD_W - 24,
-      ),
-      x + 12,
-      imgY + imgH + 84,
-    )
+    drawDestinationCard(ctx, destination, view, NAV_PAD + index * (NAV_CARD_W + NAV_CARD_GAP))
   })
 }
 
@@ -2042,126 +1984,50 @@ function drawNavScreen(
   ctx.restore()
 }
 
-/** Passport card pinned on the cabin wall; click opens the detail view. */
-function PassportCard3D() {
-  const save = useJourneyStore((state) => state.save)
-  const phase = useOnboardingStore((state) => state.phase)
-  const detailOpen = useOnboardingStore((state) => state.passportDetailOpen)
-  const setPassportDetailOpen = useOnboardingStore((state) => state.setPassportDetailOpen)
-  const [hovered, setHovered] = useState(false)
-  const groupRef = useRef<THREE.Group>(null)
-  const appearRef = useRef(0)
-  const glowRef = useRef<THREE.PointLight>(null)
+/**
+ * PIP's tour highlight drawn on the navigation screen itself: a glowing
+ * frame around the cards, the facts or the Confirm button. Lives in the
+ * screen plane's local frame (1 canvas px = 1 mm, origin at the centre).
+ */
+function NavTourHighlight({ target: area }: { target: NavRect | null }) {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
-
-  // The freshly issued passport materializes on its tray: a short
-  // rise + scale-in with a warm glow, so the hub handoff is not a cut.
-  useFrame((_, delta) => {
+  const groupRef = useRef<THREE.Group>(null)
+  useFrame((state) => {
     const group = groupRef.current
     if (!group) return
-    appearRef.current = Math.min(1, appearRef.current + delta / (reducedMotion ? 0.01 : 0.75))
-    const eased = 1 - Math.pow(1 - appearRef.current, 3)
-    const baseScale = 0.55 * (hovered ? 1.06 : 1)
-    group.scale.setScalar(baseScale * (0.55 + 0.45 * eased))
-    group.position.y = 0.449 + (1 - eased) * 0.12
-    if (glowRef.current) glowRef.current.intensity = (1 - eased) * 2.2
+    const wave = reducedMotion ? 0.5 : (Math.sin(state.clock.elapsedTime * 4.2) + 1) / 2
+    group.children.forEach((child) => {
+      const material = (child as THREE.Mesh).material as THREE.MeshBasicMaterial
+      material.opacity = 0.45 + wave * 0.55
+    })
   })
-
-  // Only the card face ABOVE the slot is clickable: without this,
-  // clicks through/under the board still hit the part of the plane
-  // hidden inside the console and opened the detail from below.
-  const isOnCardFace = (point: THREE.Vector3): boolean => {
-    const group = groupRef.current
-    if (!group) return false
-    // Force fresh matrices: on the very first hover the group's
-    // matrixWorld may be stale, which made the first pass miss and
-    // only the second hover work.
-    group.updateWorldMatrix(false, true)
-    const local = group.worldToLocal(point.clone())
-    return Math.abs(local.x) < 0.33 && local.y > -0.15
-  }
-
-  const texture = useMemo(() => {
-    if (!save) return null
-    return makePassportTexture(getPassportView(save))
-  }, [save])
-
-  useEffect(() => () => texture?.dispose(), [texture])
-
-  // The card keeps a fixed orientation like the controls around it:
-  // leaning back slightly on the board, facing the same way as the
-  // take-off button (toward the pilot/camera). No billboarding —
-  // that hid the slot groove and looked detached from the console.
-  // No yaw/roll: the card is aligned with the board and with its
-  // support (right zone, centre x = 0.725). Its pivot stays at the
-  // card centre, so the isOnCardFace hit-test is unchanged. The foot
-  // (half-height 0.385 x 0.55 = 0.212 along the lean) lands exactly
-  // on the support tray top (y = 0.25) at z = -0.10:
-  //   foot y = 0.449 - 0.212 * cos(0.35) = 0.250
-  //   foot z = -0.173 + 0.212 * sin(0.35) = -0.100
-
-  // While the detail is open, the 3D card leaves the console (it is
-  // "in hand" now, not duplicated on the desk). It belongs to the hub
-  // and to the launch/playing cabin, never to the intro/registration.
-  const onConsole =
-    phase === 'hub' || phase === 'launching' || phase === 'playing'
-  if (!save || !texture || detailOpen || !onConsole) return null
+  if (!area) return null
+  const t = 5
+  const pad = 7
+  const target = { x: area.x - pad, y: area.y - pad, w: area.w + pad * 2, h: area.h + pad * 2 }
+  const cx = (target.x + target.w / 2) / 1000 - NAV_W / 2000
+  const cy = NAV_H / 2000 - (target.y + target.h / 2) / 1000
+  const w = target.w / 1000
+  const h = target.h / 1000
+  const bars: [number, number, number, number][] = [
+    [0, h / 2, w + t / 1000, t / 1000],
+    [0, -h / 2, w + t / 1000, t / 1000],
+    [-w / 2, 0, t / 1000, h],
+    [w / 2, 0, t / 1000, h],
+  ]
   return (
-    // Standing on its support tray in the right zone, leaning
-    // back like a card propped on the dashboard.
-    <group
-      ref={groupRef}
-      position={[CARD_ZONE_CENTER_X, 0.449, -0.173]}
-      rotation={[-0.35, 0, 0]}
-      scale={0.55 * (hovered ? 1.06 : 1)}
-    >
-      {/* Warm pulse while the card settles (fades to zero). */}
-      <pointLight ref={glowRef} position={[0, 0.1, 0.28]} color="#FFD9A8" distance={0.9} intensity={2.2} />
-      <mesh position={[0, 0, -0.012]}>
-        <planeGeometry args={[0.66, 0.83]} />
-        <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
-      </mesh>
-
-      <mesh
-        onPointerDown={(event) => {
-          event.stopPropagation()
-          if (!isOnCardFace(event.point)) return
-          setPassportDetailOpen(true)
-        }}
-        onPointerOver={(event) => {
-          if (!isOnCardFace(event.point)) return
-          setHovered(true)
-          emitAudio('uiHover', { dedupeKey: 'passport-3d', dedupeMs: 180 })
-          document.body.style.cursor = 'pointer'
-        }}
-        onPointerMove={(event) => {
-          // Backup for a missed pointerover (e.g. after the hover
-          // scale shifted the geometry under the cursor) — and the
-          // release when the pointer slides below the slot: the
-          // visible face ends there, even if the ray still hits the
-          // hidden part of the plane inside the board.
-          if (isOnCardFace(event.point)) {
-            if (!hovered) {
-              setHovered(true)
-              document.body.style.cursor = 'pointer'
-            }
-          } else if (hovered) {
-            setHovered(false)
-            document.body.style.cursor = 'auto'
-          }
-        }}
-        onPointerOut={() => {
-          setHovered(false)
-          document.body.style.cursor = 'auto'
-        }}
-      >
-        <planeGeometry args={[0.6, 0.77]} />
-        <meshBasicMaterial
-          map={texture}
-          toneMapped={false}
-          color={hovered ? '#FFE9C9' : '#FFFFFF'}
-        />
-      </mesh>
+    <group ref={groupRef} position={[cx, cy, 0.002]}>
+      {bars.map(([x, y, bw, bh], index) => (
+        <mesh key={index} position={[x, y, 0]}>
+          <planeGeometry args={[bw, bh]} />
+          <meshBasicMaterial
+            color={BEACON_COLOR}
+            toneMapped={false}
+            transparent
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -2189,6 +2055,9 @@ function NavScreenOnBoard() {
   const save = useJourneyStore((state) => state.save)
   const view = getPassportView(save)
   const [hovered, setHovered] = useState(false)
+  const focus = useHubFocus()
+  const navEnabled = hubElementEnabled(focus, 'nav')
+  const navAllowed = (element: string) => hubElementEnabled(focus, element)
 
   // One canvas + texture for the screen's whole life; the contents
   // are redrawn only while the blend or the selection changes.
@@ -2238,45 +2107,33 @@ function NavScreenOnBoard() {
       rotation={[-Math.PI / 2, 0, 0]}
       onPointerDown={(event) => {
         event.stopPropagation()
-        // The board controls only respond in the hub.
+        // The board controls only respond in the hub, and during the
+        // guided tour only once PIP points at the screen.
         if (phase !== 'hub') return
         if (!routeOpen) {
+          if (!navEnabled) return
           setRouteOpen(true)
           return
         }
         const uv = event.uv
         if (!uv) return
-        const yFromTop = 1 - uv.y
+        const px = uv.x * NAV_W
+        const py = (1 - uv.y) * NAV_H
         if (selectedDestinationId) {
-          if (
-            uv.x >= 220 / NAV_W &&
-            uv.x <= 640 / NAV_W &&
-            yFromTop >= 0.78 &&
-            yFromTop <= 0.92
-          ) {
+          if (inNavRect(NAV_RECT.confirm, px, py)) {
             const destination = DESTINATIONS.find(
               (entry) => entry.id === selectedDestinationId,
             )
-            if (destination?.available) confirmRoute()
+            if (destination?.available && navAllowed('nav-confirm')) confirmRoute()
             return
           }
-          if (
-            uv.x >= 16 / NAV_W &&
-            uv.x <= 196 / NAV_W &&
-            yFromTop >= 0.78 &&
-            yFromTop <= 0.92
-          ) {
+          if (inNavRect(NAV_RECT.back, px, py) && navAllowed('nav-back')) {
             clearSelection()
           }
           return
         }
-        if (yFromTop < NAV_CARDS_TOP_FRAC || yFromTop > NAV_CARDS_BOTTOM_FRAC) {
-          return
-        }
-        const index = Math.floor(
-          (uv.x - NAV_CARD_X0 / NAV_W) /
-            ((NAV_CARD_W + NAV_CARD_GAP) / NAV_W),
-        )
+        if (!inNavRect(NAV_RECT.cards, px, py) || !navAllowed('nav-cards')) return
+        const index = Math.floor((px - NAV_PAD) / (NAV_CARD_W + NAV_CARD_GAP))
         const destination = DESTINATIONS[index]
         if (destination?.available) selectDestination(destination.id)
       }}
@@ -2291,6 +2148,17 @@ function NavScreenOnBoard() {
       }}
     >
       <planeGeometry args={[0.86, 0.4]} />
+      <NavTourHighlight
+        target={
+          !routeOpen || !focus.tourActive
+            ? null
+            : focus.target === 'nav-cards' && !selectedDestinationId
+              ? NAV_RECT.cards
+              : focus.target === 'nav-confirm' && selectedDestinationId
+                ? NAV_RECT.confirm
+                : null
+        }
+      />
       <meshBasicMaterial
         map={screen.texture}
         toneMapped={false}
@@ -2300,289 +2168,41 @@ function NavScreenOnBoard() {
   )
 }
 
-/* ------------------------------------------------------------------ */
-/* Cabin surface textures (procedural canvas)                          */
-/* ------------------------------------------------------------------ */
-
-/** Painted hull panels: base gradient, seams and rivets. */
-function makePanelCanvas(
-  base: string,
-  dark: string,
-  seam: string,
-  size = 512,
-): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  const gradient = ctx.createLinearGradient(0, 0, size, size)
-  gradient.addColorStop(0, base)
-  gradient.addColorStop(1, dark)
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, size, size)
-  const random = mulberry32(0x9a37)
-  // Speckle for grain.
-  for (let i = 0; i < 900; i += 1) {
-    ctx.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.12)'
-    ctx.fillRect(random() * size, random() * size, 1.6, 1.6)
-  }
-  // Seams.
-  ctx.strokeStyle = seam
-  ctx.lineWidth = 3
-  for (const frac of [1 / 3, 2 / 3]) {
-    ctx.beginPath()
-    ctx.moveTo(size * frac, 0)
-    ctx.lineTo(size * frac, size)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(0, size * frac)
-    ctx.lineTo(size, size * frac)
-    ctx.stroke()
-  }
-  // Rivets at the seam intersections and corners.
-  ctx.fillStyle = 'rgba(253,244,236,0.45)'
-  for (const fx of [0.06, 1 / 3, 2 / 3, 0.94]) {
-    for (const fy of [0.06, 1 / 3, 2 / 3, 0.94]) {
-      ctx.beginPath()
-      ctx.arc(size * fx, size * fy, 4, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
-  return canvas
-}
-
-function makePanelTexture(base: string, dark: string, seam: string): THREE.CanvasTexture {
-  const texture = new THREE.CanvasTexture(makePanelCanvas(base, dark, seam))
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.wrapS = THREE.RepeatWrapping
-  texture.wrapT = THREE.RepeatWrapping
-  texture.anisotropy = 4
-  return texture
-}
-
-/** Console top: darker dashboard with a bordered equipment area. */
-function makeConsoleTopTexture(): THREE.CanvasTexture {
-  const W = 512
-  const H = 256
-  const canvas = document.createElement('canvas')
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  const gradient = ctx.createLinearGradient(0, 0, W, H)
-  gradient.addColorStop(0, '#4A3670')
-  gradient.addColorStop(1, '#2C1F45')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, W, H)
-  const random = mulberry32(0xc0a5)
-  for (let i = 0; i < 700; i += 1) {
-    ctx.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.12)'
-    ctx.fillRect(random() * W, random() * H, 1.6, 1.6)
-  }
-  // Only a perimeter border: any divider line or plate painted here
-  // would run underneath the screen, buttons or card support and
-  // read as a moulding crossing a functional component.
-  ctx.strokeStyle = 'rgba(143,227,216,0.35)'
-  ctx.lineWidth = 3
-  ctx.strokeRect(10, 10, W - 20, H - 20)
-  // Fine engraved traces along the front and back margins (canvas
-  // y = 14 / H-14, i.e. board z = +/-0.31 in either V orientation):
-  // orbital-route arcs with node dots at the ends. They stay in the
-  // 0.11-deep margin strips, where no screen, button or support
-  // reaches (the nav frame ends at z = +/-0.24), and components
-  // sitting on the board cover them anyway where they overlap.
-  ctx.strokeStyle = 'rgba(143,227,216,0.28)'
-  ctx.lineWidth = 2
-  for (const y of [14, H - 14]) {
-    ctx.beginPath()
-    ctx.moveTo(24, y)
-    ctx.quadraticCurveTo(W / 2, y + (y < H / 2 ? 6 : -6), W - 24, y)
-    ctx.stroke()
-    for (const x of [24, W - 24]) {
-      ctx.beginPath()
-      ctx.arc(x, y, 3, 0, Math.PI * 2)
-      ctx.stroke()
-    }
-  }
-  ctx.fillStyle = 'rgba(253,244,236,0.5)'
-  for (const [x, y] of [
-    [18, 18],
-    [W - 18, 18],
-    [18, H - 18],
-    [W - 18, H - 18],
-  ] as const) {
-    ctx.beginPath()
-    ctx.arc(x, y, 4, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  return texture
-}
-
-/** Subtle Cosmic Mail identity decal for the front wall: an
- *  envelope with a route arc, drawn in cream on transparent. */
-function makeMailDecalTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')!
-  ctx.strokeStyle = 'rgba(253,244,236,0.85)'
-  ctx.fillStyle = 'rgba(253,244,236,0.85)'
-  ctx.lineWidth = 6
-  // Envelope body.
-  roundRectPath(ctx, 76, 56, 200, 130, 10)
-  ctx.stroke()
-  // Flap.
-  ctx.beginPath()
-  ctx.moveTo(76, 66)
-  ctx.lineTo(176, 140)
-  ctx.lineTo(276, 66)
-  ctx.stroke()
-  // Route arc out of the envelope toward the top right.
-  ctx.setLineDash([12, 10])
-  ctx.beginPath()
-  ctx.moveTo(286, 120)
-  ctx.quadraticCurveTo(380, 40, 470, 70)
-  ctx.stroke()
-  ctx.setLineDash([])
-  ctx.beginPath()
-  ctx.arc(470, 70, 9, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.font = '700 34px ui-monospace, monospace'
-  ctx.textAlign = 'left'
-  ctx.fillText('COSMIC MAIL', 76, 228)
-  ctx.font = '600 20px ui-monospace, monospace'
-  ctx.fillStyle = 'rgba(253,244,236,0.55)'
-  ctx.fillText('EARTH COSMIC ARCHIVE', 76, 252 - 8)
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  return texture
-}
-
-/** Small dark plate label for the outgoing-mail slot: an envelope
- *  glyph and OUTGOING MAIL in cream monospace. Purely decorative
- *  for now; the slot geometry it labels is a plain recess, so a
- *  future mail-delivery interaction can reuse it as-is. */
-function makeSlotLabelTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 96
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#241736'
-  ctx.fillRect(0, 0, 512, 96)
-  ctx.strokeStyle = 'rgba(253,244,236,0.85)'
-  ctx.fillStyle = 'rgba(253,244,236,0.85)'
-  ctx.lineWidth = 5
-  // Envelope glyph.
-  roundRectPath(ctx, 28, 22, 72, 52, 8)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.moveTo(28, 28)
-  ctx.lineTo(64, 54)
-  ctx.lineTo(100, 28)
-  ctx.stroke()
-  ctx.font = '700 34px ui-monospace, monospace'
-  ctx.textAlign = 'left'
-  ctx.fillText('OUTGOING MAIL', 124, 62)
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  return texture
-}
-
-/** Insignia plaque for the console's front edge: COSMIC MAIL —
- *  DELIVERY UNIT 01 in cream on a dark plate. */
-function makeInsigniaTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 128
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#241736'
-  ctx.fillRect(0, 0, 512, 128)
-  ctx.strokeStyle = 'rgba(255,217,168,0.55)'
-  ctx.lineWidth = 3
-  ctx.strokeRect(8, 8, 512 - 16, 128 - 16)
-  ctx.textAlign = 'center'
-  ctx.fillStyle = '#FDF4EC'
-  ctx.font = '800 42px system-ui, sans-serif'
-  ctx.fillText('COSMIC MAIL', 256, 56)
-  ctx.fillStyle = 'rgba(253,244,236,0.65)'
-  ctx.font = '600 24px ui-monospace, monospace'
-  ctx.fillText('DELIVERY UNIT 01', 256, 96)
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  return texture
-}
-
-/** Grayscale radial top for the console buttons (tinted per button). */
-function makeButtonTopTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
-  const ctx = canvas.getContext('2d')!
-  const gradient = ctx.createRadialGradient(52, 48, 6, 64, 64, 62)
-  gradient.addColorStop(0, '#FFFFFF')
-  gradient.addColorStop(0.55, '#CFCFCF')
-  gradient.addColorStop(1, '#6E6E6E')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, 128, 128)
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)'
-  ctx.lineWidth = 6
-  ctx.beginPath()
-  ctx.arc(64, 64, 56, 0, Math.PI * 2)
-  ctx.stroke()
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
-
 /**
- * The big take-off button on the console top, just right of the
- * navigation screen and centred on the board. A transparent hinged
- * lid covers it until a destination is locked on the navigation
- * screen; then the lid flips open, the button glows, and pressing
- * it is what actually takes off.
+ * Main button (Inicio de misión) on its yellow/black hazard ring, in
+ * the BUTTON anchor frame of the CM-01 console (+Y = board normal,
+ * -Z = toward the window). A glass safety dome covers it until a
+ * destination is confirmed on the navigation screen; then the dome
+ * swings back on its hinge, the button glows, and pressing it takes off.
  */
 function TakeOffButton() {
-  // The lid only lifts once SELECT confirms the route, not while
-  // the destination is merely previewed on the navigation screen.
   const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
   const takeOff = useOnboardingStore((state) => state.takeOff)
   const lidRef = useRef<THREE.Group>(null)
+  const buttonMaterialRef = useRef<THREE.MeshStandardMaterial>(null)
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const lid = lidRef.current
-    if (!lid) return
-    lid.rotation.x = THREE.MathUtils.damp(
-      lid.rotation.x,
-      routeConfirmed ? -1.9 : 0,
-      6,
-      delta,
-    )
+    if (lid) {
+      lid.rotation.x = THREE.MathUtils.damp(lid.rotation.x, routeConfirmed ? -1.75 : 0, 6, delta)
+    }
+    const material = buttonMaterialRef.current
+    if (material) {
+      material.emissiveIntensity = routeConfirmed
+        ? 0.55 + Math.sin(state.clock.elapsedTime * 4) * 0.25
+        : 0.08
+    }
   })
 
   return (
-    // Centred on the board's total width (x = 0), back row: bezel
-    // (r = 0.16) spans x -0.16..0.16, z -0.235..0.085. The lid
-    // hinge is at the back (z = -0.205); closed it covers
-    // z -0.20..0.05, and fully open (rotation.x = -1.9) its disc
-    // stays within x -0.125..0.125, z -0.287..-0.207, y 0.29..0.53
-    // — clear of the nav frame (x <= -0.218, top 0.245), of the
-    // indicator cluster (z >= 0.07) and of the passport tray
-    // (x >= 0.485) in every intermediate state. The hinge posts,
-    // pin and moving knuckle below keep the disc attached to a
-    // visible axle instead of floating over the button.
-    <group position={[CONSOLE_CENTER_X, 0, -0.075]}>
-      {/* Bezel ring the big button sits in. */}
-      <mesh position={[0, 0.232, 0]}>
-        <cylinderGeometry args={[0.16, 0.16, 0.02, 24]} />
-        <meshStandardMaterial color="#1B1029" roughness={0.6} />
+    <group>
+      {/* White collar the red cap sits in (socket top is y = 0.04). */}
+      <mesh position={[0, 0.05, 0]}>
+        <cylinderGeometry args={[0.175, 0.185, 0.03, 40]} />
+        <meshStandardMaterial color="#D9DDE2" roughness={0.45} metalness={0.2} />
       </mesh>
       <mesh
-        position={[0, 0.25, 0]}
+        position={[0, 0.095, 0]}
         onPointerDown={(event) => {
           event.stopPropagation()
           if (routeConfirmed) takeOff()
@@ -2597,208 +2217,188 @@ function TakeOffButton() {
           document.body.style.cursor = 'auto'
         }}
       >
-        <cylinderGeometry args={[0.1, 0.115, 0.05, 24]} />
+        <cylinderGeometry args={[0.14, 0.15, 0.07, 40]} />
         <meshStandardMaterial
-          color="#D64541"
-          emissive="#D64541"
-          emissiveIntensity={routeConfirmed ? 0.45 : 0}
-          roughness={0.35}
+          ref={buttonMaterialRef}
+          color="#E0313A"
+          emissive="#FF2A2A"
+          emissiveIntensity={0.08}
+          roughness={0.55}
         />
       </mesh>
-      {/* Hinge hardware that carries the lid: two gold posts
-          standing on the board/bezel back edge hold the lid's axle
-          pin at the lid pivot (y = 0.285, the disc's back edge).
-          Post tops stop at y = 0.27, just below the closed lid's
-          underside (0.2725), so the disc never touches them, and
-          the pin (r = 0.015, bottom y = 0.27) rests on the posts. */}
-      {[-0.09, 0.09].map((x) => (
-        <mesh key={x} position={[x, 0.2475, -0.13]}>
-          <boxGeometry args={[0.04, 0.045, 0.04]} />
-          <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
-        </mesh>
-      ))}
-      <mesh position={[0, 0.285, -0.13]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.015, 0.015, 0.24, 12]} />
-        <meshStandardMaterial color="#9A7433" roughness={0.4} metalness={0.6} />
+      {/* Dome base ring + hinge block at the back (toward the window). */}
+      <mesh position={[0, 0.045, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.205, 0.014, 10, 48]} />
+        <meshStandardMaterial color="#4B515B" roughness={0.4} metalness={0.5} />
       </mesh>
-      {/* Transparent hinged lid: closed over the button until a
-          route is locked, then it flips up toward the window. */}
-      <group ref={lidRef} position={[0, 0.285, -0.13]}>
-        {/* Moving hinge knuckle: a gold barrel around the axle at
-            the lid's back edge, so the disc is visibly attached to
-            the pin it rotates on. Its axis is the lid's rotation
-            axis, so it stays at the pivot in both states. */}
-        <mesh rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.08, 12]} />
-          <meshStandardMaterial color="#9A7433" roughness={0.4} metalness={0.6} />
+      <mesh position={[0, 0.055, -0.215]}>
+        <boxGeometry args={[0.12, 0.04, 0.04]} />
+        <meshStandardMaterial color="#8A9099" roughness={0.4} metalness={0.5} />
+      </mesh>
+      {/* Glass safety dome, hinged on the back edge. */}
+      <group ref={lidRef} position={[0, 0.055, -0.205]}>
+        <group position={[0, 0, 0.205]}>
+          <mesh onPointerDown={(event) => event.stopPropagation()} renderOrder={5}>
+            <sphereGeometry args={[0.2, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            {/* Satin glass: a mirror-smooth clearcoat caught every cabin
+                light as a tiny highlight, and bloom turned them into
+                "stars". A softer, front-side-only surface gives one
+                broad sheen instead. */}
+            <meshStandardMaterial
+              color="#DDEFFF"
+              transparent
+              opacity={0.32}
+              roughness={0.35}
+              metalness={0}
+              envMapIntensity={0.4}
+              depthWrite={false}
+              side={THREE.FrontSide}
+            />
+          </mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.2, 0.01, 8, 48]} />
+            <meshStandardMaterial color="#B9BFC6" roughness={0.35} metalness={0.4} />
+          </mesh>
+        </group>
+      </group>
+    </group>
+  )
+}
+
+const BEACON_COLOR = new THREE.Color('#FFC94A').multiplyScalar(1.6)
+
+/**
+ * Guided-tour highlight drawn on a cabin anchor (+Y = surface normal):
+ * a glowing frame that breathes around the element plus an arrow that
+ * bobs above it, so a child sees exactly what PIP is talking about.
+ */
+function TourBeacon({
+  width,
+  depth,
+  round = false,
+  arrowHeight = 0.42,
+}: {
+  width: number
+  depth: number
+  round?: boolean
+  arrowHeight?: number
+}) {
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const frameRef = useRef<THREE.Group>(null)
+  const arrowRef = useRef<THREE.Group>(null)
+  const frameMaterial = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: BEACON_COLOR,
+        toneMapped: false,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    [],
+  )
+  useEffect(() => () => frameMaterial.dispose(), [frameMaterial])
+  const t = 0.022
+
+  useFrame((state) => {
+    const time = state.clock.elapsedTime
+    const wave = reducedMotion ? 0.5 : (Math.sin(time * 4.2) + 1) / 2
+    if (frameRef.current) frameRef.current.scale.setScalar(1 + wave * 0.06)
+    const firstFrame = frameRef.current?.children[0] as THREE.Mesh | undefined
+    const material = firstFrame?.material as THREE.MeshBasicMaterial | undefined
+    if (material) material.opacity = 0.55 + wave * 0.45
+    if (arrowRef.current) {
+      arrowRef.current.position.y =
+        arrowHeight + (reducedMotion ? 0 : Math.abs(Math.sin(time * 3)) * 0.12)
+    }
+  })
+
+  return (
+    <group>
+      <group ref={frameRef} position={[0, 0.03, 0]}>
+        {round ? (
+          <mesh rotation={[-Math.PI / 2, 0, 0]} material={frameMaterial}>
+            <ringGeometry args={[width / 2, width / 2 + t * 1.6, 48]} />
+          </mesh>
+        ) : (
+          <>
+            {(
+              [
+                [0, depth / 2, width + t, t],
+                [0, -depth / 2, width + t, t],
+                [width / 2, 0, t, depth + t],
+                [-width / 2, 0, t, depth + t],
+              ] as const
+            ).map(([x, z, w, d], index) => (
+              <mesh key={index} position={[x, 0, z]} material={frameMaterial}>
+                <boxGeometry args={[w, t, d]} />
+              </mesh>
+            ))}
+          </>
+        )}
+      </group>
+      <group ref={arrowRef} position={[0, arrowHeight, 0]}>
+        <mesh rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.07, 0.16, 20]} />
+          <meshBasicMaterial color={BEACON_COLOR} toneMapped={false} />
         </mesh>
-        <mesh
-          position={[0, 0, 0.13]}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <cylinderGeometry args={[0.125, 0.125, 0.025, 24]} />
-          <meshStandardMaterial
-            color="#BFEFFF"
-            transparent
-            opacity={0.35}
-            roughness={0.1}
-            metalness={0}
-            depthWrite={false}
-          />
+        <mesh position={[0, 0.13, 0]}>
+          <cylinderGeometry args={[0.025, 0.025, 0.14, 12]} />
+          <meshBasicMaterial color={BEACON_COLOR} toneMapped={false} />
         </mesh>
       </group>
     </group>
   )
 }
 
-/** Ceiling light strip with a slow, calm pulse. */
-function CeilingStrip() {
-  const materialRef = useRef<THREE.MeshBasicMaterial>(null)
-  useFrame((state) => {
-    const material = materialRef.current
-    if (!material) return
-    material.opacity = 0.75 + Math.sin(state.clock.elapsedTime * 0.6) * 0.15
-  })
-  return (
-    <mesh position={[0, 2.27, -1]}>
-      <boxGeometry args={[3, 0.04, 0.18]} />
-      <meshBasicMaterial
-        ref={materialRef}
-        color="#FFF3D0"
-        transparent
-        toneMapped={false}
-      />
-    </mesh>
-  )
+/** Shows a TourBeacon only while PIP points at this cabin element. */
+function TourHighlight({
+  element,
+  children,
+}: {
+  element: HubTarget
+  children: ReactNode
+}) {
+  const focus = useHubFocus()
+  const routeOpen = useOnboardingStore((state) => state.routeOpen)
+  const albumOpen = useOnboardingStore((state) => state.passportDetailOpen)
+  if (focus.target !== element || routeOpen || albumOpen) return null
+  return <>{children}</>
 }
 
-/** Console status light: a soft teal pulse on the board. The
- *  sphere sits in a dark round socket, and a short arm links the
- *  socket to the front face of the navigation frame, so the
- *  indicator reads as part of the radar assembly instead of a
- *  loose ball on the desk. `position` is the sphere centre; the
- *  socket and arm are derived from it (socket top and arm top at
- *  y = 0.245, flush with the nav frame top, on the board top). */
-function StatusLight({ position }: { position: [number, number, number] }) {
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null)
-  useFrame((state) => {
-    const material = materialRef.current
-    if (!material) return
-    material.emissiveIntensity = 0.8 + Math.sin(state.clock.elapsedTime * 2.2) * 0.5
-  })
-  return (
-    <group>
-      {/* Arm from the nav frame's front edge (z = 0.24) into the
-          socket: spans z 0.215..0.275, x width 0.05. */}
-      <mesh position={[position[0], 0.235, position[2] - 0.045]}>
-        <boxGeometry args={[0.05, 0.02, 0.06]} />
-        <meshStandardMaterial color="#1B1029" roughness={0.6} />
-      </mesh>
-      {/* Socket the sphere is seated in. */}
-      <mesh position={[position[0], 0.235, position[2]]}>
-        <cylinderGeometry args={[0.04, 0.045, 0.02, 16]} />
-        <meshStandardMaterial color="#1B1029" roughness={0.6} />
-      </mesh>
-      <mesh position={position}>
-        <sphereGeometry args={[0.035, 12, 10]} />
-        <meshStandardMaterial
-          ref={materialRef}
-          color="#8FE3D8"
-          emissive="#8FE3D8"
-          emissiveIntensity={1}
-          toneMapped={false}
-        />
-      </mesh>
-    </group>
-  )
-}
-
-/** Recessed status panel in the corridor between the launch
- *  controls and the passport support (board x 0.26..0.42,
- *  z -0.24..0.24). Three small lights with printed labels, driven
- *  only by states the game already has: POWER is on whenever the
- *  ship is out of the menu, ROUTE follows the confirmed route
- *  (the same state that lifts the take-off lid), MAIL follows the
- *  passport being onboard. No pointer handlers: indicators only. */
-function StatusPanel() {
+/**
+ * Click target for the Álbum de misiones resting on the console (the
+ * book itself is modelled in the cabin GLB). ALBUM anchor frame:
+ * +Y = out of the cover, -Z = toward the window.
+ */
+function MissionAlbumHit({ onHover }: { onHover: (hovered: boolean) => void }) {
   const phase = useOnboardingStore((state) => state.phase)
-  const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
   const save = useJourneyStore((state) => state.save)
-  const pulseLightRef = useRef<THREE.MeshStandardMaterial>(null)
-
-  const texture = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 256
-    canvas.height = 768
-    const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#241736'
-    ctx.fillRect(0, 0, 256, 768)
-    ctx.strokeStyle = 'rgba(143,227,216,0.35)'
-    ctx.lineWidth = 3
-    ctx.strokeRect(6, 6, 256 - 12, 768 - 12)
-    // Labels sit right of the light discs (discs at canvas x ~64,
-    // labels centred at x ~168). Canvas top maps to the board's
-    // back edge, so POWER is at the back, MAIL at the front.
-    ctx.fillStyle = 'rgba(253,244,236,0.85)'
-    ctx.font = '700 40px ui-monospace, monospace'
-    ctx.textAlign = 'center'
-    for (const [index, label] of ['POWER', 'ROUTE', 'MAIL'].entries()) {
-      ctx.fillText(label, 168, 128 + index * 256)
-    }
-    const tex = new THREE.CanvasTexture(canvas)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = 4
-    return tex
-  }, [])
-  useEffect(() => () => texture.dispose(), [texture])
-
-  useFrame((state) => {
-    const material = pulseLightRef.current
-    if (!material) return
-    material.emissiveIntensity = 1 + Math.sin(state.clock.elapsedTime * 2.2) * 0.4
-  })
-
-  const lights: Array<{
-    z: number
-    color: string
-    active: boolean
-    pulse?: boolean
-  }> = [
-    { z: -0.15, color: '#8FE3D8', active: phase !== 'menu', pulse: true },
-    { z: 0, color: '#FFD9A8', active: routeConfirmed },
-    { z: 0.15, color: '#F2B5E2', active: save !== null },
-  ]
-
+  const setPassportDetailOpen = useOnboardingStore((state) => state.setPassportDetailOpen)
+  const albumAllowed = hubElementEnabled(useHubFocus(), 'album')
+  const enabled =
+    Boolean(save) && (phase === 'hub' || phase === 'playing') && albumAllowed
   return (
-    <group position={[0.34, 0, 0]}>
-      <mesh
-        position={[0, 0.229, 0]}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <boxGeometry args={[0.16, 0.008, 0.48]} />
-        <meshStandardMaterial color="#1B1029" roughness={0.6} />
-      </mesh>
-      <mesh position={[0, 0.236, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.15, 0.47]} />
-        <meshBasicMaterial map={texture} toneMapped={false} />
-      </mesh>
-      {lights.map((light, index) => (
-        <mesh
-          key={index}
-          position={[-0.045, 0.239, light.z]}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <cylinderGeometry args={[0.02, 0.02, 0.012, 14]} />
-          <meshStandardMaterial
-            ref={light.pulse ? pulseLightRef : undefined}
-            color={light.active ? light.color : '#3A3350'}
-            emissive={light.color}
-            emissiveIntensity={light.active ? 1.2 : 0.12}
-            toneMapped={false}
-          />
-        </mesh>
-      ))}
-    </group>
+    <mesh
+      position={[0, 0.06, 0]}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        if (enabled) setPassportDetailOpen(true)
+      }}
+      onPointerOver={() => {
+        if (!enabled) return
+        onHover(true)
+        emitAudio('uiHover', { dedupeKey: 'album-3d', dedupeMs: 180 })
+        document.body.style.cursor = 'pointer'
+      }}
+      onPointerOut={() => {
+        onHover(false)
+        document.body.style.cursor = 'auto'
+      }}
+    >
+      <boxGeometry args={[0.72, 0.16, 0.86]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -2816,19 +2416,26 @@ function MemoryWindowHolograms() {
   return introSvg ? <WindowHologram svg={introSvg} /> : null
 }
 
+/** Scale of the navigation screen inside the CM-01 nav recess (1.22 x 0.68). */
+const NAV_SCREEN_SCALE = 1.35
+
 /**
- * Real cockpit interior, visible only during the cabin steps: a dark
- * wall with a round window hole (Mars and the stars show through it),
- * a gold rim, a low dashboard console, and PIP floating by.
+ * Cabina de mando CM-01 Explorer, visible only during the cabin steps:
+ * the modelled room (round panoramic window, side monitors, U console,
+ * pilot seat, lanterns) with the interactive navigation screen, the
+ * main button under its safety dome and the mission album mounted on
+ * its anchors. Mars and the stars show through the open window.
  */
 function CabinInterior() {
   const phase = useOnboardingStore((state) => state.phase)
   const dialogueIndex = useOnboardingStore((state) => state.dialogueIndex)
   const boardingStage = useOnboardingStore((state) => state.boardingStage)
+  const albumOpen = useOnboardingStore((state) => state.passportDetailOpen)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const groupRef = useRef<THREE.Group>(null)
   const windowDarkRef = useRef<THREE.MeshBasicMaterial>(null)
   const windowRimRef = useRef<THREE.MeshBasicMaterial>(null)
+  const [albumHovered, setAlbumHovered] = useState(false)
   // The launch countdown happens INSIDE the cabin (seated, PIP
   // talking); from liftoff on, the wide menu shot returns.
   const cabin =
@@ -2846,9 +2453,7 @@ function CabinInterior() {
 
     // Cosmic Memory Window: during the cinematic intro (except the
     // Welcome moment) the glass darkens to ~85% so the hologram
-    // stage reads inside the window. The planet stays behind the
-    // dimming, the gold frame and PIP/console lighting are untouched.
-    // Leaving the intro (Skip/Back) fades it back out.
+    // stage reads inside the window. Leaving the intro fades it out.
     const inMemoryWindow =
       phase === 'intro' && introMomentForLine(dialogueIndex) !== 'arrival'
     const darkTarget = inMemoryWindow ? 0.85 : 0
@@ -2871,190 +2476,61 @@ function CabinInterior() {
     }
   })
 
-  // Front wall of the cube: 8 wide, 4.6 high, with the wide window
-  // hole (radius 1.7) the pilot looks through.
-  const wallShape = useMemo(() => {
-    const shape = new THREE.Shape()
-    shape.moveTo(-4, -2.3)
-    shape.lineTo(4, -2.3)
-    shape.lineTo(4, 2.3)
-    shape.lineTo(-4, 2.3)
-    shape.closePath()
-    const hole = new THREE.Path()
-    hole.absarc(0, 0.3, 1.7, 0, Math.PI * 2, true)
-    shape.holes.push(hole)
-    return new THREE.ShapeGeometry(shape, 48)
-  }, [])
-
-  // Cabin surfaces: textured hull panels for the wall, floor and side
-  // walls; a dashboard top for the console; radial tops for buttons.
-  const surfaces = useMemo(() => {
-    const wallTexture = makePanelTexture('#2E1F45', '#1B1029', 'rgba(143,227,216,0.22)')
-    // ShapeGeometry UVs are the shape units (-4..4, -2.3..2.3): map
-    // one tile across the whole wall.
-    wallTexture.repeat.set(1 / 8, 1 / 4.6)
-    wallTexture.offset.set(0.5, 0.5)
-    const floorTexture = makePanelTexture('#241A33', '#150E21', 'rgba(253,244,236,0.14)')
-    floorTexture.repeat.set(2.5, 2.2)
-    const sideTexture = makePanelTexture('#2A1D40', '#191022', 'rgba(253,244,236,0.16)')
-    sideTexture.repeat.set(2, 1)
-    const consoleTopTexture = makeConsoleTopTexture()
-    const buttonTopTexture = makeButtonTopTexture()
-    const mailDecalTexture = makeMailDecalTexture()
-    const slotLabelTexture = makeSlotLabelTexture()
-    const insigniaTexture = makeInsigniaTexture()
-    const sideMat = new THREE.MeshStandardMaterial({ map: sideTexture, roughness: 0.6 })
-    const consoleMats = [
-      sideMat,
-      sideMat,
-      new THREE.MeshStandardMaterial({ map: consoleTopTexture, roughness: 0.6 }),
-      sideMat,
-      sideMat,
-      sideMat,
-    ]
-    const buttonMats = (color: string, sideColor: string) => {
-      const side = new THREE.MeshBasicMaterial({ color: sideColor, toneMapped: false })
-      const top = new THREE.MeshBasicMaterial({
-        map: buttonTopTexture,
-        color,
-        toneMapped: false,
-      })
-      return [side, top, side]
-    }
-    return {
-      wallTexture,
-      floorTexture,
-      sideTexture,
-      mailDecalTexture,
-      slotLabelTexture,
-      insigniaTexture,
-      consoleMats,
-      buttonSand: buttonMats('#FFD9A8', '#8A6A3F'),
-      buttonTeal: buttonMats('#8FE3D8', '#2F6B62'),
-      textures: [wallTexture, floorTexture, sideTexture, consoleTopTexture, buttonTopTexture, mailDecalTexture, slotLabelTexture, insigniaTexture],
-    }
-  }, [])
-
-  useEffect(
-    () => () => surfaces.textures.forEach((texture) => texture.dispose()),
-    [surfaces],
-  )
-
   if (!cabin && phase !== 'launching') return null
+
+  // The album leaves the console while its pages are open ("in hand").
+  const albumHidden = albumOpen && (phase === 'hub' || phase === 'playing')
 
   return (
     <group ref={groupRef} visible={cabin}>
-      {/* The ship: a fixed cube room (8 x 4.6, front wall at z=-4.5).
-          Floor, ceiling and side walls meet at clean edges. */}
-      <mesh position={[0, -2.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[8, 9]} />
-        <meshStandardMaterial
-          map={surfaces.floorTexture}
-          roughness={0.95}
-          side={THREE.DoubleSide}
+      <Suspense fallback={null}>
+        <CabinCM01
+          launching={phase === 'launching'}
+          reducedMotion={reducedMotion}
+          albumHovered={albumHovered}
+          albumHidden={albumHidden}
+          slots={{
+            NAV: (
+              <group scale={NAV_SCREEN_SCALE}>
+                <group position={[-NAV_ZONE_CENTER_X, -NAV_SCREEN_Y, 0]}>
+                  <NavScreenOnBoard />
+                  <RadarSweep position={[NAV_ZONE_CENTER_X, NAV_SCREEN_Y + 0.009, 0]} />
+                </group>
+                <TourHighlight element="nav">
+                  <TourBeacon width={0.96} depth={0.54} arrowHeight={0.36} />
+                </TourHighlight>
+              </group>
+            ),
+            BUTTON: (
+              <>
+                <TakeOffButton />
+                <TourHighlight element="button">
+                  <TourBeacon width={0.46} depth={0.46} round arrowHeight={0.5} />
+                </TourHighlight>
+              </>
+            ),
+            ALBUM: albumHidden ? null : (
+              <>
+                <MissionAlbumHit onHover={setAlbumHovered} />
+                <TourHighlight element="album">
+                  <TourBeacon width={0.8} depth={0.94} arrowHeight={0.45} />
+                </TourHighlight>
+              </>
+            ),
+            SCREEN_L: <CabinMonitor kind="ship" />,
+            SCREEN_R: <CabinMonitor kind="mission" />,
+          }}
         />
-      </mesh>
-      <mesh position={[0, 2.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[8, 9]} />
-        <meshStandardMaterial
-          map={surfaces.sideTexture}
-          roughness={0.95}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position={[-4, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[9, 4.6]} />
-        <meshStandardMaterial
-          map={surfaces.sideTexture}
-          roughness={0.9}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position={[4, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[9, 4.6]} />
-        <meshStandardMaterial
-          map={surfaces.sideTexture}
-          roughness={0.9}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+      </Suspense>
 
-      {/* Architecture: mid-height trim strips, corner posts, a
-          floor aisle and the pulsing ceiling light. */}
-      {[-3.97, 3.97].map((x) => (
-        <mesh key={x} position={[x, 0, 0]}>
-          <boxGeometry args={[0.06, 0.06, 9]} />
-          <meshBasicMaterial color="#8FE3D8" transparent opacity={0.35} toneMapped={false} />
-        </mesh>
-      ))}
-      {[[-3.95, -4.45], [3.95, -4.45], [-3.95, 4.45], [3.95, 4.45]].map(([x, z]) => (
-        <mesh key={`${x}-${z}`} position={[x, 0, z]}>
-          <boxGeometry args={[0.1, 4.6, 0.1]} />
-          <meshStandardMaterial color="#5A4A2E" roughness={0.5} metalness={0.4} />
-        </mesh>
-      ))}
-      <mesh position={[0, -2.29, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.8, 6]} />
-        <meshBasicMaterial color="#8FE3D8" transparent opacity={0.12} toneMapped={false} />
+      {/* Faint glass in the window opening, plus the Memory Window
+          dimming disc used by the intro holograms. */}
+      <mesh position={[0, 0.3, -4.62]}>
+        <circleGeometry args={[1.7, 64]} />
+        <meshBasicMaterial color="#D8FFF8" transparent opacity={0.04} depthWrite={false} />
       </mesh>
-      <CeilingStrip />
-
-      {/* Front wall with the wide window hole. */}
-      <mesh geometry={wallShape} position={[0, 0, -4.5]}>
-        <meshStandardMaterial
-          map={surfaces.wallTexture}
-          roughness={0.9}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {/* Window frame: outer gold ring, thin inner rim, bolts,
-          a soft glow ring and a faint glass disc for depth. */}
-      <mesh position={[0, 0.3, -4.44]}>
-        <torusGeometry args={[1.85, 0.05, 12, 64]} />
-        <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
-      </mesh>
-      <mesh position={[0, 0.3, -4.42]}>
-        <torusGeometry args={[1.7, 0.045, 12, 64]} />
-        <meshStandardMaterial color="#E8B04B" roughness={0.4} metalness={0.3} />
-      </mesh>
-      {Array.from({ length: 8 }, (_, i) => {
-        const angle = (i / 8) * Math.PI * 2 + Math.PI / 8
-        return (
-          <mesh
-            key={i}
-            position={[Math.cos(angle) * 1.85, 0.3 + Math.sin(angle) * 1.85, -4.44]}
-          >
-            <sphereGeometry args={[0.05, 10, 8]} />
-            <meshStandardMaterial color="#3A2C12" roughness={0.4} metalness={0.6} />
-          </mesh>
-        )
-      })}
-      {/* Sill band: a short tunnel from the outer ring into the
-          wall, giving the frame real physical depth. */}
-      <mesh position={[0, 0.3, -4.55]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[1.85, 1.85, 0.18, 64, 1, true]} />
-        <meshStandardMaterial
-          color="#5A4A2E"
-          roughness={0.55}
-          metalness={0.4}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position={[0, 0.3, -4.47]}>
-        <circleGeometry args={[1.68, 48]} />
-        <meshBasicMaterial
-          color="#D8FFF8"
-          transparent
-          opacity={0.05}
-          depthWrite={false}
-        />
-      </mesh>
-      {/* Memory Window dimming: a dark disc just in front of the
-          glass (behind the gold frame rings at z=-4.44/-4.42), so
-          the hologram stage reads inside the window while Earth
-          remains barely visible behind it. */}
-      <mesh position={[0, 0.3, -4.46]} renderOrder={2}>
-        <circleGeometry args={[1.68, 48]} />
+      <mesh position={[0, 0.3, -4.6]} renderOrder={2}>
+        <circleGeometry args={[1.7, 64]} />
         <meshBasicMaterial
           ref={windowDarkRef}
           color="#070512"
@@ -3078,205 +2554,170 @@ function CabinInterior() {
       {/* Intro archive hologram: behind PIP, inside the round window. */}
       <MemoryWindowHolograms />
 
-      {/* Cosmic Mail identity decal on the front wall. */}
-      <mesh position={[-2.7, 1.05, -4.48]}>
-        <planeGeometry args={[1.3, 0.65]} />
-        <meshBasicMaterial map={surfaces.mailDecalTexture} transparent toneMapped={false} />
-      </mesh>
-
-      {/* Soft indirect fill so walls and structure read without
-          losing the dark, mysterious mood. */}
-      <hemisphereLight args={['#5A4A77', '#17102A', 0.55]} />
-      <directionalLight position={[0, 1.5, -3]} intensity={0.5} color="#E5A49A" />
-
-      {/* Console pedestal down to the floor, in hull panels.
-          Clicks on it (and on the board/buttons) are swallowed so
-          they never leak through to the passport card behind. */}
-      <mesh
-        position={[0.1, -1.72, -1.45]}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <boxGeometry args={[1.9, 1.25, 0.6]} />
-        <meshStandardMaterial map={surfaces.sideTexture} roughness={0.7} />
-      </mesh>
-
-      {/* Cabin lighting: warm spill over the console, teal accent
-          toward the navigation screen. */}
-      <pointLight position={[0.1, 0.6, -0.6]} intensity={6} distance={6} color="#FFD9A8" />
-      <pointLight position={[-0.5, 0.2, -1.2]} intensity={3} distance={4} color="#8FE3D8" />
-
-      {/* Control panel fixed in the room, dashboard tilt toward
-          the pilot (the same in tutorial and hub views). */}
-      <group position={[0.1, -1.15, -1.4]} rotation={[0.35, 0, 0]}>
-        {/* Wider base plate the board sits on: its top (y = -0.225)
-            is flush with the board bottom, so nothing floats. */}
-        <mesh position={[0, -0.265, 0]}>
-          <boxGeometry args={[2.7, 0.08, 0.9]} />
-          <meshStandardMaterial color="#2C1F45" roughness={0.6} />
-        </mesh>
-        <mesh
-          material={surfaces.consoleMats}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <boxGeometry args={[2.5, 0.45, 0.7]} />
-        </mesh>
-        {/* Front edge light strip and recessed vents. */}
-        <mesh position={[0, 0.18, 0.36]}>
-          <boxGeometry args={[2.3, 0.03, 0.03]} />
-          <meshBasicMaterial color="#8FE3D8" transparent opacity={0.5} toneMapped={false} />
-        </mesh>
-        {[-0.95, 0.95].map((x) => (
-          <mesh key={x} position={[x, 0, 0.36]}>
-            <boxGeometry args={[0.3, 0.12, 0.02]} />
-            <meshStandardMaterial color="#1B1029" roughness={0.8} />
-          </mesh>
-        ))}
-        {/* Insignia plaque on the front edge, between the vents:
-            a dark plate (z 0.347..0.357) with the COSMIC MAIL —
-            DELIVERY UNIT 01 plate on its face. */}
-        <mesh position={[0, -0.02, 0.352]}>
-          <boxGeometry args={[0.64, 0.18, 0.01]} />
-          <meshStandardMaterial color="#241736" roughness={0.5} />
-        </mesh>
-        <mesh position={[0, -0.02, 0.359]}>
-          <planeGeometry args={[0.62, 0.16]} />
-          <meshBasicMaterial map={surfaces.insigniaTexture} toneMapped={false} />
-        </mesh>
-        {/* Status light on the strip of board in front of the screen
-            (screen front edge z = 0.24, board front edge z = 0.35),
-            centred in the navigation zone — never on the screen. */}
-        <StatusLight position={[NAV_ZONE_CENTER_X, CONSOLE_TOP_Y + 0.015, 0.29]} />
-        {/* Navigation screen inset into the top face: THE navigation
-            panel. At rest it is the idle radar; tapping it (or
-            continuing a mission) leans the pilot in and the
-            destinations appear on this screen itself — no hologram.
-            Frame 0.94 x 0.48 centred in the left zone: a uniform
-            0.04 rim around the 0.86 x 0.40 screen plane, 0.11 from
-            the board edges front/back, flush with the board top
-            (0.225..0.245) so it reads as an inset, not a slab. */}
-        <mesh position={[NAV_ZONE_CENTER_X, 0.235, 0]}>
-          <boxGeometry args={[0.94, 0.02, 0.48]} />
-          <meshBasicMaterial color="#0B2E29" toneMapped={false} />
-        </mesh>
-        <NavScreenOnBoard />
-        <RadarSweep position={[NAV_ZONE_CENTER_X, 0.264, 0]} />
-        <TakeOffButton />
-        {/* Recessed POWER / ROUTE / MAIL panel in the empty
-            corridor between the launch controls and the passport
-            support (see StatusPanel). */}
-        <StatusPanel />
-        {/* Three auxiliary indicators grouped symmetrically below
-            (in front of) the take-off button, in a shallow triangle
-            around the board centre x = 0: side buttons at
-            (+/-0.13, 0.135), apex button at (0, 0.215). Centre-to-
-            centre distances are 0.153 (side-to-apex) and 0.247
-            (side-to-main bezel), leaving ~0.022 edge-to-edge gaps;
-            the cluster spans x -0.195..0.195, 0.023 clear of the
-            nav frame (x <= -0.218) and 0.29 clear of the passport
-            tray (x >= 0.485). Raised toward the main button: its
-            front-most edge is now z = 0.28, 0.07 from the board's
-            front edge (was 0.025). The middle (apex) indicator
-            keeps the teal material, as before. */}
-        {[
-          [-0.13, 0.135],
-          [0, 0.215],
-          [0.13, 0.135],
-        ].map(([offsetX, z], index) => (
-          <group key={index} position={[CONSOLE_CENTER_X + offsetX, 0, z]}>
-            <mesh position={[0, 0.232, 0]}>
-              <cylinderGeometry args={[0.065, 0.065, 0.02, 14]} />
-              <meshStandardMaterial color="#1B1029" roughness={0.6} />
-            </mesh>
-            <mesh
-              position={[0, 0.242, 0]}
-              material={index === 1 ? surfaces.buttonTeal : surfaces.buttonSand}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <cylinderGeometry args={[0.05, 0.058, 0.045, 14]} />
-            </mesh>
-          </group>
-        ))}
-        <PassportCard3D />
-        {/* Passport support, one piece with the console (right zone,
-            centre x = 0.725): a tray the card foot rests on, two side
-            cheeks the card leans between, and a back brace tilted at
-            the card's own lean so the card lies against it.
-            Tray 0.48 x 0.30, top at y = 0.25, centred on the card
-            foot (z = -0.10): the foot (y = 0.25) touches it without
-            piercing the board, with a visible margin all around.
-            Cheeks: inner faces 0.198 from centre, 0.016 clear of the
-            card backing (half-width 0.182), sitting on the tray.
-            Brace: same width as the tray, tilted -0.35 like the
-            card, centre 0.025 behind the card centre along its
-            normal, so a 0.013 gap keeps it from touching the card
-            while its lower end lands on the tray (y = 0.252). */}
-        <group position={[CARD_ZONE_CENTER_X, 0, 0]}>
-          <mesh
-            position={[0, 0.2375, -0.1]}
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <boxGeometry args={[0.48, 0.025, 0.3]} />
-            <meshStandardMaterial color="#1B1029" roughness={0.6} />
-          </mesh>
-          <mesh position={[0, 0.254, 0.042]}>
-            <boxGeometry args={[0.48, 0.008, 0.012]} />
-            <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
-          </mesh>
-          {[-0.215, 0.215].map((x) => (
-            <mesh
-              key={x}
-              position={[x, 0.28, -0.12]}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <boxGeometry args={[0.035, 0.06, 0.18]} />
-              <meshStandardMaterial color="#2C1F45" roughness={0.6} />
-            </mesh>
-          ))}
-          <mesh
-            position={[0, 0.44, -0.196]}
-            rotation={[-0.35, 0, 0]}
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <boxGeometry args={[0.48, 0.4, 0.025]} />
-            <meshStandardMaterial color="#2C1F45" roughness={0.6} />
-          </mesh>
-        </group>
-        {/* Outgoing-mail slot in front of the passport tray, on
-            the same centre line as the card: a dark recess
-            (0.30 x 0.035, top y = 0.237) with thin gold lips, and
-            an OUTGOING MAIL label plate just in front of it
-            (z 0.185..0.245). Decorative only — no handlers, so it
-            cannot steal clicks from the card behind it. */}
-        <group position={[CARD_ZONE_CENTER_X, 0, 0]}>
-          <mesh
-            position={[0, 0.231, 0.135]}
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <boxGeometry args={[0.3, 0.012, 0.035]} />
-            <meshBasicMaterial color="#0B0812" />
-          </mesh>
-          {[0.1135, 0.1565].map((z) => (
-            <mesh key={z} position={[0, 0.229, z]}>
-              <boxGeometry args={[0.3, 0.008, 0.008]} />
-              <meshStandardMaterial color="#9A7433" roughness={0.45} metalness={0.5} />
-            </mesh>
-          ))}
-          <mesh
-            position={[0, 0.229, 0.215]}
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <boxGeometry args={[0.3, 0.008, 0.06]} />
-            <meshStandardMaterial color="#1B1029" roughness={0.6} />
-          </mesh>
-          <mesh position={[0, 0.236, 0.215]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[0.29, 0.05]} />
-            <meshBasicMaterial map={surfaces.slotLabelTexture} toneMapped={false} />
-          </mesh>
-        </group>
-      </group>
+      {/* Bright, friendly cabin light: soft sky fill from the ceiling
+          panels, warm spill from the window ring and a key over the
+          console from the pilot's side. */}
+      {/* Violet "aura" of the reference sheet: lavender sky fill, deep
+          violet bounce from below and violet rims in the side bays. */}
+      <hemisphereLight args={['#DCD0F7', '#3A2A63', 1.15]} />
+      <directionalLight position={[0.5, 2.0, 1.5]} intensity={0.7} color="#F4EEFF" />
+      <pointLight position={[-3.0, 1.4, -1.0]} intensity={4} distance={5.5} color="#8C6BE0" />
+      <pointLight position={[3.0, 1.4, -1.0]} intensity={4} distance={5.5} color="#8C6BE0" />
+      <pointLight position={[0, 0.6, 2.6]} intensity={3} distance={5} color="#7B5CC9" />
+      <pointLight position={[0, 1.55, -1.6]} intensity={4} distance={7} color="#FFE9D2" />
+      <pointLight position={[0, 0.4, -3.9]} intensity={3.5} distance={4.5} color="#FF9A4A" />
+      <pointLight position={[-0.9, -0.3, -2.4]} intensity={1.2} distance={2.2} color="#5FE0CF" />
 
       <CabinPip />
     </group>
+  )
+}
+
+/**
+ * Title-shot lighting. Inside the cabin the warm key and the ship's
+ * spot are dimmed so the CM-01's own violet-tinted lights lead.
+ */
+/** True while the camera is inside the CM-01 cabin (boarding, hub or the
+ *  seated part of the launch). Read every frame: launch stages change
+ *  without a React re-render. */
+function cameraInCabin(
+  phase: string,
+  boardingStage: string,
+  reducedMotion: boolean,
+): boolean {
+  if (phase === 'launching') return inCabinStage(launchClock.value, reducedMotion)
+  return phase !== 'menu' && boardingStage === 'cabin'
+}
+
+function MenuLights() {
+  const phase = useOnboardingStore((state) => state.phase)
+  const boardingStage = useOnboardingStore((state) => state.boardingStage)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const ambientRef = useRef<THREE.AmbientLight>(null)
+  const keyRef = useRef<THREE.DirectionalLight>(null)
+  const fillRef = useRef<THREE.DirectionalLight>(null)
+  const warmRef = useRef<THREE.PointLight>(null)
+  const violet = useMemo(() => new THREE.Color('#C9B8F0'), [])
+  const white = useMemo(() => new THREE.Color('#FFFFFF'), [])
+
+  // The cabin keeps its violet mood (and the menu its warm key light)
+  // in every phase, including the seated countdown of the launch.
+  useFrame(() => {
+    const inCabin = cameraInCabin(phase, boardingStage, reducedMotion)
+    if (ambientRef.current) {
+      ambientRef.current.intensity = inCabin ? 0.25 : 0.4
+      ambientRef.current.color.copy(inCabin ? violet : white)
+    }
+    if (keyRef.current) keyRef.current.intensity = inCabin ? 0.35 : 1.6
+    if (fillRef.current) fillRef.current.intensity = inCabin ? 0.6 : 0.5
+    if (warmRef.current) warmRef.current.intensity = inCabin ? 0 : 8
+  })
+
+  return (
+    <>
+      <ambientLight ref={ambientRef} intensity={0.4} />
+      <directionalLight ref={keyRef} position={[-6, 8, 10]} intensity={1.6} color="#FFD9A8" />
+      <directionalLight ref={fillRef} position={[6, -2, 8]} intensity={0.5} color="#B8A6D9" />
+      <pointLight ref={warmRef} position={[5.4, 0, 2]} intensity={8} distance={11} color="#FFD9A8" />
+    </>
+  )
+}
+
+/**
+ * Bloom + violet vignette inside the cabin, kept on for the whole launch:
+ * the countdown glows like the hub, and in space the exhaust and the
+ * warp streaks bloom.
+ */
+function CabinGlow() {
+  const phase = useOnboardingStore((state) => state.phase)
+  const boardingStage = useOnboardingStore((state) => state.boardingStage)
+  const glow =
+    phase === 'launching' || (phase !== 'menu' && boardingStage === 'cabin')
+  return glow ? <CabinEffects /> : null
+}
+
+/* ------------------------------------------------------------------ */
+/* Warp streaks: the stars stretch into speed lines during the flight   */
+/* ------------------------------------------------------------------ */
+
+const WARP_COUNT = 180
+// Streaks rush past the ship opposite to its travel (it flies toward -X,
+// slightly down), so they move +X with a touch of upward drift.
+const WARP_DIR = new THREE.Vector3(1, 0.07, 0.04).normalize()
+
+function WarpStreaks() {
+  const phase = useOnboardingStore((state) => state.phase)
+  const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const linesRef = useRef<THREE.LineSegments>(null)
+
+  const { geometry, seeds } = useMemo(() => {
+    const random = mulberry32(0x3a7f)
+    const list = Array.from({ length: WARP_COUNT }, () => ({
+      x: -30 + random() * 52,
+      y: -10 + random() * 18,
+      z: -22 + random() * 26,
+      speed: 0.7 + random() * 0.6,
+      tint: random(),
+    }))
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(WARP_COUNT * 6), 3))
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(WARP_COUNT * 6), 3))
+    return { geometry: geo, seeds: list }
+  }, [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+
+  const cream = useMemo(() => new THREE.Color('#FFF3DC').multiplyScalar(1.6), [])
+  const teal = useMemo(() => new THREE.Color('#8FE3D8').multiplyScalar(1.6), [])
+  const tmp = useMemo(() => new THREE.Color(), [])
+
+  useFrame((_, delta) => {
+    const lines = linesRef.current
+    if (!lines) return
+    const warp =
+      phase === 'launching' && !reducedMotion && !inCabinStage(launchClock.value, reducedMotion)
+        ? warpFactor(launchClock.value, reducedMotion)
+        : 0
+    lines.visible = warp > 0.02
+    if (!lines.visible) return
+    const positions = geometry.getAttribute('position') as THREE.BufferAttribute
+    const colors = geometry.getAttribute('color') as THREE.BufferAttribute
+    const travel = Math.min(delta, 0.05) * (6 + warp * 70)
+    const length = 0.15 + warp * warp * 5
+    seeds.forEach((seed, index) => {
+      seed.x += WARP_DIR.x * travel * seed.speed
+      seed.y += WARP_DIR.y * travel * seed.speed
+      seed.z += WARP_DIR.z * travel * seed.speed
+      if (seed.x > 22) {
+        seed.x -= 52
+        seed.y -= 52 * WARP_DIR.y
+      }
+      const tailLength = length * seed.speed
+      positions.setXYZ(index * 2, seed.x, seed.y, seed.z)
+      positions.setXYZ(
+        index * 2 + 1,
+        seed.x - WARP_DIR.x * tailLength,
+        seed.y - WARP_DIR.y * tailLength,
+        seed.z - WARP_DIR.z * tailLength,
+      )
+      tmp.copy(seed.tint > 0.75 ? teal : cream).multiplyScalar(0.35 + warp * 0.65)
+      colors.setXYZ(index * 2, tmp.r, tmp.g, tmp.b)
+      colors.setXYZ(index * 2 + 1, 0, 0, 0)
+    })
+    positions.needsUpdate = true
+    colors.needsUpdate = true
+  })
+
+  if (phase !== 'launching') return null
+  return (
+    <lineSegments ref={linesRef} geometry={geometry} frustumCulled={false} visible={false}>
+      <lineBasicMaterial
+        vertexColors
+        transparent
+        toneMapped={false}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </lineSegments>
   )
 }
 
@@ -3287,28 +2728,61 @@ function CabinInterior() {
  * canopy glass, where the window shows the last mission's planet.
  * Mounted only before the game world.
  */
+/** Sharpest pixel density we render at (the screen's, capped). */
+const MAX_DPR = 1.75
+
+/**
+ * Adaptive resolution: the cabin fills the screen with lit, textured
+ * surfaces, which an integrated GPU cannot always draw at full pixel
+ * density. PerformanceMonitor moves `factor` down when the frame rate
+ * drops and back up when it recovers; the density follows it between
+ * 1 and the screen's own (capped), in 0.25 steps so it rarely changes.
+ */
+function useAdaptiveDpr(): [number, (factor: number) => void] {
+  const screenDpr = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, MAX_DPR)
+  const [dpr, setDpr] = useState(screenDpr)
+  const onFactor = (factor: number) => {
+    const next = Math.round((1 + (screenDpr - 1) * factor) * 4) / 4
+    setDpr(Math.max(1, Math.min(screenDpr, next)))
+  }
+  return [dpr, onFactor]
+}
+
 export default function MenuScene() {
+  const [dpr, onDprFactor] = useAdaptiveDpr()
   return (
     <Canvas
-      dpr={[1, 1.75]}
+      dpr={dpr}
       camera={{ position: [0, 0.4, 16], fov: 42, near: 0.1, far: 160 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
-      onCreated={({ gl }) => {
-        gl.toneMapping = THREE.ACESFilmicToneMapping
-        gl.toneMappingExposure = 1.1
+      onCreated={(state) => {
+        state.gl.toneMapping = THREE.ACESFilmicToneMapping
+        state.gl.toneMappingExposure = 1.1
+        // DEV only: renderer stats for performance checks.
+        if (import.meta.env.DEV) {
+          ;(window as unknown as { __cosmicR3f?: unknown }).__cosmicR3f = state
+        }
       }}
     >
+      <PerformanceMonitor
+        factor={1}
+        step={0.25}
+        ms={200}
+        iterations={8}
+        flipflops={4}
+        onChange={({ factor }) => onDprFactor(factor)}
+        onFallback={() => onDprFactor(0)}
+      />
       <color attach="background" args={['#050309']} />
       <CameraRig />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[-6, 8, 10]} intensity={1.6} color="#FFD9A8" />
-      <directionalLight position={[6, -2, 8]} intensity={0.5} color="#B8A6D9" />
-      <pointLight position={[5.4, 0, 2]} intensity={8} distance={11} color="#FFD9A8" />
+      <MenuLights />
       <MenuStars />
       <ShootingStar />
       <BackdropPlanet />
+      <WarpStreaks />
       <MailShip />
       <CabinInterior />
+      <CabinGlow />
     </Canvas>
   )
 }

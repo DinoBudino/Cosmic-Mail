@@ -1,20 +1,16 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { MARS_OBJECTS } from '../data/marsObjects'
-import { useGameStore } from '../store/gameStore'
-import { makeGlowTexture } from './textures'
+import type { WorldPosition } from '../data/marsObjects'
+import { SPIRIT_SITE } from '../data/spiritSite'
 import { mulberry32 } from './random'
 import {
-  buildMesaGeometry,
   buildRockGeometry,
   createRocks,
-  ROCK_FORMATIONS,
   type RockInstance,
 } from './landscape'
 import { playerPosition } from './playerPosition'
 import {
-  distanceToPath,
   distanceToSurveyTrail,
   getRegionWeight,
   getTerrainHeight,
@@ -23,7 +19,7 @@ import {
   PALETTE,
   QUALITY_PRESETS,
   SUN_DIRECTION,
-  SURVEY_VIEWPOINT,
+  SURVEY_ROUTE,
   WORLD,
   type Quality,
 } from './worldConfig'
@@ -41,14 +37,38 @@ const TERRAIN_COLORS = {
   cool: new THREE.Color(PALETTE.rockDark),
 }
 
-const OPPORTUNITY = MARS_OBJECTS.find((object) => object.id === 'opportunity')!
-const INGENUITY = MARS_OBJECTS.find((object) => object.id === 'ingenuity')!
-
-/** Rover wheel ruts winding east from Opportunity (Zona A storytelling). */
-const ROVER_TRACKS: readonly (readonly [number, number])[][] = [
-  [[1.5, 2.5], [5, 4.5], [9, 3], [13, 5.5], [17, 4.5]],
-  [[1.5, 3.6], [5, 5.6], [9, 4.1], [13, 6.6], [17, 5.6]],
+/**
+ * Opportunity's wheel tracks: two ruts following the last stretch of the
+ * survey trail into the explorer's resting place. Real rover tracks are a
+ * familiar sight in NASA images, and they quietly lead the child to it.
+ */
+const TRACK_CENTRE: readonly WorldPosition[] = [
+  ...SURVEY_ROUTE.slice(-4),
+  { x: SPIRIT_SITE.position.x, z: SPIRIT_SITE.position.z + 1.2 },
 ]
+/** Half the distance between the left and right wheel ruts. */
+const TRACK_GAUGE = 0.5
+
+function trackRuts(): (readonly [number, number])[][] {
+  const curve = new THREE.CatmullRomCurve3(
+    TRACK_CENTRE.map((point) => new THREE.Vector3(point.x, 0, point.z)),
+  )
+  const samples = Math.ceil(curve.getLength() / 0.7)
+  const points = curve.getSpacedPoints(samples)
+  return [-1, 1].map((side) =>
+    points.map((point, index) => {
+      const previous = points[Math.max(0, index - 1)]!
+      const next = points[Math.min(points.length - 1, index + 1)]!
+      const dx = next.x - previous.x
+      const dz = next.z - previous.z
+      const length = Math.hypot(dx, dz) || 1
+      return [
+        point.x + (-dz / length) * TRACK_GAUGE * side,
+        point.z + (dx / length) * TRACK_GAUGE * side,
+      ] as const
+    }),
+  )
+}
 
 /**
  * The ruts are thinner than the terrain vertex spacing (~1.56 u), so vertex
@@ -59,11 +79,8 @@ const ROVER_TRACKS: readonly (readonly [number, number])[][] = [
 function buildRutGeometry(): THREE.BufferGeometry {
   const positions: number[] = []
   const indices: number[] = []
-  const halfWidth = 0.35
-  for (const rut of ROVER_TRACKS) {
-    const world = rut.map(
-      ([dx, dz]) => [OPPORTUNITY.position.x + dx, OPPORTUNITY.position.z + dz] as const,
-    )
+  const halfWidth = 0.13
+  for (const world of trackRuts()) {
     const dense: (readonly [number, number])[] = []
     for (let index = 0; index < world.length - 1; index += 1) {
       const [ax, az] = world[index]!
@@ -111,7 +128,7 @@ function RoverTracks() {
   useEffect(() => () => geometry.dispose(), [geometry])
   return (
     <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial color={PALETTE.terrainDark} roughness={1} metalness={0} side={THREE.DoubleSide} />
+      <meshStandardMaterial color={PALETTE.terrainDark} roughness={1} metalness={0} side={THREE.DoubleSide} transparent opacity={0.6} depthWrite={false} />
     </mesh>
   )
 }
@@ -144,7 +161,7 @@ function makeTerrainTexture(): THREE.CanvasTexture | null {
   const random = mulberry32(0x9e57)
   context.fillStyle = '#F4ECE4'
   context.fillRect(0, 0, size, size)
-  const tones = ['#D9B09A', '#C08B6E', '#E9CDB4', '#8E748C', '#B77B65']
+  const tones = ['#E7B98D', '#D9895C', '#F2CDB4', '#69534D', '#C77A4E']
   // Toroidal drawing: every mark is also drawn in the neighbouring tiles,
   // so soft blotches never get clipped at the tile edge and the repeating
   // texture has no visible seams (no squares).
@@ -262,27 +279,14 @@ function buildTerrainGeometry(): THREE.PlaneGeometry {
       if (weight > 0) color.lerp(tint.color, weight * tint.strength)
     }
 
-    const pathDistance = Math.min(
-      distanceToPath(x, z),
-      distanceToSurveyTrail(x, z),
-    )
-    if (pathDistance < 4.2) {
+    // The survey trail reads as packed, slightly paler ground where the
+    // rover drove; no painted loop to sites that are not on this map.
+    const pathDistance = distanceToSurveyTrail(x, z)
+    if (pathDistance < 3.2) {
       const pathBlend =
-        1 - THREE.MathUtils.smoothstep(pathDistance, 0.8, 4.2)
-      color.lerp(TERRAIN_COLORS.path, pathBlend * 0.55)
+        1 - THREE.MathUtils.smoothstep(pathDistance, 0.6, 3.2)
+      color.lerp(TERRAIN_COLORS.path, pathBlend * 0.3)
     }
-    const clearing = 1 - THREE.MathUtils.smoothstep(
-      Math.hypot(x - OPPORTUNITY.position.x, z - OPPORTUNITY.position.z), 3, 10,
-    )
-    color.lerp(TERRAIN_COLORS.path, clearing * 0.34)
-
-    // Ingenuity flight area: a pale compacted apron inside the rock-free
-    // radius, so the clear zone reads as a zone even from a distance.
-    const flightClearing = 1 - THREE.MathUtils.smoothstep(
-      Math.hypot(x - INGENUITY.position.x, z - INGENUITY.position.z), 6, 13,
-    )
-    color.lerp(TERRAIN_COLORS.path, flightClearing * 0.42)
-
     color.toArray(colors, index * 3)
   }
 
@@ -292,9 +296,9 @@ function buildTerrainGeometry(): THREE.PlaneGeometry {
   return geometry
 }
 
-function RockBatch({ rocks, variant }: { rocks: RockInstance[]; variant: number }) {
+function RockBatch({ rocks, variant, detail }: { rocks: RockInstance[]; variant: number; detail: number }) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
-  const geometry = useMemo(() => buildRockGeometry(variant), [variant])
+  const geometry = useMemo(() => buildRockGeometry(variant, detail), [variant, detail])
   useEffect(() => () => geometry.dispose(), [geometry])
 
   useLayoutEffect(() => {
@@ -327,46 +331,28 @@ function RockBatch({ rocks, variant }: { rocks: RockInstance[]; variant: number 
       castShadow
       receiveShadow
     >
-      <meshStandardMaterial roughness={0.92} metalness={0.03} flatShading />
+      <meshStandardMaterial roughness={0.94} metalness={0.02} vertexColors />
     </instancedMesh>
   )
 }
+
+/** Rocks at least this scale use the detailed geometry. */
+const ROCK_DETAIL_SCALE = 0.7
 
 function Rocks({ quality }: { quality: Quality }) {
   const count = QUALITY_PRESETS[quality].rockCount
   const batches = useMemo(() => {
     const rocks = createRocks(count)
-    return [0, 1, 2].map((variant) => rocks.filter((rock) => rock.variant === variant))
+    // Large rocks get the detailed shape; pebbles the light one.
+    return [0, 1, 2].flatMap((variant) => [
+      { variant, detail: 3, rocks: rocks.filter((rock) => rock.variant === variant && rock.scale >= ROCK_DETAIL_SCALE) },
+      { variant, detail: 2, rocks: rocks.filter((rock) => rock.variant === variant && rock.scale < ROCK_DETAIL_SCALE) },
+    ])
   }, [count])
-  return <group>{batches.map((rocks, variant) => <RockBatch key={variant} rocks={rocks} variant={variant} />)}</group>
-}
-
-function DistantMesas() {
-  const geometries = useMemo(() => [0x5e7a, 0x6f8b, 0x709c].map(buildMesaGeometry), [])
-  useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries])
-
   return (
     <group>
-      {ROCK_FORMATIONS.map((mesa, index) => (
-        <mesh
-          key={index}
-          geometry={geometries[mesa.variant]}
-          position={[
-            mesa.x,
-            getTerrainHeight(mesa.x, mesa.z) - 2,
-            mesa.z,
-          ]}
-          rotation={[0, mesa.rotation, 0]}
-          scale={[mesa.width, mesa.height, mesa.depth]}
-        >
-          <meshStandardMaterial
-            vertexColors
-            color={mesa.color}
-            roughness={1}
-            metalness={0}
-            flatShading
-          />
-        </mesh>
+      {batches.map((batch) => (
+        <RockBatch key={`${batch.variant}-${batch.detail}`} rocks={batch.rocks} variant={batch.variant} detail={batch.detail} />
       ))}
     </group>
   )
@@ -435,7 +421,7 @@ function FootprintTrail() {
     const dz = playerPosition.z - current.lastZ
     const moved = Math.hypot(dx, dz)
     current.distance += moved
-    // No footprints while the boots are off the ground.
+    // No footprints while off the ground.
     if (moved > 1e-4 && current.distance >= FOOTPRINT_SPACING && playerPosition.airborne <= 0.25) {
       current.distance = 0
       current.side = current.side === 1 ? -1 : 1
@@ -490,259 +476,6 @@ function FootprintTrail() {
   )
 }
 
-/**
- * Small discovery details per region (Fase 5): orientation and curiosity
- * only — no collectibles, no mechanics. Deterministic, low-count and built
- * from the shared palette so the world reads as four places, not one field.
- */
-function RegionDiscovery() {
-  const siteById = (id: string) => MARS_OBJECTS.find((o) => o.id === id)!
-  const opportunity = siteById('opportunity')
-  const insight = siteById('insight')
-  const ingenuity = siteById('ingenuity')
-  const viking1 = siteById('viking1')
-
-  const at = (site: typeof opportunity, dx: number, dz: number) => {
-    const x = site.position.x + dx
-    const z = site.position.z + dz
-    return { x, z, y: getTerrainHeight(x, z) }
-  }
-
-  const opportunityDetails = useMemo(() => {
-    const random = mulberry32(0x0dd1)
-    const craters = Array.from({ length: 4 }, () => {
-      const angle = random() * Math.PI * 2
-      const dist = 6 + random() * 4
-      return { ...at(opportunity, Math.cos(angle) * dist, Math.sin(angle) * dist), radius: 0.8 + random() * 0.7 }
-    })
-    const fins = Array.from({ length: 3 }, (_, i) => {
-      const angle = i * 2.1 + 0.4
-      const dist = 8 + i * 1.2
-      return { ...at(opportunity, Math.cos(angle) * dist, Math.sin(angle) * dist), height: 1.1 + random() * 0.8, rotation: angle + random() }
-    })
-    return { craters, fins }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const insightDetails = useMemo(() => {
-    const posts = Array.from({ length: 5 }, (_, i) => {
-      const angle = i * 1.25 + 0.3
-      const dist = 5.5 + (i % 3) * 1.6
-      return { ...at(insight, Math.cos(angle) * dist, Math.sin(angle) * dist), rotation: angle }
-    })
-    const ripples = Array.from({ length: 8 }, (_, i) => {
-      const angle = i * 0.79 + 0.2
-      const dist = 6 + (i % 4) * 1.4
-      return { ...at(insight, Math.cos(angle) * dist, Math.sin(angle) * dist), rotation: angle + 0.6 }
-    })
-    return { posts, ripples }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const ingenuityDetails = useMemo(() => {
-    // Dashed flight-path arc on the ground around the clear apron.
-    const marks = Array.from({ length: 10 }, (_, i) => {
-      const angle = (i / 10) * Math.PI * 2 + 0.15
-      return { ...at(ingenuity, Math.cos(angle) * 5.8, Math.sin(angle) * 5.8), rotation: angle }
-    })
-    const dustPatches = Array.from({ length: 3 }, (_, i) => {
-      const angle = i * 2.3 + 1
-      const dist = 7.5 + i
-      return { ...at(ingenuity, Math.cos(angle) * dist, Math.sin(angle) * dist), radius: 1.2 + i * 0.25 }
-    })
-    return { marks, dustPatches }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const vikingDetails = useMemo(() => {
-    const random = mulberry32(0x101)
-    const spires = Array.from({ length: 4 }, (_, i) => {
-      const angle = i * 1.6 + 0.5
-      const dist = 6.5 + (i % 3) * 1.8
-      return { ...at(viking1, Math.cos(angle) * dist, Math.sin(angle) * dist), height: 1.4 + random() * 1.2, rotation: angle }
-    })
-    return { spires }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const spawnGround = getTerrainHeight(WORLD.spawn.x, WORLD.spawn.z)
-  const viewpointGround = getTerrainHeight(
-    SURVEY_VIEWPOINT.x,
-    SURVEY_VIEWPOINT.z,
-  )
-
-  return (
-    <group>
-      {/* Landing marker: recognizable home reference at spawn. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[WORLD.spawn.x, spawnGround + 0.04, WORLD.spawn.z]}>
-        <ringGeometry args={[2.2, 2.85, 40]} />
-        <meshStandardMaterial color={PALETTE.path} roughness={1} depthWrite={false} />
-      </mesh>
-
-      {/* Geological Passage viewpoint: a small field-survey cairn, not a
-          historical artifact. It gives the player a clear high point. */}
-      <group
-        position={[SURVEY_VIEWPOINT.x, viewpointGround, SURVEY_VIEWPOINT.z]}
-      >
-        {[0, 0.9, 1.8, 2.7].map((angle, index) => (
-          <mesh
-            key={index}
-            position={[
-              Math.cos(angle) * 0.9,
-              0.26 + index * 0.12,
-              Math.sin(angle) * 0.9,
-            ]}
-            rotation={[0.12, angle, 0.18]}
-            scale={[0.55 - index * 0.06, 0.42, 0.48]}
-            castShadow
-          >
-            <dodecahedronGeometry args={[1, 0]} />
-            <meshStandardMaterial
-              color={PALETTE.rockLight}
-              roughness={0.95}
-              flatShading
-            />
-          </mesh>
-        ))}
-        <mesh position={[0, 0.78, 0]}>
-          <cylinderGeometry args={[0.035, 0.05, 1.1, 6]} />
-          <meshStandardMaterial color={PALETTE.rockDark} roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 1.36, 0]}>
-          <sphereGeometry args={[0.08, 10, 8]} />
-          <meshBasicMaterial color={PALETTE.accent} toneMapped={false} />
-        </mesh>
-      </group>
-      {[-2.85, 2.85].map((dx, i) => (
-        <group key={i} position={[WORLD.spawn.x + dx, spawnGround, WORLD.spawn.z + (i === 0 ? -1.2 : 1.2)]}>
-          <mesh position={[0, 0.45, 0]} castShadow>
-            <cylinderGeometry args={[0.05, 0.07, 0.9, 6]} />
-            <meshStandardMaterial color={PALETTE.rockLight} roughness={0.8} />
-          </mesh>
-          <mesh position={[0, 0.98, 0]}>
-            <sphereGeometry args={[0.09, 10, 8]} />
-            <meshBasicMaterial color={PALETTE.accent} toneMapped={false} />
-          </mesh>
-        </group>
-      ))}
-
-      {/* Valley of Echoes: small craters + sedimentary fins. */}
-      {opportunityDetails.craters.map((c, i) => (
-        <mesh key={`c${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[c.x, c.y + 0.04, c.z]}>
-          <ringGeometry args={[c.radius * 0.7, c.radius, 24]} />
-          <meshStandardMaterial color={PALETTE.terrainDark} roughness={1} depthWrite={false} />
-        </mesh>
-      ))}
-      {opportunityDetails.fins.map((f, i) => (
-        <mesh key={`f${i}`} position={[f.x, f.y + f.height * 0.28, f.z]} rotation={[0, f.rotation, 0.18]} scale={[1, f.height, 0.28]} castShadow>
-          <boxGeometry args={[1.4, 0.6, 0.9]} />
-          <meshStandardMaterial color={PALETTE.mesaNear} roughness={1} flatShading />
-        </mesh>
-      ))}
-
-      {/* Silent Plains: small instrument posts + wind ripples flowing in dust. */}
-      {insightDetails.posts.map((p, i) => (
-        <group key={`p${i}`} position={[p.x, p.y, p.z]} rotation={[0, p.rotation, 0]}>
-          <mesh position={[0, 0.35, 0]} castShadow>
-            <cylinderGeometry args={[0.05, 0.07, 0.7, 6]} />
-            <meshStandardMaterial color={PALETTE.rockLight} metalness={0.4} roughness={0.5} />
-          </mesh>
-          <mesh position={[0, 0.78, 0]} castShadow>
-            <boxGeometry args={[0.3, 0.16, 0.2]} />
-            <meshStandardMaterial color={PALETTE.accent} metalness={0.3} roughness={0.5} />
-          </mesh>
-        </group>
-      ))}
-      {insightDetails.ripples.map((r, i) => (
-        <mesh key={`r${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[r.x, r.y + 0.03, r.z]} scale={[1, 0.18, 1]}>
-          <circleGeometry args={[1.1, 20]} />
-          <meshStandardMaterial color={PALETTE.dust} roughness={1} depthWrite={false} transparent opacity={0.55} />
-        </mesh>
-      ))}
-
-      {/* First Flight Dunes: dashed flight arc + settled dust patches. */}
-      {ingenuityDetails.marks.map((m, i) => (
-        <mesh key={`m${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[m.x, m.y + 0.05, m.z]}>
-          <circleGeometry args={[0.28, 12]} />
-          <meshStandardMaterial color={PALETTE.terrainDark} roughness={1} depthWrite={false} />
-        </mesh>
-      ))}
-      {ingenuityDetails.dustPatches.map((d, i) => (
-        <mesh key={`d${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[d.x, d.y + 0.03, d.z]}>
-          <circleGeometry args={[d.radius, 20]} />
-          <meshStandardMaterial color={PALETTE.dust} roughness={1} depthWrite={false} transparent opacity={0.5} />
-        </mesh>
-      ))}
-
-      {/* Ancient Lands: dark eroded spires. */}
-      {vikingDetails.spires.map((s, i) => (
-        <group key={`s${i}`} position={[s.x, s.y, s.z]} rotation={[0, s.rotation, 0]}>
-          <mesh position={[0, s.height * 0.3, 0]} castShadow scale={[0.9, s.height / 1.4, 0.9]}>
-            <octahedronGeometry args={[0.7, 0]} />
-            <meshStandardMaterial color={PALETTE.rockDark} roughness={1} flatShading />
-          </mesh>
-          <mesh position={[0.3, s.height * 0.12, 0.25]} castShadow scale={[0.6, s.height / 2.2, 0.6]}>
-            <octahedronGeometry args={[0.7, 0]} />
-            <meshStandardMaterial color={PALETTE.mesaNear} roughness={1} flatShading />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  )
-}
-
-/**
- * Ground sparkles (Fase A, Journey-style glints): static additive points
- * resting on the sand across the playable area, gently twinkling together.
- * Cheap impression of view-dependent glitter without a custom shader.
- */
-function Sparkles({ quality }: { quality: Quality }) {
-  const reducedMotion = useGameStore((state) => state.reducedMotion)
-  const materialRef = useRef<THREE.PointsMaterial>(null)
-  const count = quality === 'low' ? 200 : 500
-  const geometry = useMemo(() => {
-    const random = mulberry32(0x51a72)
-    const buffer = new THREE.BufferGeometry()
-    const positions = new Float32Array(count * 3)
-    for (let index = 0; index < count; index += 1) {
-      const angle = random() * Math.PI * 2
-      const radius = Math.sqrt(random()) * (WORLD.playRadius + 4)
-      const x = Math.cos(angle) * radius
-      const z = Math.sin(angle) * radius
-      positions[index * 3] = x
-      positions[index * 3 + 1] = getTerrainHeight(x, z) + 0.06
-      positions[index * 3 + 2] = z
-    }
-    buffer.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    buffer.computeBoundingSphere()
-    return buffer
-  }, [count])
-  const glowTexture = useMemo(() => makeGlowTexture(), [])
-
-  useEffect(() => () => geometry.dispose(), [geometry])
-  useEffect(() => () => glowTexture?.dispose(), [glowTexture])
-
-  useFrame(({ clock }) => {
-    const material = materialRef.current
-    if (!material) return
-    material.opacity = reducedMotion ? 0.18 : 0.18 + Math.sin(clock.elapsedTime * 2.3) * 0.08
-  })
-
-  return (
-    <points geometry={geometry} frustumCulled={false}>
-      <pointsMaterial
-        ref={materialRef}
-        map={glowTexture ?? undefined}
-        color={PALETTE.starWarm}
-        size={0.1}
-        sizeAttenuation
-        transparent
-        opacity={0.18}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        toneMapped={false}
-      />
-    </points>
-  )
-}
-
 export function Terrain({ quality }: TerrainProps) {
   const geometry = useMemo(() => buildTerrainGeometry(), [])
   const terrainTexture = useMemo(() => makeTerrainTexture(), [])
@@ -765,12 +498,9 @@ export function Terrain({ quality }: TerrainProps) {
           metalness={0.02}
         />
       </mesh>
-      <Sparkles quality={quality} />
       <Rocks quality={quality} />
       <RoverTracks />
-      <RegionDiscovery />
       <FootprintTrail />
-      <DistantMesas />
     </group>
   )
 }

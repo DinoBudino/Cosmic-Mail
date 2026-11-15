@@ -321,8 +321,6 @@ export function AudioDirector() {
     } else if (archiveView === 'reconstruction') {
       clearOverride()
       emitAudio('reconstructionOpened')
-    } else if (archiveView === 'full-scan') {
-      emitAudio('fullScanOpened')
     } else if (archiveView === 'none' && previous !== 'none') {
       if (previous === 'reconstruction') emitAudio('reconstructionClosed')
       else if (previous === 'smart-letter') emitAudio('smartLetterClosed')

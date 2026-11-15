@@ -1,10 +1,17 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { getMarkerViews, type MarkerState } from '../data/scanMarkers'
-import { SPIRIT_SCAN_ANCHORS, SPIRIT_SITE } from '../data/spiritSite'
+import { getScanAnchors, SPIRIT_SITE } from '../data/spiritSite'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
+import { useNarrativeStore } from '../store/narrativeStore'
+
+/**
+ * Parts hunt: the child first searches with PIP's clue alone. If the part is
+ * not found after this long, its marker appears to help.
+ */
+const REVEAL_AFTER_MS = 9000
 
 const COLORS: Record<MarkerState, { ring: string; fill: string; text: string }> =
   {
@@ -102,7 +109,7 @@ function ScanMarker({
     <group userData={{ scannerIgnore: true }}>
       <sprite
         ref={sprite}
-        position={[position[0], position[1] + 0.6, position[2]]}
+        position={[position[0], position[1] + 0.38, position[2]]}
         renderOrder={12}
         userData={{ scannerIgnore: true }}
       >
@@ -142,9 +149,12 @@ function ScanMarker({
 }
 
 /**
- * Diegetic numbered markers on the explorer's scannable parts. Shown only
- * while the scanner is equipped and the explorer is identified; they never
- * name a part, only 1/2/3 with pending / next / aimed / recorded states.
+ * Parts hunt markers. While the scanner is out and the explorer is known:
+ * - parts already recorded show a green check;
+ * - the part to find now stays hidden at first (PIP gives a clue), and its
+ *   marker appears after a while, when PIP is asked for help, or as soon as
+ *   the reticle finds it;
+ * - other parts show nothing, so there is only ever one thing to look for.
  * Distractor parts carry no marker. Positions come from the scan anchors.
  */
 export function ScanMarkers() {
@@ -153,37 +163,55 @@ export function ScanMarkers() {
       state.scannerEquipped &&
       state.scannerMissionId === SPIRIT_SITE.missionId,
   )
-  const sweeping = useGameStore((state) => state.fullScanSweepActive)
   const aimedId = useGameStore((state) => state.scannerSelectedComponentId)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
+  const hintedId = useNarrativeStore((state) =>
+    state.attention?.kind === 'hint' ? state.attention.componentId : null,
+  )
   const progress = useJourneyStore(
     (state) => state.save?.missions[SPIRIT_SITE.missionId] ?? null,
   )
-  const orderedIds = useMemo(
-    () => SPIRIT_SCAN_ANCHORS.map((anchor) => anchor.componentId),
-    [],
-  )
+  const orderedIds = getScanAnchors().map((anchor) => anchor.componentId)
+  const scannedIds = progress?.scannedComponentIds
+  const nextId =
+    orderedIds.find((id) => !(scannedIds ?? []).includes(id)) ?? null
 
-  if (!equipped || !progress?.discovered || sweeping) return null
-  const views = getMarkerViews(
-    orderedIds,
-    progress.scannedComponentIds,
-    aimedId,
-  )
+  // The clue gets a head start before the marker gives the answer away.
+  const [revealedId, setRevealedId] = useState<string | null>(null)
+  const active = equipped && Boolean(progress?.discovered)
+  useEffect(() => {
+    if (!active || !nextId) return
+    const timer = window.setTimeout(() => setRevealedId(nextId), REVEAL_AFTER_MS)
+    return () => window.clearTimeout(timer)
+  }, [active, nextId])
+
+  if (!active || !progress) return null
+  const views = getMarkerViews(orderedIds, progress.scannedComponentIds, aimedId)
 
   return (
     <group name="ScanMarkers">
-      {SPIRIT_SCAN_ANCHORS.map((anchor, index) => (
-        <ScanMarker
-          key={anchor.componentId}
-          position={anchor.position}
-          hitSize={anchor.hitSize}
-          hitOffset={anchor.hitOffset}
-          number={views[index]!.number}
-          state={views[index]!.state}
-          reducedMotion={reducedMotion}
-        />
-      ))}
+      {getScanAnchors().map((anchor, index) => {
+        const view = views[index]!
+        const isNext = anchor.componentId === nextId
+        const shown =
+          view.state === 'recorded' ||
+          (isNext &&
+            (view.state === 'aimed' ||
+              revealedId === nextId ||
+              hintedId === nextId))
+        if (!shown) return null
+        return (
+          <ScanMarker
+            key={anchor.componentId}
+            position={anchor.position}
+            hitSize={anchor.hitSize}
+            hitOffset={anchor.hitOffset}
+            number={view.number}
+            state={view.state}
+            reducedMotion={reducedMotion}
+          />
+        )
+      })}
     </group>
   )
 }

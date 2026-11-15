@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { MAILWING_LANDING } from '../data/spiritSite'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { MARS_OBJECTS } from '../data/marsObjects'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { mulberry32 } from './random'
@@ -10,118 +12,96 @@ import {
 } from './terrainHeight'
 import { PALETTE, PATH_WAYPOINTS, PLAYER, WORLD } from './worldConfig'
 
-/** Broad erosion shelves, not pointed peaks. All geometry lives above y=0. */
-export function buildMesaGeometry(seed: number): THREE.BufferGeometry {
-  const random = mulberry32(seed)
-  const sides = 12
-  const profile = [
-    [0, 1.08], [0.14, 1.04], [0.2, 0.92], [0.52, 0.86],
-    [0.57, 0.75], [0.88, 0.7], [0.94, 0.59], [1, 0.56],
-  ] as const
-  const outline = Array.from({ length: sides }, () => 0.85 + random() * 0.3)
-  const positions: number[] = []
-  const colors: number[] = []
-  const indices: number[] = []
-  const shade = new THREE.Color()
-  const foot = new THREE.Color('#574766')
-  const wall = new THREE.Color('#8E748C')
-  const cap = new THREE.Color('#D49A77')
+function hash3(x: number, y: number, z: number, seed: number): number {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647) ^ Math.imul(seed, 144665)
+  h = Math.imul(h ^ (h >>> 13), 1274126177)
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295
+}
 
-  profile.forEach(([height, radius], level) => {
-    for (let side = 0; side < sides; side += 1) {
-      const angle = side / sides * Math.PI * 2
-      const erosion = outline[side] * (0.97 + random() * 0.06)
-      positions.push(
-        Math.cos(angle) * radius * erosion + height * 0.13,
-        height + (level === 0 ? 0 : (random() - 0.5) * 0.025),
-        Math.sin(angle) * radius * erosion - height * 0.08,
-      )
-      shade.copy(foot).lerp(wall, height)
-      if (level === 2 || level === 4) shade.lerp(foot, 0.2)
-      if (level >= 6) shade.lerp(cap, 0.6)
-      shade.toArray(colors, colors.length)
-      if (level > 0) {
-        const a = (level - 1) * sides + side
-        const b = (level - 1) * sides + (side + 1) % sides
-        const c = level * sides + side
-        const d = level * sides + (side + 1) % sides
-        indices.push(a, c, b, b, c, d)
-      }
-    }
+function valueNoise3(x: number, y: number, z: number, seed: number): number {
+  const ix = Math.floor(x)
+  const iy = Math.floor(y)
+  const iz = Math.floor(z)
+  const fx = x - ix
+  const fy = y - iy
+  const fz = z - iz
+  const ux = fx * fx * (3 - 2 * fx)
+  const uy = fy * fy * (3 - 2 * fy)
+  const uz = fz * fz * (3 - 2 * fz)
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+  const corner = (dx: number, dy: number, dz: number) => hash3(ix + dx, iy + dy, iz + dz, seed)
+  return lerp(
+    lerp(lerp(corner(0, 0, 0), corner(1, 0, 0), ux), lerp(corner(0, 1, 0), corner(1, 1, 0), ux), uy),
+    lerp(lerp(corner(0, 0, 1), corner(1, 0, 1), ux), lerp(corner(0, 1, 1), corner(1, 1, 1), ux), uy),
+    uz,
+  )
+}
+
+/**
+ * Weathered Martian rocks. A finely subdivided sphere is pushed by layered
+ * noise (broad lumps plus small pits), cut by a few soft planes so it keeps
+ * some fractured faces, and flattened underneath so it sits in the sand.
+ * Shared vertices give smooth shading, so rocks no longer read as bare
+ * polygons on the ground. `detail` 3 (1280 triangles) is for large rocks;
+ * small ones use 2 (320 triangles) with the same shape. Vertex colours add dust on the upper faces and
+ * darker crevices; the instance colour tints the whole rock.
+ */
+export function buildRockGeometry(variant: number, detail = 3): THREE.BufferGeometry {
+  const seed = 17 + variant * 31
+  const base = mergeVertices(new THREE.IcosahedronGeometry(1, detail))
+  base.deleteAttribute('normal')
+  base.deleteAttribute('uv')
+  const position = base.getAttribute('position')
+  const random = mulberry32(0x40c4 + variant * 977)
+  const cuts = Array.from({ length: 3 + variant }, () => {
+    const theta = random() * Math.PI * 2
+    const y = random() * 1.2 - 0.2
+    const normal = new THREE.Vector3(Math.cos(theta), y, Math.sin(theta)).normalize()
+    return { normal, offset: 0.62 + random() * 0.2 }
   })
-  const center = positions.length / 3
-  positions.push(0.13, 1, -0.08)
-  cap.toArray(colors, colors.length)
-  const lastRing = (profile.length - 1) * sides
-  for (let side = 0; side < sides; side += 1) {
-    indices.push(center, lastRing + (side + 1) % sides, lastRing + side)
-  }
-  const indexed = new THREE.BufferGeometry()
-  indexed.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  indexed.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-  indexed.setIndex(indices)
-  const geometry = indexed.toNonIndexed()
-  indexed.dispose()
-  geometry.computeVertexNormals()
-  geometry.computeBoundingSphere()
-  return geometry
-}
-
-/** Three shared low-poly shapes; deformation is coherent across split vertices. */
-export function buildRockGeometry(variant: number): THREE.BufferGeometry {
-  const geometry = variant === 0
-    ? new THREE.DodecahedronGeometry(1, 0)
-    : variant === 1 ? new THREE.IcosahedronGeometry(1, 0) : new THREE.OctahedronGeometry(1, 0)
-  const position = geometry.getAttribute('position')
+  const point = new THREE.Vector3()
+  const colors = new Float32Array(position.count * 3)
   for (let index = 0; index < position.count; index += 1) {
-    const x = position.getX(index)
-    const y = position.getY(index)
-    const z = position.getZ(index)
-    const erosion = 0.88 + Math.sin(x * 7.1 + y * 3.7 + z * 5.3 + variant * 2) * 0.12
-    position.setXYZ(index, x * erosion + y * 0.12, y * erosion, z * erosion)
+    point.fromBufferAttribute(position, index)
+    const broad = valueNoise3(point.x * 1.3 + 3, point.y * 1.3, point.z * 1.3, seed) - 0.5
+    const mid = valueNoise3(point.x * 3.1, point.y * 3.1 + 7, point.z * 3.1, seed + 1) - 0.5
+    const fine = valueNoise3(point.x * 7.5, point.y * 7.5, point.z * 7.5 + 11, seed + 2) - 0.5
+    const radius = 1 + broad * 0.42 + mid * 0.16 + fine * 0.05
+    point.multiplyScalar(radius)
+    // Soft fracture planes: points beyond a plane are pulled back onto it.
+    for (const cut of cuts) {
+      const distance = point.dot(cut.normal) - cut.offset
+      if (distance > 0) point.addScaledVector(cut.normal, -distance * 0.85)
+    }
+    // Flat, slightly spread base so the rock sits in the sand. The spread
+    // grows smoothly below the line: a hard step here left a dark lip.
+    if (point.y < -0.35) {
+      const below = Math.min(1, (-0.35 - point.y) / 0.4)
+      const spread = 1 + 0.05 * below * below
+      point.y = -0.35 + (point.y + 0.35) * 0.25
+      point.x *= spread
+      point.z *= spread
+    }
+    position.setXYZ(index, point.x, point.y, point.z)
+    const crevice = 0.86 + (mid + 0.5) * 0.2 + fine * 0.18
+    colors[index * 3] = crevice
+    colors[index * 3 + 1] = crevice
+    colors[index * 3 + 2] = crevice
   }
-  geometry.computeVertexNormals()
-  geometry.computeBoundingSphere()
-  return geometry
+  base.computeVertexNormals()
+  // Fine dust settles on the faces looking up.
+  const normal = base.getAttribute('normal')
+  const dust = new THREE.Color(PALETTE.dust)
+  for (let index = 0; index < position.count; index += 1) {
+    const up = THREE.MathUtils.smoothstep(normal.getY(index), 0.45, 0.95) * 0.42
+    colors[index * 3] = THREE.MathUtils.lerp(colors[index * 3]!, dust.r * 1.25, up)
+    colors[index * 3 + 1] = THREE.MathUtils.lerp(colors[index * 3 + 1]!, dust.g * 1.25, up)
+    colors[index * 3 + 2] = THREE.MathUtils.lerp(colors[index * 3 + 2]!, dust.b * 1.25, up)
+  }
+  base.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  base.computeBoundingSphere()
+  return base
 }
-
-export interface RockFormation {
-  x: number
-  z: number
-  width: number
-  depth: number
-  height: number
-  rotation: number
-  variant: number
-  color: string
-}
-
-/** Asymmetric canyon walls outside the playable area and camera boom. */
-export const ROCK_FORMATIONS: readonly RockFormation[] = [
-  // The western walls frame the open approach towards Opportunity.
-  { x: -178, z: -22, width: 16, depth: 23, height: 18, rotation: 0.25, variant: 0, color: PALETTE.mesaNear },
-  { x: -160, z: 54, width: 12, depth: 18, height: 12, rotation: -0.4, variant: 1, color: PALETTE.mesaNear },
-  { x: -92, z: -164, width: 23, depth: 17, height: 23, rotation: 0.3, variant: 2, color: PALETTE.mesaNear },
-  { x: -36, z: -186, width: 11, depth: 14, height: 16, rotation: 0.8, variant: 0, color: PALETTE.mesaNear },
-  { x: 63, z: -178, width: 27, depth: 18, height: 17, rotation: -0.2, variant: 1, color: PALETTE.mesaNear },
-  { x: 166, z: -84, width: 18, depth: 26, height: 21, rotation: 0.6, variant: 2, color: PALETTE.mesaNear },
-  { x: 174, z: 34, width: 17, depth: 22, height: 14, rotation: -0.3, variant: 0, color: PALETTE.mesaNear },
-  { x: 98, z: 154, width: 22, depth: 17, height: 18, rotation: 0.4, variant: 1, color: PALETTE.mesaNear },
-  { x: -51, z: 173, width: 26, depth: 16, height: 12, rotation: -0.4, variant: 2, color: PALETTE.mesaNear },
-  // Mid-distance framing wall on the approach to the Opportunity valley:
-  // close enough to read as its backdrop from the spawn, still clear of the
-  // playable camera envelope.
-  { x: -168, z: 48, width: 14, depth: 16, height: 15, rotation: -0.2, variant: 1, color: PALETTE.mesaNear },
-  // Valley of Echoes backdrop: layered mesa north of Opportunity.
-  { x: -118, z: -146, width: 20, depth: 14, height: 14, rotation: 0.15, variant: 0, color: PALETTE.mesaNear },
-  // Lower-contrast distant silhouettes, with deliberate gaps instead of a ring.
-  { x: -210, z: -138, width: 24, depth: 20, height: 25, rotation: 0.2, variant: 1, color: PALETTE.mesaFar },
-  { x: -105, z: -240, width: 31, depth: 22, height: 28, rotation: -0.5, variant: 0, color: PALETTE.mesaFar },
-  { x: 38, z: -258, width: 34, depth: 23, height: 24, rotation: 0.1, variant: 2, color: PALETTE.mesaFar },
-  { x: 228, z: -60, width: 29, depth: 19, height: 29, rotation: -0.3, variant: 1, color: PALETTE.mesaFar },
-  { x: 168, z: 210, width: 27, depth: 22, height: 24, rotation: 0.3, variant: 0, color: PALETTE.mesaFar },
-  { x: -168, z: 198, width: 25, depth: 20, height: 22, rotation: -0.1, variant: 2, color: PALETTE.mesaFar },
-]
 
 /** Rock-free radius per site: Ingenuity's flight area stays clearest. */
 export const SITE_ROCK_CLEARANCE: Readonly<Record<string, number>> = {
@@ -178,6 +158,7 @@ export function createRocks(count: number): RockInstance[] {
     if (Math.hypot(x, z) > WORLD.playRadius + 7) continue
 
     if (Math.hypot(x - WORLD.spawn.x, z - WORLD.spawn.z) < 4.5) continue
+    if (Math.hypot(x - MAILWING_LANDING.position.x, z - MAILWING_LANDING.position.z) < 8.5) continue
     if (distanceToPath(x, z) < 2.6) continue
     if (distanceToSurveyTrail(x, z) < 2.2) continue
     if (
@@ -228,7 +209,6 @@ export function createRocks(count: number): RockInstance[] {
     if (region === 'ingenuity') scale *= 0.85
     const stretchY = 0.4 + random() * 0.45
     const color = new THREE.Color(PALETTE.rockDark).lerp(new THREE.Color(PALETTE.rockLight), random())
-    if (!isBoulder && random() < 0.045) color.lerp(new THREE.Color(PALETTE.accent), 0.6)
     if (region === 'viking1') color.lerp(new THREE.Color(PALETTE.rockDark), 0.45)
     if (region === 'insight') color.lerp(new THREE.Color(PALETTE.dust), 0.4)
     const buryFactor = region === 'opportunity' && random() < 0.5 ? 0.22 : 0.42
@@ -264,6 +244,7 @@ export function createRocks(count: number): RockInstance[] {
     const z = waypoint.z + dirX * side * 4.4
     if (Math.hypot(x, z) > WORLD.playRadius) continue
     if (Math.hypot(x - WORLD.spawn.x, z - WORLD.spawn.z) < 4) continue
+    if (Math.hypot(x - MAILWING_LANDING.position.x, z - MAILWING_LANDING.position.z) < 8.5) continue
     if (getTerrainSlope(x, z) > 0.62) continue
     let nearSite = false
     for (const object of MARS_OBJECTS) {
@@ -321,32 +302,6 @@ export function createRocks(count: number): RockInstance[] {
     })
   }
 
-  // Ingenuity flight-area markers: small stones ringing the clear apron at
-  // the edge of its rock-free radius, so the zone has a readable boundary.
-  const ingenuity = MARS_OBJECTS.find((object) => object.id === 'ingenuity')!
-  for (let index = 0; index < 6; index += 1) {
-    const angle = (index / 6) * Math.PI * 2 + 0.26
-    const x = ingenuity.position.x + Math.cos(angle) * 11.5
-    const z = ingenuity.position.z + Math.sin(angle) * 11.5
-    if (Math.hypot(x, z) > WORLD.playRadius) continue
-    if (distanceToPath(x, z) < 3) continue
-    if (getTerrainSlope(x, z) > 0.62) continue
-    const scale = 0.45
-    rocks.push({
-      x,
-      y: getTerrainHeight(x, z) + scale * 0.7 * 0.42,
-      z,
-      scale,
-      stretchX: 1.1,
-      stretchY: 0.7,
-      stretchZ: 0.9,
-      variant: index % 3,
-      rotation: angle,
-      tilt: 0.05,
-      color: new THREE.Color(PALETTE.rockLight).lerp(new THREE.Color(PALETTE.rockDark), 0.25),
-    })
-  }
-
   return rocks
 }
 
@@ -381,9 +336,8 @@ export function getBoulderObstacles(count = 150): BoulderObstacle[] {
 }
 
 /**
- * Player movement collision for the few boulders tall enough to matter.
- * The player can still walk around them or fly over them once flight is
- * unlocked. Mutates x/z to avoid per-frame allocations.
+ * Player movement collision for the few boulders tall enough to matter: the
+ * player walks around them. Mutates x/z to avoid per-frame allocations.
  */
 export function resolveBoulderCollision(
   position: { x: number; z: number },

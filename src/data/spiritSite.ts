@@ -26,20 +26,57 @@ export interface MissionSite {
   placeholderNote: string
 }
 
+/** The two Mars Exploration Rovers the game visits (one landing each). */
+export type MarsExplorerId = Extract<MissionId, 'opportunity' | 'spirit'>
+export const MARS_EXPLORER_IDS: readonly MarsExplorerId[] = ['opportunity', 'spirit']
+
+let activeExplorer: MarsExplorerId = 'opportunity'
+
+/** Chosen from orbit before landing; the whole Mars visit follows it. */
+export function setActiveExplorer(id: MarsExplorerId): void {
+  activeExplorer = id
+}
+
+export function getActiveExplorer(): MarsExplorerId {
+  return activeExplorer
+}
+
+/**
+ * The Mars explorer's site. The `SPIRIT_*` names are historical (the pilot
+ * mission was Spirit). Spirit and Opportunity are twins with the same
+ * design, so one site, one model and one set of anchors serve both: the
+ * mission id follows the landing chosen from orbit.
+ */
 export const SPIRIT_SITE: MissionSite = {
-  missionId: 'spirit',
+  get missionId() {
+    return activeExplorer
+  },
   destination: 'mars',
-  label: 'Spirit',
+  get label() {
+    return activeExplorer === 'spirit' ? 'Spirit' : 'Opportunity'
+  },
   position: { x: 0, z: -45 },
   interactionRadius: 6.5,
   collisionRadius: 2.2,
   ringRadius: 5.2,
   cameraClearance: 3.6,
-  pipMessage:
-    "There! Something is resting in the dust. Let's inspect it with the scanner.",
+  pipMessage: 'There! Something is resting in the dust.',
   placeholderNote:
-    'Development placeholder: the Spirit model is provisional. Its scan content and NASA sources are real.',
+    'Stylized model of the Mars Exploration Rover design shared by Spirit and Opportunity. Its scan content and NASA sources are real.',
 }
+
+/**
+ * Scan station view: where the camera waits while the child hunts the
+ * parts. A 3/4 front view (the rover's front faces +Z in the world) so the
+ * mast, its cameras and the arm at the front are all in sight at once.
+ */
+export const SCAN_STATION_VIEW = {
+  /** World direction from the rover to the camera (normalized on use). */
+  direction: { x: 0.95, z: 0.7 },
+  distance: 4.4,
+  eyeHeight: 1.55,
+  lookHeight: 1.05,
+} as const
 
 /**
  * Scannable component anchors, defined by data. Each anchor binds a mission
@@ -49,6 +86,7 @@ export const SPIRIT_SITE: MissionSite = {
  * on `componentId`, never on placeholder geometry.
  */
 export interface ScanAnchor {
+  /** `${missionId}-${part}`: the same part on either twin. */
   componentId: string
   /** Position relative to the rover origin (ground contact point). */
   position: readonly [number, number, number]
@@ -57,76 +95,94 @@ export interface ScanAnchor {
   hitOffset: readonly [number, number, number]
 }
 
-export const SPIRIT_SCAN_ANCHORS: readonly ScanAnchor[] = [
+const PART_ANCHORS: readonly (Omit<ScanAnchor, 'componentId'> & { part: string })[] = [
+  // Rover-local, model public/models/mer-rover.glb (front is -X). Hit boxes
+  // are a little larger than the parts so small hands can aim easily.
+  // Order = the parts hunt (same as the mission's components): eyes, rock
+  // tool, heat reader.
   {
-    componentId: 'spirit-pancam',
-    position: [0.5, 2.16, -0.35],
-    hitSize: [0.78, 0.5, 0.5],
-    hitOffset: [0, 0, 0.04],
+    part: 'pancam',
+    position: [-0.21, 1.93, 0],
+    hitSize: [0.42, 0.42, 0.64],
+    hitOffset: [0, 0, 0],
   },
   {
-    componentId: 'spirit-mini-tes',
-    position: [0.18, 1.9, -0.58],
-    hitSize: [0.5, 0.5, 0.5],
-    hitOffset: [0, 0, 0.04],
+    part: 'rock-abrasion-tool',
+    position: [-1.04, 0.5, -0.16],
+    hitSize: [0.4, 0.34, 0.36],
+    hitOffset: [-0.04, 0, 0],
   },
   {
-    componentId: 'spirit-rock-abrasion-tool',
-    position: [0.72, 0.92, 0.58],
-    hitSize: [0.5, 0.5, 0.9],
-    hitOffset: [0, 0, 0.32],
+    part: 'mini-tes',
+    position: [-0.19, 1.38, 0],
+    hitSize: [0.36, 0.64, 0.36],
+    hitOffset: [0, 0, 0],
   },
 ]
 
 /**
  * Distractor anchors: real rover parts that respond to the scanner with a
- * short PIP note but never count toward progress. Hit boxes avoid the
- * component anchors above so the ray cannot be ambiguous.
+ * short PIP note but never count toward progress. With the real model the
+ * meshes themselves carry the ids; these boxes document where they are.
  */
-export const SPIRIT_DISTRACTOR_ANCHORS: readonly (Omit<
-  ScanAnchor,
-  'componentId'
-> & { distractorId: string })[] = [
+const DISTRACTOR_PARTS: readonly (Omit<ScanAnchor, 'componentId'> & {
+  part: string
+})[] = [
   {
-    distractorId: 'spirit-solar-panels',
-    position: [0, 1.12, 0],
-    hitSize: [1.9, 0.18, 0.8],
+    part: 'solar-panels',
+    position: [0, 0.97, 0],
+    hitSize: [2.16, 0.12, 2.64],
     hitOffset: [0, 0, 0],
   },
   {
-    distractorId: 'spirit-wheels',
-    position: [-0.92, 0.34, 0],
-    hitSize: [0.34, 0.7, 1.5],
+    part: 'wheels',
+    position: [0, 0.27, 0],
+    hitSize: [2.11, 0.55, 1.84],
     hitOffset: [0, 0, 0],
   },
   {
-    distractorId: 'spirit-antenna',
-    position: [-0.72, 1.4, -0.36],
-    hitSize: [0.5, 0.7, 0.5],
+    part: 'antenna',
+    position: [0.34, 1.42, -0.06],
+    hitSize: [0.3, 0.8, 0.62],
     hitOffset: [0, 0, 0],
   },
 ]
 
+const anchorCache = new Map<string, readonly ScanAnchor[]>()
+
+/** Scan anchors of the active explorer, in hunt order. */
+export function getScanAnchors(): readonly ScanAnchor[] {
+  const cached = anchorCache.get(activeExplorer)
+  if (cached) return cached
+  const list = PART_ANCHORS.map(({ part, ...anchor }) => ({
+    ...anchor,
+    componentId: `${activeExplorer}-${part}`,
+  }))
+  anchorCache.set(activeExplorer, list)
+  return list
+}
+
+/** Distractor part id for the active explorer. */
+export function distractorId(part: string): string {
+  return `${activeExplorer}-${part}`
+}
+
+export const DISTRACTOR_PART_ANCHORS = DISTRACTOR_PARTS
+
 export function findScanAnchor(componentId: string): ScanAnchor | undefined {
-  return SPIRIT_SCAN_ANCHORS.find(
+  return getScanAnchors().find(
     (anchor) => anchor.componentId === componentId,
   )
 }
 
 /**
- * Memory-trace anchors for the full recognition scan (climax). One trace per
- * memory fragment, spread on the four sides of the body (rover-local
- * coordinates) so the player circles the explorer to sweep it. They are a
- * fictional overlay, not hardware: the rover stays still and untouched.
+ * Mailwing, landed beside the landing zone. After the letter is sealed the
+ * child walks back here and boards to return to Mars orbit.
  */
-export const SPIRIT_TRACE_ANCHORS: readonly {
-  kind: 'identity' | 'trajectory' | 'discoveries' | 'missionEnd'
-  position: readonly [number, number, number]
-  /** Radius of the (invisible) aiming sphere. */
-  hitRadius: number
-}[] = [
-  { kind: 'identity', position: [0, 0.8, 0.74], hitRadius: 0.32 },
-  { kind: 'trajectory', position: [-1.18, 0.82, 0], hitRadius: 0.32 },
-  { kind: 'discoveries', position: [0, 0.8, -0.74], hitRadius: 0.32 },
-  { kind: 'missionEnd', position: [1.18, 0.82, 0], hitRadius: 0.32 },
-]
+export const MAILWING_LANDING = {
+  position: { x: -8.5, z: 80.5 },
+  /** Ship model scale (the model is ~12 m tall at 1). */
+  scale: 1,
+  collisionRadius: 3.7,
+  boardRadius: 7.2,
+} as const

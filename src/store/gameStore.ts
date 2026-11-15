@@ -2,28 +2,20 @@ import { create } from 'zustand'
 import type { Quality } from '../game/worldConfig'
 import type { MissionId } from '../data/missions'
 import type { MarsObjectId } from '../data/marsObjects'
-import { DEFAULT_SCANNER_LENS, type ScannerLensId } from '../data/scannerLenses'
 import {
   clampVolume,
   sanitizeAudioPreferences,
   type AudioPreferences,
 } from '../game/audio/audioSettings'
-import {
-  createReconstruction,
-  revealFragment,
-  allFragmentsRevealed,
-  type MemoryFragmentKind,
-  type ReconstructionState,
-} from '../data/fullScanReconstruction'
 import { clearInput } from '../game/input'
 import { isOnboardingActive } from './onboardingStore'
+import type { BriefingStepId } from '../data/marsBriefing'
 
 const STORAGE_KEY = 'cosmic-mail:settings:v1'
 
 /** One archive overlay at a time. Presentation-only, never persisted. */
 export type ArchiveView =
   | 'none'
-  | 'full-scan'
   | 'smart-letter'
   | 'reconstruction'
 
@@ -35,6 +27,18 @@ export type ScannerPhysicalState =
   | 'valid'
   | 'out-of-range'
   | 'occluded'
+
+/** Reward shown when a scan finishes (practice rock, part or landscape). */
+export interface ScanCelebration {
+  seq: number
+  kind: 'practice' | 'component' | 'environmental'
+  title: string
+  /** Short action word, e.g. "Looks" for a camera. Optional. */
+  verb?: string
+  detail: string
+  /** World point of the scanned surface, for the burst effect. */
+  at: { x: number; y: number; z: number }
+}
 
 interface PersistedSettings extends AudioPreferences {
   quality: Quality
@@ -134,21 +138,30 @@ interface GameState {
   activeSiteId: MarsObjectId | null
   /** Spirit's contextual scan range (independent from the four legacy sites). */
   nearbySpirit: boolean
+  /** Close enough to Mailwing to board it. */
+  nearbyShip: boolean
   /** Ephemeral Cosmic Scanner state; closed on reload. */
   scannerOpen: boolean
   scannerMissionId: MissionId | null
   scannerSelectedComponentId: string | null
-  /** Active scanner lens. Ephemeral: never persisted, never progress. */
-  scannerLens: ScannerLensId
-  /** True once the player has switched lens at least once this visit. */
-  lensTouched: boolean
-  /** Wrong-lens presses per component this visit (ephemeral). */
-  wrongLensAttempts: Record<string, number>
-  registerWrongLensAttempt: (componentId: string) => number
+  /**
+   * The last finished scan, shown as a small reward card and a burst on the
+   * target. Ephemeral: never persisted. `seq` grows with every scan.
+   */
+  scanCelebration: ScanCelebration | null
+  celebrateScan: (celebration: Omit<ScanCelebration, 'seq'>) => void
+  dismissScanCelebration: () => void
   /** Distractor rover part under the reticle (gives a note, no progress). */
   scannerDistractorId: string | null
   /** Primary 3D scanner mode: the astronaut physically holds the device. */
   scannerEquipped: boolean
+  /**
+   * Scan station: the explorer's parts hunt. The camera holds a fixed view
+   * of the explorer, walking is paused and the reticle follows the pointer
+   * until every part is found (set by MissionNarrativeController).
+   */
+  scanStation: boolean
+  setScanStation: (active: boolean) => void
   /** 0..1 hold-to-scan progress for the current target. */
   scannerScanProgress: number
   /** Environmental target under the reticle, separate from mission parts. */
@@ -168,29 +181,18 @@ interface GameState {
   historicalExplanationId: string | null
   /** Progressive radar: hidden during the first landing beat. */
   radarUnlocked: boolean
+  /**
+   * Guided Mars arrival briefing on screen (null = closed). While open the
+   * world is paused and the HUD steps aside, except the radar PIP presents.
+   */
+  marsBriefingStep: BriefingStepId | null
+  setMarsBriefingStep: (step: BriefingStepId | null) => void
   /** Arrival protocol: the scanner stays locked until the calibration station. */
   scannerLocked: boolean
   setScannerLocked: (locked: boolean) => void
   /** Memorial landmarks open only in free exploration (protocol M7). */
   landmarksLocked: boolean
   setLandmarksLocked: (locked: boolean) => void
-  /**
-   * Full recognition scan (ephemeral, never persisted). The in-world sweep
-   * and the accessible panel share this one reconstruction state; the only
-   * persisted effect stays the single `completeFullScan` event.
-   */
-  fullScanRecon: ReconstructionState
-  fullScanSweepActive: boolean
-  scannerTraceKind: MemoryFragmentKind | null
-  setFullScanRecon: (
-    next: ReconstructionState | ((current: ReconstructionState) => ReconstructionState),
-  ) => void
-  resetFullScan: () => void
-  /** Leaves the dialog and starts sweeping the explorer in the world. */
-  startFullScanSweep: (missionId: MissionId) => void
-  /** Reveals one trace; the fourth one opens the rebuild step. */
-  revealFullScanTrace: (kind: MemoryFragmentKind, missionId: MissionId) => boolean
-  setScannerTraceTarget: (kind: MemoryFragmentKind | null) => void
   /** Short, skippable camera emphasis for sighting/identification. */
   cinematicFocus: {
     kind: 'sighting' | 'identification'
@@ -215,6 +217,7 @@ interface GameState {
   cancelTravel: () => void
   setNearbySite: (id: MarsObjectId | null) => void
   setNearbySpirit: (nearby: boolean) => void
+  setNearbyShip: (nearby: boolean) => void
   showPipMessage: (message: string) => void
   clearPipMessage: () => void
   markRegionVisited: (id: MarsObjectId) => void
@@ -227,7 +230,6 @@ interface GameState {
   unequipScanner: () => void
   toggleScanner: (missionId: MissionId) => void
   setScannerTarget: (componentId: string | null) => void
-  setScannerLens: (lens: ScannerLensId) => void
   setScannerDistractorTarget: (distractorId: string | null) => void
   setScannerEnvironmentalTarget: (environmentalId: string | null) => void
   setScannerPhysicalState: (state: ScannerPhysicalState) => void
@@ -305,14 +307,18 @@ export const useGameStore = create<GameState>((set, get) => {
   nearbySiteId: null,
   activeSiteId: null,
   nearbySpirit: false,
+  nearbyShip: false,
+  setNearbyShip: (nearbyShip) => {
+    if (get().nearbyShip === nearbyShip) return
+    set({ nearbyShip })
+  },
   scannerOpen: false,
   scannerMissionId: null,
   scannerSelectedComponentId: null,
-  scannerLens: DEFAULT_SCANNER_LENS,
-  lensTouched: false,
-  wrongLensAttempts: {},
+  scanCelebration: null,
   scannerDistractorId: null,
   scannerEquipped: false,
+  scanStation: false,
   scannerScanProgress: 0,
   scannerEnvironmentalId: null,
   scannerTargetKind: null,
@@ -322,11 +328,14 @@ export const useGameStore = create<GameState>((set, get) => {
   scannerLatched: false,
   historicalExplanationId: null,
   radarUnlocked: false,
+  marsBriefingStep: null,
+  setMarsBriefingStep: (marsBriefingStep) => {
+    if (get().marsBriefingStep === marsBriefingStep) return
+    clearInput()
+    set({ marsBriefingStep })
+  },
   scannerLocked: false,
   landmarksLocked: false,
-  fullScanRecon: createReconstruction(),
-  fullScanSweepActive: false,
-  scannerTraceKind: null,
   cinematicFocus: null,
   scannerCardComponentId: null,
   scannerRecordsOpen: false,
@@ -463,12 +472,16 @@ export const useGameStore = create<GameState>((set, get) => {
       travelTargetId: null,
     })
   },
+  setScanStation: (scanStation) => {
+    if (get().scanStation === scanStation) return
+    clearInput()
+    set({ scanStation })
+  },
   unequipScanner: () => {
     // Movement keys stay held here too; only scanner state is released.
     set({
       scannerEquipped: false,
       scannerMissionId: null,
-      scannerTraceKind: null,
       scannerSelectedComponentId: null,
       scannerDistractorId: null,
       scannerEnvironmentalId: null,
@@ -500,18 +513,13 @@ export const useGameStore = create<GameState>((set, get) => {
       scannerScanProgress: 0,
     })
   },
-  setScannerLens: (scannerLens) => {
-    const state = get()
-    if (state.scannerLens === scannerLens) return
-    // Switching lens restarts any in-flight hold; movement is untouched.
-    set({ scannerLens, scannerScanProgress: 0, lensTouched: true })
+  celebrateScan: (celebration) => {
+    const seq = (get().scanCelebration?.seq ?? 0) + 1
+    set({ scanCelebration: { ...celebration, seq } })
   },
-  registerWrongLensAttempt: (componentId) => {
-    const next = (get().wrongLensAttempts[componentId] ?? 0) + 1
-    set((state) => ({
-      wrongLensAttempts: { ...state.wrongLensAttempts, [componentId]: next },
-    }))
-    return next
+  dismissScanCelebration: () => {
+    if (get().scanCelebration === null) return
+    set({ scanCelebration: null })
   },
   setScannerDistractorTarget: (scannerDistractorId) => {
     const state = get()
@@ -590,8 +598,9 @@ export const useGameStore = create<GameState>((set, get) => {
     if (state.scannerTriggerHeld === scannerTriggerHeld) return
     set({
       scannerTriggerHeld,
-      // Releasing the trigger always drops a touch latch.
-      ...(scannerTriggerHeld ? {} : { scannerScanProgress: 0, scannerLatched: false }),
+      // Releasing the trigger drops a touch latch. Progress is kept: letting
+      // go early is never a penalty, the next hold continues from there.
+      ...(scannerTriggerHeld ? {} : { scannerLatched: false }),
     })
   },
   setScannerLatched: () => {
@@ -658,7 +667,6 @@ export const useGameStore = create<GameState>((set, get) => {
       archiveView,
       archiveMissionId,
       scannerOpen: false,
-      scannerTraceKind: null,
       scannerEquipped: false,
       scannerMissionId: null,
       scannerSelectedComponentId: null,
@@ -679,61 +687,7 @@ export const useGameStore = create<GameState>((set, get) => {
     clearInput()
     set({ archiveView: 'none', archiveMissionId: null })
   },
-  setFullScanRecon: (next) => {
-    set((state) => ({
-      fullScanRecon:
-        typeof next === 'function' ? next(state.fullScanRecon) : next,
-    }))
-  },
-  resetFullScan: () => {
-    set({
-      fullScanRecon: createReconstruction(),
-      fullScanSweepActive: false,
-      scannerTraceKind: null,
-    })
-  },
-  startFullScanSweep: (missionId) => {
-    const state = get()
-    if (allFragmentsRevealed(state.fullScanRecon)) {
-      get().openArchive('full-scan', missionId)
-      return
-    }
-    if (state.archiveView !== 'none') get().closeArchive()
-    set({ fullScanSweepActive: true })
-    get().equipScanner(missionId)
-  },
-  revealFullScanTrace: (kind, missionId) => {
-    const result = revealFragment(get().fullScanRecon, kind)
-    if (result.action !== 'revealed') return false
-    set({
-      fullScanRecon: result.state,
-      scannerTraceKind: null,
-    })
-    if (allFragmentsRevealed(result.state)) {
-      set({ fullScanSweepActive: false })
-      get().openArchive('full-scan', missionId)
-    }
-    return true
-  },
-  setScannerTraceTarget: (kind) => {
-    const state = get()
-    if (!state.scannerEquipped && kind !== null) return
-    if (state.scannerTraceKind === kind) return
-    set({
-      scannerTraceKind: kind,
-      ...(kind
-        ? {
-            scannerSelectedComponentId: null,
-            scannerDistractorId: null,
-            scannerEnvironmentalId: null,
-            scannerTargetKind: null,
-            scannerPhysicalState: 'valid' as const,
-            scannerAnalysis: 'idle' as const,
-          }
-        : {}),
-      scannerScanProgress: 0,
-    })
-  },
+
   setQuality: (quality) => {
     set({ quality })
     persistSettings()
@@ -822,6 +776,7 @@ export function isWorldPaused(): boolean {
   const state = useGameStore.getState()
   return (
     isOnboardingActive() ||
+    state.marsBriefingStep !== null ||
     state.settingsOpen ||
     state.activeSiteId !== null ||
     state.scannerOpen ||

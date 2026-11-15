@@ -10,13 +10,14 @@ import { AudioDirector } from './game/audio/AudioDirector'
 import { Onboarding } from './ui/onboarding/Onboarding'
 import { CosmicRadar } from './ui/CosmicRadar'
 import { CosmicScanner } from './ui/CosmicScanner'
-import { FullScanOverlay } from './ui/FullScanDialog'
 import { MemoryReconstructionOverlay } from './ui/MemoryReconstruction'
 import { SmartLetterOverlay } from './ui/SmartLetter'
 import { ScannerHud } from './ui/ScannerHud'
+import { ScanReward } from './ui/ScanReward'
 import { ScannerReadingCard } from './ui/ScannerReadingCard'
 import { SiteInteraction } from './ui/SiteInteraction'
 import { SpiritInteraction } from './ui/SpiritInteraction'
+import { ShipInteraction } from './ui/ShipInteraction'
 import { CinematicOverlay } from './ui/CinematicOverlay'
 import { Hud } from './ui/Hud'
 import { MissionPanel } from './ui/MissionPanel'
@@ -24,6 +25,7 @@ import { ObjectiveBar } from './ui/ObjectiveBar'
 import { PipSpeech } from './ui/PipSpeech'
 import { SettingsMenu } from './ui/SettingsMenu'
 import { TouchControls } from './ui/TouchControls'
+import { MarsBriefing } from './ui/MarsBriefing'
 import { SceneBoundary, SceneStatus } from './ui/SceneStatus'
 
 const GameCanvas = lazy(() => import('./game/GameCanvas'))
@@ -32,7 +34,9 @@ export default function App() {
   const settingsOpen = useGameStore((state) => state.settingsOpen)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
+  const briefingOpen = useGameStore((state) => state.marsBriefingStep !== null)
   const scannerCamera = useGameStore((state) => state.scannerCamera)
+  const scanStation = useGameStore((state) => state.scanStation)
   const onboardingActive = useOnboardingStore((state) => state.phase !== 'playing')
 
   useEffect(() => attachInput(isWorldPaused), [])
@@ -94,7 +98,7 @@ export default function App() {
           className="game"
           data-reduced-motion={reducedMotion}
           data-scanner={scannerEquipped ? 'equipped' : 'idle'}
-          data-scanner-camera={scannerCamera}
+          data-scanner-camera={scanStation ? 'station' : scannerCamera}
         >
           <div className="world-layer" inert={settingsOpen}>
             <SceneBoundary>
@@ -103,22 +107,26 @@ export default function App() {
               </Suspense>
             </SceneBoundary>
 
-            <Hud />
-            <ObjectiveBar />
-            <MissionPanel />
+            {/* The guided arrival briefing owns the screen: only the radar
+                PIP presents stays, everything else waits until it ends. */}
+            {!briefingOpen && <Hud />}
+            {!briefingOpen && <ObjectiveBar />}
+            {!briefingOpen && <MissionPanel />}
             <CosmicRadar />
             <ScannerHud />
-            <PipSpeech />
+            {!briefingOpen && <ScanReward />}
+            {!briefingOpen && <PipSpeech />}
             <CinematicOverlay />
-            <TouchControls />
+            {!briefingOpen && <TouchControls />}
             <MissionNarrativeController />
+            <MarsBriefing />
           </div>
           <SettingsMenu />
           <SiteInteraction />
           <SpiritInteraction />
+          <ShipInteraction />
           <CosmicScanner />
           <ScannerReadingCard />
-          <FullScanOverlay />
           <SmartLetterOverlay />
           <MemoryReconstructionOverlay />
         </main>

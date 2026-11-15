@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
+import { hubElementEnabled, useHubFocus } from '../../store/hubFocus'
 import { areAllMissionsComplete } from '../../store/journeyLogic'
 import { ArchiveFinale } from './ArchiveFinale'
 import { DestinationNavigation } from './DestinationNavigation'
@@ -23,6 +24,13 @@ export function Hub() {
   const setPassportDetailOpen = useOnboardingStore(
     (state) => state.setPassportDetailOpen,
   )
+  const focus = useHubFocus()
+  const navEnabled = hubElementEnabled(focus, 'nav')
+  const albumEnabled = hubElementEnabled(focus, 'album')
+  // During the guided tour the album and the navigation close-up stay
+  // open until PIP has explained them.
+  const albumCloseEnabled = hubElementEnabled(focus, 'album-close')
+  const navBackEnabled = hubElementEnabled(focus, 'nav-back')
   const [closing, setClosing] = useState(false)
   const openedAtRef = useRef(0)
   const save = useJourneyStore((state) => state.save)
@@ -32,14 +40,14 @@ export function Hub() {
   )
 
   const requestClose = () => {
-    if (closing) return
+    if (closing || !albumCloseEnabled) return
     if (performance.now() - openedAtRef.current < 600) return
     setClosing(true)
   }
 
   const closeDetail = useCallback(() => {
-    if (!closing) setClosing(true)
-  }, [closing])
+    if (!closing && albumCloseEnabled) setClosing(true)
+  }, [closing, albumCloseEnabled])
 
   const finishClose = () => {
     setClosing(false)
@@ -53,11 +61,11 @@ export function Hub() {
   useEffect(() => {
     if (!routeOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setRouteOpen(false)
+      if (event.key === 'Escape' && navBackEnabled) setRouteOpen(false)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [routeOpen, setRouteOpen])
+  }, [routeOpen, setRouteOpen, navBackEnabled])
 
   useEffect(() => {
     if (!passportDetailOpen) return
@@ -77,6 +85,7 @@ export function Hub() {
         <button
           type="button"
           className="identity__back"
+          disabled={!navBackEnabled}
           onClick={() => setRouteOpen(false)}
         >
           ← Back to cabin
@@ -98,6 +107,7 @@ export function Hub() {
           <button
             type="button"
             className="mirror-controls"
+            disabled={!navEnabled}
             onClick={() => setRouteOpen(true)}
           >
             Open navigation (keyboard)
@@ -118,9 +128,10 @@ export function Hub() {
         <button
           type="button"
           className="mirror-controls"
+          disabled={!albumEnabled}
           onClick={() => setPassportDetailOpen(true)}
         >
-          View my passport
+          Open mission album
         </button>
       </div>
 
@@ -128,7 +139,7 @@ export function Hub() {
 
       {passportDetailOpen && (
         <div
-          className="passport-detail"
+          className={`passport-detail${focus.tourActive ? ' passport-detail--tour' : ''}`}
           onClick={(event) => {
             if (event.target === event.currentTarget) requestClose()
           }}
@@ -142,7 +153,12 @@ export function Hub() {
             <Passport pinned />
             <button
               type="button"
-              className="settings-resume passport-detail__close"
+              className={`settings-resume passport-detail__close${
+                focus.tourActive && focus.target === 'album-close'
+                  ? ' is-tour-target'
+                  : ''
+              }`}
+              disabled={!albumCloseEnabled}
               onClick={closeDetail}
             >
               Back to cabin

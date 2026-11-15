@@ -275,25 +275,6 @@
   color: var(--cream-faint);
 }
 
-.touch-boost {
-  pointer-events: auto;
-  min-width: 76px;
-  min-height: 52px;
-  border: 1px solid rgba(255, 217, 168, 0.45);
-  border-radius: 999px;
-  background: rgba(255, 217, 168, 0.14);
-  color: var(--cream);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  touch-action: none;
-}
-
-.touch-boost:active {
-  background: rgba(255, 217, 168, 0.32);
-}
-
 /* ------------------------------------------------------ PIP speech box */
 
 .pip-speech {
@@ -1087,148 +1068,173 @@
 .cosmic-radar {
   position: absolute;
   right: calc(20px + env(safe-area-inset-right, 0px));
-  bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   z-index: 6;
-  width: min(238px, calc(100vw - 40px));
-  box-sizing: border-box;
-  padding: 13px;
-  border: 1px solid rgba(244, 180, 223, 0.28);
-  border-radius: 18px;
-  background: rgba(27, 16, 41, 0.82);
-  color: var(--cream);
-  box-shadow: 0 18px 40px -22px rgba(10, 4, 16, 0.9);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.cosmic-radar.is-near {
-  border-color: rgba(255, 217, 168, 0.68);
-  box-shadow:
-    0 18px 40px -22px rgba(10, 4, 16, 0.9),
-    0 0 0 1px rgba(255, 217, 168, 0.12);
-}
-
-.cosmic-radar__header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 168px;
+  color: var(--cream);
+  pointer-events: none;
+}
+
+.cosmic-radar > * {
+  pointer-events: auto;
+}
+
+/* Actions float above the map, never inside it. */
+.cosmic-radar__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
+  width: 100%;
 }
 
-.cosmic-radar__header .settings-eyebrow {
-  margin: 0;
+.cosmic-radar__stack:empty {
+  display: none;
 }
 
-.cosmic-radar__title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 650;
-}
-
-.cosmic-radar__distance {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  color: var(--cream-dim);
-  white-space: nowrap;
-}
-
-.cosmic-radar__scope {
+.cosmic-radar__map-wrap {
   position: relative;
-  width: 124px;
-  height: 124px;
-  margin: 10px auto 8px;
-  border: 1px solid rgba(255, 217, 168, 0.24);
+  width: 148px;
+  height: 148px;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(51, 32, 63, 0.75), rgba(12, 6, 18, 0.78)),
-    repeating-radial-gradient(circle, transparent 0 18px, rgba(255, 217, 168, 0.06) 18px 19px);
-  overflow: hidden;
+  background: rgba(105, 83, 77, 0.55);
+  box-shadow:
+    0 0 0 3px rgba(242, 205, 180, 0.85),
+    0 14px 30px -12px rgba(30, 18, 14, 0.75);
+  transition: box-shadow 300ms ease;
 }
 
-.cosmic-radar__sweep {
-  position: absolute;
-  inset: -50%;
-  background: conic-gradient(
-    from 0deg,
-    rgba(255, 217, 168, 0.3),
-    transparent 28%
-  );
-  animation: radar-sweep 4.4s linear infinite;
+.cosmic-radar.is-near .cosmic-radar__map-wrap {
+  box-shadow:
+    0 0 0 4px #f47b38,
+    0 0 26px rgba(244, 123, 56, 0.65),
+    0 14px 30px -12px rgba(30, 18, 14, 0.75);
 }
 
 .cosmic-radar__map {
-  position: absolute;
-  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
 }
 
+.cosmic-radar__disc {
+  stroke: none;
+}
+
 .cosmic-radar__ring {
   fill: none;
-  stroke: rgba(255, 217, 168, 0.18);
-  stroke-width: 1;
+  stroke: rgba(242, 205, 180, 0.22);
+  stroke-width: 0.8;
 }
 
-.cosmic-radar__ring--faint {
-  stroke: rgba(244, 180, 223, 0.12);
+.cosmic-radar__view {
+  fill: rgba(242, 205, 180, 0.12);
 }
 
-.cosmic-radar__line {
-  stroke: rgba(244, 180, 223, 0.5);
-  stroke-width: 1;
-  stroke-dasharray: 2 2;
+.cosmic-radar__pointer {
+  fill: #f47b38;
+  stroke: #f2cdb4;
+  stroke-width: 0.8;
+  stroke-linejoin: round;
 }
 
-.cosmic-radar__blip {
-  fill: #ffd9a8;
-  filter: drop-shadow(0 0 4px rgba(255, 217, 168, 0.85));
+.cosmic-radar__star {
+  fill: #f47b38;
+  stroke: #f2cdb4;
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+
+.cosmic-radar__halo {
+  fill: rgba(244, 123, 56, 0.35);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: minimap-pulse 1.6s ease-in-out infinite;
 }
 
 .cosmic-radar__player {
-  fill: #f4b4df;
+  fill: #f2cdb4;
+  stroke: #3a2b27;
+  stroke-width: 0.9;
+  stroke-linejoin: round;
 }
 
-.cosmic-radar__near-line {
-  margin: 8px 0 0;
-  font-size: 0.72rem;
-  line-height: 1.45;
-  color: var(--cream-dim);
+.cosmic-radar__label {
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(58, 43, 39, 0.82);
+  color: #f2cdb4;
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: center;
 }
 
-.cosmic-radar__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+.cosmic-radar.is-near .cosmic-radar__label {
+  background: #f47b38;
+  color: #2a1a14;
 }
 
 .cosmic-radar__action {
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: rgba(253, 244, 236, 0.06);
-  color: var(--cream-dim);
+  align-self: center;
+  padding: 6px 12px;
+  border: 1px solid rgba(242, 205, 180, 0.4);
+  border-radius: 999px;
+  background: rgba(58, 43, 39, 0.82);
+  color: #f2cdb4;
   font: inherit;
-  font-size: 0.66rem;
 }
 
 .cosmic-radar__action:hover {
-  color: var(--cream);
-  background: rgba(253, 244, 236, 0.12);
+  background: rgba(105, 83, 77, 0.95);
 }
 
 .cosmic-radar__scan,
 .cosmic-radar__dev {
-  min-height: 44px;
-  margin-top: 8px;
+  min-height: 48px;
+}
+
+.cosmic-radar__scan {
+  background: linear-gradient(180deg, #f47b38, #d9895c);
+  border-color: #f2cdb4;
+  color: #2a1a14;
+  font-weight: 750;
+  animation: minimap-scan 1.6s ease-in-out infinite;
 }
 
 .cosmic-radar__note {
-  margin: 6px 0 0;
-  font-size: 0.64rem;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(58, 43, 39, 0.82);
   line-height: 1.4;
   color: var(--cream-faint);
+}
+
+@keyframes minimap-pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.9; }
+  50% { transform: scale(1.25); opacity: 0.35; }
+}
+
+@keyframes minimap-scan {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 123, 56, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(244, 123, 56, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-radar__halo,
+  .cosmic-radar__scan {
+    animation: none;
+  }
+}
+
+[data-reduced-motion='true'] .cosmic-radar__halo,
+[data-reduced-motion='true'] .cosmic-radar__scan {
+  animation: none;
 }
 
 @keyframes radar-sweep {
@@ -1577,13 +1583,12 @@
   .cosmic-radar {
     right: calc(12px + env(safe-area-inset-right, 0px));
     bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-    width: min(210px, calc(100vw - 24px));
-    padding: 10px;
+    width: 140px;
   }
 
-  .cosmic-radar__scope {
-    width: 104px;
-    height: 104px;
+  .cosmic-radar__map-wrap {
+    width: 118px;
+    height: 118px;
   }
 
   .cosmic-scanner {
@@ -1608,7 +1613,7 @@
 @media (max-width: 420px) {
   .cosmic-radar {
     bottom: calc(90px + env(safe-area-inset-bottom, 0px));
-    width: min(184px, calc(100vw - 24px));
+    width: 124px;
   }
 
   /* PIP's dialogue already uses the lower-left band on very small
@@ -1618,13 +1623,9 @@
     display: none;
   }
 
-  .cosmic-radar__scope {
-    width: 92px;
-    height: 92px;
-  }
-
-  .cosmic-radar__title {
-    font-size: 0.88rem;
+  .cosmic-radar__map-wrap {
+    width: 100px;
+    height: 100px;
   }
 
   .scanner-hotspot__name {
@@ -1637,7 +1638,6 @@
 
 .cosmic-radar__archive {
   min-height: 44px;
-  margin-top: 8px;
 }
 
 .mission-pilot.is-sealed {
@@ -2339,39 +2339,6 @@
   opacity: 0.4;
 }
 
-.scanner-hud__lenses {
-  display: flex;
-  gap: 4px;
-}
-
-.scanner-hud__lens {
-  flex: 1;
-  min-height: 32px;
-  padding: 5px 6px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: rgba(253, 244, 236, 0.06);
-  color: var(--cream);
-  font: inherit;
-  font-size: 0.68rem;
-  cursor: pointer;
-}
-
-.scanner-hud__lens.is-active {
-  border-color: rgba(255, 217, 168, 0.7);
-  background: rgba(255, 217, 168, 0.18);
-  color: #ffd9a8;
-}
-
-.scanner-hud__lens:hover:not(.is-active) {
-  background: rgba(253, 244, 236, 0.12);
-}
-
-.scanner-hud__lens:focus-visible {
-  outline: 2px solid #ffd9a8;
-  outline-offset: 2px;
-}
-
 .scanner-hud__archive {
   border-color: rgba(255, 217, 168, 0.48);
   color: #ffd9a8;
@@ -2436,13 +2403,6 @@
   color: #ffd9a8;
   font: inherit;
   font-size: 0.72rem;
-}
-
-.scanner-hud__dev--reset,
-.cosmic-radar__dev--reset {
-  border-color: rgba(255, 168, 168, 0.42);
-  background: rgba(255, 130, 130, 0.1);
-  color: #ffc2c2;
 }
 
 /* ------------------------------------------------------ Scan reading card */
@@ -2965,26 +2925,9 @@
   line-height: 1.35;
 }
 
-.cosmic-radar--quiet {
-  max-width: 250px;
-  padding: 12px 14px;
-}
-
-.cosmic-radar__quiet-line {
-  margin: 6px 0 0;
-  color: var(--cream-faint);
-  font-size: 0.74rem;
-  line-height: 1.45;
-}
-
 .scanner-hud__count--field {
   color: #ffd9a8;
   font-size: 0.58rem;
-}
-
-.touch-boost:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .cinematic-focus {
@@ -3056,6 +2999,11 @@
 
 .game[data-scanner="equipped"][data-scanner-camera="first-person"] canvas {
   cursor: crosshair;
+}
+
+/* Scan station: the reticle IS the cursor. */
+.game[data-scanner="equipped"][data-scanner-camera="station"] canvas {
+  cursor: none;
 }
 
 .scanner-reading__field-notes {
@@ -3553,12 +3501,12 @@
 
 .cosmic-radar.is-guided {
   animation: radar-arrive 0.7s ease-out both;
-  box-shadow: 0 0 0 2px rgba(255, 217, 168, 0.55);
 }
 
-.scanner-hud__lens.is-guided {
-  box-shadow: 0 0 0 2px #ffd9a8;
-  animation: lens-nudge 1.4s ease-in-out infinite;
+.cosmic-radar.is-guided .cosmic-radar__map-wrap {
+  box-shadow:
+    0 0 0 4px #f2cdb4,
+    0 0 22px rgba(244, 123, 56, 0.55);
 }
 
 @keyframes radar-arrive {
@@ -3572,27 +3520,8 @@
   }
 }
 
-@keyframes lens-nudge {
-  50% {
-    box-shadow: 0 0 0 5px rgba(255, 217, 168, 0.35);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .cosmic-radar.is-guided,
-  .scanner-hud__lens.is-guided {
-    animation: none;
-  }
-}
-
-.scanner-hud__lenses.is-intro {
-  border-radius: 12px;
-  animation: lens-nudge 1.4s ease-in-out infinite;
-  box-shadow: 0 0 0 2px rgba(255, 217, 168, 0.7);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .scanner-hud__lenses.is-intro {
+  .cosmic-radar.is-guided {
     animation: none;
   }
 }
@@ -3705,25 +3634,21 @@
 .hud-controls > summary,
 .hud-key,
 .hud-quality,
-.cosmic-radar__distance,
+.cosmic-radar__label,
 .cosmic-radar__note,
 .cosmic-radar__action,
-.cosmic-radar__near-line,
-.cosmic-radar__quiet-line,
 .scanner-hud__archive,
 .scanner-hud__assist,
 .scanner-hud__action,
 .scanner-hud__count,
 .scanner-hud__count--field,
 .scanner-hud__hint,
-.scanner-hud__lens,
 .scanner-hud__put-away,
 .scanner-reticle__label,
 .spirit-interaction__label,
 .spirit-interaction__action,
 .spirit-interaction__hint,
 .touch-hint,
-.touch-boost,
 .touch-scanner,
 .mission-site small,
 .settings-eyebrow {
@@ -3773,7 +3698,6 @@
   color: #ffd9a8;
 }
 
-.scanner-reticle__status[data-status='wrong-lens'],
 .scanner-reticle__status[data-status='out-of-range'],
 .scanner-reticle__status[data-status='blocked'] {
   color: #ffb4a0;
@@ -3861,4 +3785,756 @@
     top: calc(56px + env(safe-area-inset-top, 0px));
     max-width: calc(100vw - 24px);
   }
+}
+
+/* The minimap caption is a primary line for the child. */
+.cosmic-radar__label {
+  font-size: 0.95rem;
+}
+
+/* ----------------------------------------- Single scan: reticle (Mars palette)
+ * One basic scan for everything. White and calm while searching; on a target
+ * the reticle turns orange and grows a little ("you are aiming right"); while
+ * holding, the ring fills and the brackets close in on the target.
+ */
+.scanner-reticle {
+  transition:
+    opacity 160ms ease,
+    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.scanner-reticle.is-target,
+.scanner-reticle.is-scanning {
+  transform: translate(-50%, -50%) scale(1.18);
+}
+
+.scanner-reticle__ring {
+  inset: -12px;
+  background: conic-gradient(
+    from -90deg,
+    #f47b38 calc(var(--scan-progress, 0) * 1turn),
+    rgba(242, 205, 180, 0.22) 0
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  filter: drop-shadow(0 0 6px rgba(244, 123, 56, 0.55));
+}
+
+.scanner-reticle__dot {
+  background: #f2cdb4;
+  box-shadow: 0 0 10px rgba(242, 205, 180, 0.85);
+}
+
+.scanner-reticle.is-target .scanner-reticle__dot {
+  background: #f47b38;
+  box-shadow: 0 0 14px rgba(244, 123, 56, 0.95);
+}
+
+.scanner-reticle.is-recorded .scanner-reticle__dot {
+  background: #9be3a4;
+  box-shadow: 0 0 12px rgba(155, 227, 164, 0.9);
+}
+
+.scanner-reticle__bracket {
+  border-color: rgba(242, 205, 180, 0.85);
+  transition: transform 120ms linear, border-color 160ms ease;
+  --close: calc(var(--scan-progress, 0) * 7px);
+}
+
+.scanner-reticle.is-target .scanner-reticle__bracket {
+  border-color: #f47b38;
+}
+
+.scanner-reticle__bracket--tl { transform: translate(var(--close), var(--close)); }
+.scanner-reticle__bracket--tr { transform: translate(calc(var(--close) * -1), var(--close)); }
+.scanner-reticle__bracket--bl { transform: translate(var(--close), calc(var(--close) * -1)); }
+.scanner-reticle__bracket--br { transform: translate(calc(var(--close) * -1), calc(var(--close) * -1)); }
+
+.scanner-reticle.is-scanning .scanner-reticle__ring {
+  animation: reticle-hum 0.5s ease-in-out infinite;
+}
+
+@keyframes reticle-hum {
+  50% {
+    filter: drop-shadow(0 0 12px rgba(244, 123, 56, 0.9));
+  }
+}
+
+/* ------------------------------------------------ Single scan: reward card */
+.scan-reward {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  z-index: 9;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  align-items: center;
+  width: min(380px, calc(100vw - 32px));
+  padding: 14px 18px 14px 14px;
+  border: 2px solid #f47b38;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(105, 83, 77, 0.95), rgba(58, 40, 36, 0.95));
+  color: #fdf4ec;
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 6px rgba(244, 123, 56, 0.18);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  animation: scan-reward-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.scan-reward.is-leaving {
+  animation: scan-reward-out 620ms cubic-bezier(0.55, 0, 0.75, 0.2) both;
+}
+
+.scan-reward__icon {
+  grid-row: span 3;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f2cdb4, #f47b38 70%);
+  box-shadow: 0 0 18px rgba(244, 123, 56, 0.7);
+}
+
+.scan-reward__icon svg {
+  width: 38px;
+  height: 38px;
+}
+
+.scan-reward__eyebrow {
+  margin: 0;
+  color: #f2cdb4;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scan-reward__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.scan-reward__verb {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: #f47b38;
+  color: #2b1a14;
+  font-size: 0.85rem;
+  font-weight: 800;
+  vertical-align: 2px;
+}
+
+.scan-reward__detail {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.scan-reward__sparkles {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.scan-reward__sparkles i {
+  position: absolute;
+  left: 46px;
+  top: 46px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f2cdb4;
+  opacity: 0;
+  animation: scan-reward-spark 900ms ease-out both;
+}
+
+@keyframes scan-reward-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(24px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* The card "flies" up toward the mission album corner. */
+@keyframes scan-reward-out {
+  to {
+    opacity: 0;
+    transform: translateX(calc(-50% + 34vw)) translateY(-18vh) scale(0.2);
+  }
+}
+
+@keyframes scan-reward-spark {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+  }
+}
+
+@media (max-width: 720px) {
+  .scan-reward {
+    top: 12%;
+  }
+
+  .scan-reward__icon {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner-reticle,
+  .scanner-reticle__bracket {
+    transition: none;
+  }
+
+  .scanner-reticle.is-scanning .scanner-reticle__ring,
+  .scan-reward,
+  .scan-reward.is-leaving,
+  .scan-reward__sparkles i {
+    animation: none;
+  }
+
+  .scan-reward.is-leaving {
+    opacity: 0;
+  }
+}
+
+/* ----------------------------------------- Parts hunt tracker (M4)
+ * Three slots in the objective bar: found parts glow green with their
+ * name, the one to find now pulses gold, the others wait as "?".
+ */
+.objective-bar:has(.hunt-tracker) {
+  border-radius: 22px;
+}
+
+.hunt-tracker {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hunt-tracker__slot {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  width: 54px;
+  padding: 4px 2px 3px;
+  border: 1.5px dashed rgba(253, 244, 236, 0.35);
+  border-radius: 12px;
+  color: rgba(253, 244, 236, 0.55);
+}
+
+.hunt-tracker__label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hunt-tracker__mystery {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.hunt-tracker__slot[data-state='next'] {
+  border-style: solid;
+  border-color: #ffd9a8;
+  color: #ffd9a8;
+  animation: hunt-next 1.6s ease-in-out infinite;
+}
+
+.hunt-tracker__slot[data-state='found'] {
+  border-style: solid;
+  border-color: #9bd6a8;
+  background: rgba(155, 214, 168, 0.16);
+  color: #9bd6a8;
+  animation: hunt-found 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes hunt-next {
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 217, 168, 0.18);
+  }
+}
+
+@keyframes hunt-found {
+  0% {
+    transform: scale(0.7);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hunt-tracker__slot[data-state='next'],
+  .hunt-tracker__slot[data-state='found'] {
+    animation: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .hunt-tracker__slot {
+    width: 44px;
+  }
+  .hunt-tracker__label {
+    display: none;
+  }
+}
+
+/* Slim scanner device: only what nothing else on screen says. */
+.scanner-hud.scanner-hud--slim {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.scanner-hud--slim:empty {
+  display: none;
+}
+
+.scanner-hud--slim .scanner-hud__put-away {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 217, 168, 0.45);
+  border-radius: 999px;
+  background: rgba(31, 20, 44, 0.82);
+  color: #fdf4ec;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.scanner-hud--slim .scanner-hud__scan {
+  min-width: 132px;
+  min-height: 64px;
+  border-radius: 999px;
+}
+
+/* ------------------------------------------------------------ Archive tablet
+   The smart letter lives on a small tech tablet: dark bezel, glowing
+   screen, three part tiles, a tap-to-read timeline and one big action. */
+.smart-letter-dialog {
+  width: min(560px, calc(100vw - 24px));
+  color: var(--cream);
+}
+
+.archive-tablet {
+  position: relative;
+  padding: 14px;
+  border-radius: 30px;
+  background: linear-gradient(160deg, #3a2a4a 0%, #1b1029 55%, #120a1c 100%);
+  box-shadow:
+    0 40px 90px -30px rgba(5, 2, 10, 0.95),
+    inset 0 0 0 1.5px rgba(253, 244, 236, 0.14),
+    inset 0 2px 0 rgba(253, 244, 236, 0.12);
+  animation: archive-tablet-in 420ms cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+
+@keyframes archive-tablet-in {
+  from { opacity: 0; transform: translateY(40px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+.archive-tablet__camera {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: #0b0614;
+  box-shadow: inset 0 0 0 1px rgba(143, 227, 216, 0.35);
+}
+
+.archive-tablet__screen {
+  position: relative;
+  max-height: calc(92dvh - 28px);
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(143, 227, 216, 0.16) 0%, rgba(143, 227, 216, 0) 60%),
+    linear-gradient(180deg, #170e26 0%, #0f0919 100%);
+  box-shadow: inset 0 0 0 1px rgba(143, 227, 216, 0.22);
+}
+
+.archive-tablet__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.archive-tablet__app { color: #8fe3d8; }
+
+.archive-tablet__status {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 217, 168, 0.14);
+  color: var(--rose-200);
+}
+
+.archive-tablet[data-state='delivered'] .archive-tablet__status {
+  background: rgba(155, 231, 176, 0.16);
+  color: #9be7b0;
+}
+
+.archive-tablet__close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(253, 244, 236, 0.2);
+  border-radius: 50%;
+  background: rgba(253, 244, 236, 0.06);
+  color: var(--cream);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.archive-tablet__hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0 12px;
+}
+
+.archive-tablet__hero h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.archive-tablet__meta {
+  margin: 4px 0 0;
+  color: var(--cream-dim);
+  font-size: 0.85rem;
+}
+
+.archive-tablet__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: rgba(143, 227, 216, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(143, 227, 216, 0.3);
+}
+
+.archive-tablet__badge .smart-letter__stamp {
+  transform: scale(0.62);
+}
+
+.archive-tablet__badge-glyph {
+  color: var(--rose-200);
+  font-size: 1.8rem;
+}
+
+.archive-tablet__parts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.archive-tablet__part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px 10px;
+  border-radius: 14px;
+  background: rgba(253, 244, 236, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(253, 244, 236, 0.1);
+  text-align: center;
+}
+
+.archive-tablet__part[data-found='true'] {
+  background: rgba(143, 227, 216, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(143, 227, 216, 0.45);
+}
+
+.archive-tablet__part-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(253, 244, 236, 0.08);
+  color: var(--cream-faint);
+  font-weight: 800;
+}
+
+.archive-tablet__part[data-found='true'] .archive-tablet__part-icon {
+  background: rgba(143, 227, 216, 0.2);
+  color: #8fe3d8;
+}
+
+.archive-tablet__part strong { font-size: 0.9rem; }
+
+.archive-tablet__part small {
+  color: var(--cream-dim);
+  font-size: 0.72rem;
+}
+
+.archive-tablet__story { margin-top: 14px; }
+
+.archive-tablet__timeline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.archive-tablet__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 84px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 217, 168, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 217, 168, 0.22);
+  color: var(--cream);
+  font: inherit;
+  cursor: pointer;
+}
+
+.archive-tablet__chip[aria-expanded='true'] {
+  background: rgba(255, 217, 168, 0.2);
+  box-shadow: inset 0 0 0 1.5px var(--rose-200);
+}
+
+.archive-tablet__chip-glyph {
+  color: var(--rose-200);
+  font-size: 1.1rem;
+}
+
+.archive-tablet__chip-label {
+  color: var(--cream-faint);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.archive-tablet__chip-short {
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.archive-tablet__detail {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(253, 244, 236, 0.06);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.archive-tablet__detail--hint {
+  background: none;
+  color: var(--cream-faint);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.archive-tablet__pip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(143, 227, 216, 0.08);
+}
+
+.archive-tablet__pip.is-success { background: rgba(155, 231, 176, 0.12); }
+
+.archive-tablet__pip .pip-avatar {
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+
+.archive-tablet__pip-line {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.archive-tablet__legacy {
+  margin: 8px 0 0;
+  color: var(--cream-faint);
+  font-size: 0.72rem;
+}
+
+.archive-tablet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.archive-tablet__action {
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 1px solid rgba(253, 244, 236, 0.28);
+  border-radius: 999px;
+  background: rgba(253, 244, 236, 0.06);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.archive-tablet__action--primary {
+  border: 0;
+  background: linear-gradient(180deg, #ffd9a8 0%, #f2b28c 100%);
+  color: #2a1a33;
+  font-size: 1.02rem;
+}
+
+.archive-tablet__action--seal {
+  min-height: 56px;
+  padding: 12px 34px;
+  font-size: 1.15rem;
+  animation: archive-tablet-seal-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes archive-tablet-seal-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 217, 168, 0); }
+  50% { box-shadow: 0 0 22px 4px rgba(255, 217, 168, 0.5); }
+}
+
+.archive-tablet__message {
+  margin: 10px 0 0;
+  color: var(--rose-200);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.archive-tablet__sources {
+  margin-top: 14px;
+  color: var(--cream-faint);
+  font-size: 0.72rem;
+}
+
+.archive-tablet__sources summary { cursor: pointer; }
+
+.archive-tablet__sources ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.archive-tablet__sources a { color: #8fe3d8; }
+
+/* The letter itself (delivery ceremony) is a paper card on the screen. */
+.archive-tablet .postal {
+  background: var(--cream);
+  color: #2a1a33;
+}
+
+@media (max-width: 480px) {
+  .archive-tablet { padding: 10px; border-radius: 24px; }
+  .archive-tablet__screen { padding: 12px; }
+  .archive-tablet__timeline { grid-template-columns: repeat(2, 1fr); }
+  .archive-tablet__hero h2 { font-size: 1.3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .archive-tablet, .archive-tablet__action--seal { animation: none; }
+}
+
+/* Scan station: the speech box sits on PIP's left, a tail pointing at PIP. */
+.pip-speech.pip-speech--beside {
+  right: auto;
+  bottom: auto;
+  max-width: min(320px, 38vw);
+  transition: left 0.18s ease-out, top 0.18s ease-out;
+}
+.pip-speech.pip-speech--beside::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -9px;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%) rotate(45deg);
+  background: inherit;
+  border-top: 1px solid rgba(244, 180, 223, 0.35);
+  border-right: 1px solid rgba(244, 180, 223, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pip-speech.pip-speech--beside { transition: none; }
+}
+
+/* Story video (Opportunity, Spirit): wider viewer, video fits the screen. */
+.smart-letter-dialog:has(.smart-letter--video) {
+  width: min(1000px, calc(100vw - 24px));
+}
+.reconstruction__video {
+  margin: 12px 0 4px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #120a1c;
+  box-shadow: 0 14px 30px -18px rgba(18, 10, 28, 0.9);
+}
+.reconstruction__video video {
+  display: block;
+  width: 100%;
+  max-height: calc(92dvh - 230px);
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #120a1c;
 }

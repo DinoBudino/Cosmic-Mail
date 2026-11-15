@@ -2,7 +2,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import * as THREE from 'three'
 import {
-  CALIBRATION_SAMPLE,
   INSPECT_FIRST_LINE,
   LATER_LINE,
   areFreeScansAllowed,
@@ -11,10 +10,7 @@ import {
 } from '../data/arrivalProtocol'
 import { getEnvironmentalSite } from '../data/environmentalSites'
 import { getMission } from '../data/missions'
-import { pickTraceHit, type TraceRayHit } from '../data/fullScanSweep'
-import { stageForProgress } from '../data/missionNarrative'
-import type { MemoryFragmentKind } from '../data/fullScanReconstruction'
-import { lensMatchesComponent } from '../data/scannerLenses'
+import { PRACTICE_SCAN_RESULT } from '../data/calibrationSample'
 import { emitAudio } from './audio/audioEvents'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
@@ -23,13 +19,14 @@ import { useNarrativeStore } from '../store/narrativeStore'
 import {
   requestDistractorNote,
   requestProtocolLine,
-  requestWrongLensFeedback,
 } from './missionNarrative'
 import { playerPosition } from './playerPosition'
 import { clearScannerAim, setScannerAim } from './scannerAim'
 import { clientToNdc, scannerPointer } from './scannerPointer'
 import { pickScannerTarget, type ScannerRayHit } from './scannerRay'
 import { SCANNER } from './worldConfig'
+import { getTerrainHeight } from './terrainHeight'
+import { terrainRayHit } from './terrainRay'
 
 const AIM_FALLBACK = new THREE.Vector3()
 
@@ -83,17 +80,6 @@ function findAncestorData(object: THREE.Object3D): AncestorData {
   return { componentId, missionId, distractorId, environmentalId, ignored }
 }
 
-function findTraceKind(object: THREE.Object3D): string | null {
-  let current: THREE.Object3D | null = object
-  while (current) {
-    if (typeof current.userData?.scannerTraceKind === 'string') {
-      return current.userData.scannerTraceKind
-    }
-    current = current.parent
-  }
-  return null
-}
-
 function isOpaque(object: THREE.Object3D): boolean {
   if (!(object instanceof THREE.Mesh)) return false
   const material = object.material
@@ -110,7 +96,10 @@ function isOpaque(object: THREE.Object3D): boolean {
  * - raycast from the real mouse position (or the centre on touch);
  * - validate mission, range and occlusion;
  * - keep the arm aimed at the surface under the reticle;
- * - commit the 1.2 s hold exactly once through journeyStore.scan().
+ * - commit the hold exactly once through journeyStore.scan().
+ *
+ * One scan mode for everything: aim and hold. Letting go early keeps the
+ * progress on that target, so a short hand never loses the work.
  */
 export function ScannerController() {
   const camera = useThree((state) => state.camera)
@@ -120,10 +109,13 @@ export function ScannerController() {
   const ndc = useRef(new THREE.Vector2())
   const intersections = useRef<THREE.Intersection[]>([])
   const rayHits = useRef<ScannerRayHit[]>([])
+  // Only objects tagged `scannerRoot` are raycast (targets and the rover);
+  // the list is refreshed twice a second, never per frame.
+  const roots = useRef<THREE.Object3D[]>([])
+  const rootsAge = useRef(Number.POSITIVE_INFINITY)
   const lastTargetId = useRef<string | null>(null)
   const holdProgress = useRef(0)
   const lastHudUpdate = useRef(0)
-  const prevTriggerHeld = useRef(false)
 
   useFrame((state, delta) => {
     const store = useGameStore.getState()
@@ -173,11 +165,20 @@ export function ScannerController() {
       ndc.current.set(0, 0)
     }
 
+    rootsAge.current += delta
+    if (rootsAge.current > 0.5) {
+      rootsAge.current = 0
+      roots.current.length = 0
+      scene.traverse((object) => {
+        if (object.userData?.scannerRoot === true) roots.current.push(object)
+      })
+    }
+
     raycaster.current.setFromCamera(ndc.current, camera)
     raycaster.current.far = SCANNER.rayFar
     intersections.current.length = 0
     raycaster.current.intersectObjects(
-      scene.children,
+      roots.current,
       true,
       intersections.current,
     )
@@ -198,29 +199,29 @@ export function ScannerController() {
         opaque: isOpaque(intersection.object),
       })
     }
-
-    // Full-scan sweep: memory traces around the identified explorer.
-    let trace: { kind: MemoryFragmentKind; index: number } | null = null
-    if (
-      store.fullScanSweepActive &&
-      explorerKnown &&
-      stageForProgress(journeyState.save?.missions[missionId] ?? null) ===
-        'ready_for_full_scan'
-    ) {
-      const traceHits: TraceRayHit[] = intersections.current.map(
-        (intersection, index) => {
-          const hit = rayHits.current[index]!
-          return {
-            traceKind: findTraceKind(intersection.object),
-            componentId: hit.componentId,
-            distractorId: hit.distractorId ?? null,
-            ignored: hit.ignored,
-            opaque: hit.opaque,
-            distance: hit.distance,
-          }
-        },
-      )
-      trace = pickTraceHit(traceHits, store.fullScanRecon.revealed, SCANNER.range)
+    // The ground as an opaque occluder, from the heightfield (cheap).
+    const ray = raycaster.current.ray
+    const ground = terrainRayHit(
+      ray.origin,
+      ray.direction,
+      SCANNER.rayFar,
+      getTerrainHeight,
+    )
+    if (ground) {
+      let at = rayHits.current.findIndex((hit) => hit.distance > ground.distance)
+      if (at < 0) at = rayHits.current.length
+      rayHits.current.splice(at, 0, {
+        componentId: null,
+        missionId: null,
+        distractorId: null,
+        environmentalId: null,
+        distance: ground.distance,
+        x: ground.x,
+        y: ground.y,
+        z: ground.z,
+        ignored: false,
+        opaque: true,
+      })
     }
 
     const picked = pickScannerTarget(
@@ -235,8 +236,8 @@ export function ScannerController() {
       picked && 'componentId' in picked ? picked.componentId : null
     const rawDistractorId =
       picked && 'distractorId' in picked ? picked.distractorId : null
-    const componentId = explorerKnown && !trace ? rawComponentId : null
-    const distractorId = explorerKnown && !trace ? rawDistractorId : null
+    const componentId = explorerKnown ? rawComponentId : null
+    const distractorId = explorerKnown ? rawDistractorId : null
     if (
       !explorerKnown &&
       (rawComponentId || rawDistractorId) &&
@@ -271,9 +272,8 @@ export function ScannerController() {
 
     // Keep the physical device pointed at the surface under the reticle,
     // even when it is not a valid target.
-    const aimHit = trace
-      ? rayHits.current[trace.index]
-      : (picked ?? rayHits.current.find((hit) => !hit.ignored && hit.opaque))
+    const aimHit =
+      picked ?? rayHits.current.find((hit) => !hit.ignored && hit.opaque)
     if (aimHit) {
       setScannerAim(aimHit.x, aimHit.y, aimHit.z)
     } else {
@@ -296,7 +296,7 @@ export function ScannerController() {
       (hit) => !hit.ignored && hit.opaque,
     )
     const physicalState =
-      trace || componentId || distractorId || validEnvironmentalId
+      componentId || distractorId || validEnvironmentalId
         ? ('valid' as const)
         : environmentalId && environmental && picked
           ? ('out-of-range' as const)
@@ -309,9 +309,7 @@ export function ScannerController() {
               : ('idle' as const)
     store.setScannerPhysicalState(physicalState)
 
-    const targetKey = trace
-      ? `trace:${trace.kind}`
-      : componentId
+    const targetKey = componentId
       ? `component:${componentId}`
       : distractorId
         ? `distractor:${distractorId}`
@@ -325,9 +323,7 @@ export function ScannerController() {
       // A latched touch scan belongs to one target: losing or changing it
       // releases the trigger so the player never scans something by accident.
       if (store.scannerLatched) store.setScannerTrigger(false)
-      if (trace) {
-        store.setScannerTraceTarget(trace.kind)
-      } else if (componentId) {
+      if (componentId) {
         store.setScannerTarget(componentId)
       } else if (distractorId) {
         store.setScannerDistractorTarget(distractorId)
@@ -338,7 +334,6 @@ export function ScannerController() {
         store.setScannerDistractorTarget(null)
         store.setScannerTarget(null)
       }
-      if (!trace) store.setScannerTraceTarget(null)
       store.setScannerScanProgress(0)
     }
 
@@ -362,67 +357,31 @@ export function ScannerController() {
             (component) => component.id === componentId,
           ) ?? null)
         : null
-    // The right lens is part of recognizing a component. A wrong lens is a
-    // soft nudge from PIP, never a failure or a penalty.
-    const lensOk = targetComponent
-      ? lensMatchesComponent(targetComponent, store.scannerLens)
-      : false
     const wantsScan =
       Boolean(save) &&
       discovered &&
       store.scannerTriggerHeld
     const canScanComponent =
-      wantsScan && Boolean(componentId) && !alreadyScanned && lensOk
+      wantsScan && Boolean(componentId) && !alreadyScanned
     const canScanDistractor = wantsScan && Boolean(distractorId)
-    // One wrong-lens attempt = one press of the scan control on a pending
-    // part, never one frame. The ladder (panel → PIP → pulse) lives in
-    // lensFeedback; the press is counted here.
-    const pressRising = store.scannerTriggerHeld && !prevTriggerHeld.current
-    prevTriggerHeld.current = store.scannerTriggerHeld
-    if (
-      pressRising &&
-      wantsScan &&
-      componentId &&
-      !alreadyScanned &&
-      targetComponent &&
-      !lensOk
-    ) {
-      const attempt = store.registerWrongLensAttempt(componentId)
-      requestWrongLensFeedback(componentId, missionId, attempt)
-      if (store.scannerLatched) store.setScannerTrigger(false)
-    }
     const calibrating =
       Boolean(validEnvironmentalId) &&
       isCalibrationSampleId(validEnvironmentalId) &&
       isCalibrationActive(step)
-    const calibrationLensOk = store.scannerLens === CALIBRATION_SAMPLE.lens
-    const canCalibrate =
-      calibrating && store.scannerTriggerHeld && calibrationLensOk
+    const canCalibrate = calibrating && store.scannerTriggerHeld
     const canScanEnvironmental =
       Boolean(save) &&
       Boolean(validEnvironmentalId) &&
       !calibrating &&
       store.scannerTriggerHeld &&
       !environmentalDetailedDone
+    const step01 = Math.min(delta, 0.05) / SCANNER.holdSeconds
+    const burstAt = aimHit
+      ? { x: aimHit.x, y: aimHit.y, z: aimHit.z }
+      : { x: playerPosition.x, y: 0, z: playerPosition.z }
 
-    if (trace && store.scannerTriggerHeld) {
-      holdProgress.current = Math.min(
-        1,
-        holdProgress.current + Math.min(delta, 0.05) / SCANNER.holdSeconds,
-      )
-      if (holdProgress.current >= 1) {
-        holdProgress.current = 0
-        store.setScannerScanProgress(0)
-        store.setScannerTrigger(false)
-        if (store.revealFullScanTrace(trace.kind, missionId)) {
-          emitAudio('scanCompleted')
-        }
-      }
-    } else if (canScanComponent && componentId) {
-      holdProgress.current = Math.min(
-        1,
-        holdProgress.current + Math.min(delta, 0.05) / SCANNER.holdSeconds,
-      )
+    if (canScanComponent && componentId) {
+      holdProgress.current = Math.min(1, holdProgress.current + step01)
 
       if (holdProgress.current >= 1) {
         const result = journey.scan(missionId, componentId)
@@ -431,14 +390,21 @@ export function ScannerController() {
         if (result?.status === 'scanned') {
           store.setScannerTrigger(false)
           // The narrative controller reacts to the new record and PIP
-          // explains it in-world; the reading card stays optional.
+          // explains it in-world; the reward card shows how it worked.
+          if (targetComponent) {
+            store.celebrateScan({
+              kind: 'component',
+              title: targetComponent.shortName,
+              verb: targetComponent.howItWorks?.verb,
+              detail:
+                targetComponent.howItWorks?.detail ?? targetComponent.scanHint,
+              at: burstAt,
+            })
+          }
         }
       }
     } else if (canScanDistractor && distractorId) {
-      holdProgress.current = Math.min(
-        1,
-        holdProgress.current + Math.min(delta, 0.05) / SCANNER.holdSeconds,
-      )
+      holdProgress.current = Math.min(1, holdProgress.current + step01)
       if (holdProgress.current >= 1) {
         requestDistractorNote(distractorId, missionId)
         holdProgress.current = 0
@@ -446,54 +412,48 @@ export function ScannerController() {
         store.setScannerTrigger(false)
       }
     } else if (canCalibrate) {
-      holdProgress.current = Math.min(
-        1,
-        holdProgress.current + Math.min(delta, 0.05) / SCANNER.holdSeconds,
-      )
+      holdProgress.current = Math.min(1, holdProgress.current + step01)
       if (holdProgress.current >= 1) {
         useNarrativeStore.getState().markProtocol('calibrated')
         holdProgress.current = 0
         store.setScannerScanProgress(0)
         store.setScannerTrigger(false)
+        emitAudio('scanCompleted')
+        store.celebrateScan({
+          kind: 'practice',
+          title: PRACTICE_SCAN_RESULT.title,
+          detail: PRACTICE_SCAN_RESULT.detail,
+          at: burstAt,
+        })
       }
     } else if (canScanEnvironmental && validEnvironmentalId) {
-      holdProgress.current = Math.min(
-        1,
-        holdProgress.current +
-          Math.min(delta, 0.05) / SCANNER.environmentalDetailSeconds,
-      )
-      const quickThreshold =
-        SCANNER.environmentalQuickSeconds /
-        SCANNER.environmentalDetailSeconds
-
-      if (
-        store.scannerAnalysis === 'idle' &&
-        holdProgress.current >= quickThreshold
-      ) {
-        const result = journey.recordEnvironmentalScan(
-          validEnvironmentalId,
-          false,
-        )
-        if (result && (result.status === 'quick' || result.status === 'duplicate')) {
-          store.setScannerAnalysis('quick')
-        }
-      }
-
+      holdProgress.current = Math.min(1, holdProgress.current + step01)
       if (holdProgress.current >= 1) {
+        // One hold records the full reading (it also counts as the quick one).
         const result = journey.recordEnvironmentalScan(
           validEnvironmentalId,
           true,
         )
         if (result && (result.status === 'detailed' || result.status === 'duplicate')) {
           store.setScannerAnalysis('detailed')
+          if (environmental && result.status === 'detailed') {
+            store.celebrateScan({
+              kind: 'environmental',
+              title: environmental.name,
+              detail: environmental.quickLine,
+              at: burstAt,
+            })
+          }
         }
         holdProgress.current = 0
         store.setScannerScanProgress(0)
         store.setScannerTrigger(false)
       }
-    } else {
+    } else if (store.scannerTriggerHeld || !targetKey) {
+      // Holding on something that cannot be scanned (or nothing): no fill.
       holdProgress.current = 0
     }
+    // Released on a valid target: the ring keeps its progress.
 
     const now = state.clock.elapsedTime
     if (

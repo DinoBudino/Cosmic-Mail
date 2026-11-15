@@ -85,6 +85,16 @@ export const MARS_OBJECTS: readonly MarsObject[] = [
   },
 ]
 
+/**
+ * Hardware actually placed in the playable world. Empty on purpose: the
+ * Mars level tells Opportunity's story at Meridiani Planum, and Viking 1,
+ * InSight and Ingenuity landed in other places on Mars, so showing them
+ * here would not be faithful. MARS_OBJECTS stays as data only: its
+ * positions still shape the terrain zones, and saved memorial notes keep
+ * validating unchanged.
+ */
+export const MARS_WORLD_SITES: readonly MarsObject[] = []
+
 /** Shared identity per region: geography + PIP's short English orientation. */
 export interface RegionInfo {
   /** Stylized microenvironment name shown to players. */

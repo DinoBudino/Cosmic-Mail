@@ -92,6 +92,7 @@ describe('JourneySaveV4 creation', () => {
       'surveyor-3',
       'spirit',
       'pioneer-10',
+      'opportunity',
     ])
     for (const progress of Object.values(save.missions)) {
       expect(progress).toEqual({

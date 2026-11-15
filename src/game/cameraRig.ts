@@ -22,6 +22,20 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * First-person mouse-look (pointer lock, centred reticle). Off at the scan
+ * station: there the view is still and the reticle follows the pointer.
+ */
+export function isMouseLookFirstPerson(
+  store: { scannerEquipped: boolean; scannerCamera: string; scanStation: boolean },
+): boolean {
+  return (
+    store.scannerEquipped &&
+    store.scannerCamera === 'first-person' &&
+    !store.scanStation
+  )
+}
+
 export function getOrbit(): Readonly<OrbitState> {
   return orbit
 }
@@ -131,8 +145,7 @@ export function attachCameraControls(element: HTMLElement): () => void {
     if (isPaused()) return
     const store = useGameStore.getState()
     const scannerAiming = store.scannerEquipped
-    const firstPerson =
-      scannerAiming && store.scannerCamera === 'first-person'
+    const firstPerson = isMouseLookFirstPerson(store)
     if (scannerAiming && !firstPerson && event.pointerType !== 'mouse') {
       // Touch dragging aims the physical scanner reticle directly. It
       // never starts a scan or an accidental camera orbit. In first
@@ -150,7 +163,9 @@ export function attachCameraControls(element: HTMLElement): () => void {
         void element.requestPointerLock?.()
       }
       // Left click is reserved for hold-to-scan while the device is
-      // equipped; right-drag orbits the aim camera.
+      // equipped; right-drag orbits the aim camera. The scan station's view
+      // never moves.
+      if (store.scanStation) return
       if (scannerAiming ? event.button !== 2 : event.button !== 0) return
     }
 
@@ -169,8 +184,7 @@ export function attachCameraControls(element: HTMLElement): () => void {
 
   const onPointerMove = (event: PointerEvent) => {
     const store = useGameStore.getState()
-    const firstPerson =
-      store.scannerEquipped && store.scannerCamera === 'first-person'
+    const firstPerson = isMouseLookFirstPerson(store)
     if (
       firstPerson &&
       document.pointerLockElement === element &&

@@ -1,0 +1,1728 @@
+{
+ "objects": 222,
+ "meshes": 190,
+ "problems": [],
+ "per_mesh": [
+  {
+   "name": "ANTENNA_BASE",
+   "verts": 194,
+   "faces": 240,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "ANTENNA_COLLAR",
+   "verts": 146,
+   "faces": 192,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "ANTENNA_LIGHT",
+   "verts": 522,
+   "faces": 560,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "ANTENNA_STEM",
+   "verts": 74,
+   "faces": 96,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "BELT_BUTTON",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_LIGHT_L",
+   "verts": 41,
+   "faces": 40,
+   "non_manifold_edges": 20,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_LIGHT_R",
+   "verts": 41,
+   "faces": 40,
+   "non_manifold_edges": 20,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_01",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_02",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_03",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_04",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_05",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_06",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_07",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_08",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_09",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BELT_SEAM_10",
+   "verts": 62,
+   "faces": 30,
+   "non_manifold_edges": 62,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "BODY_CORE",
+   "verts": 2522,
+   "faces": 2592,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "CAMERA_HOUSING",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "CAMERA_LENS",
+   "verts": 85,
+   "faces": 84,
+   "non_manifold_edges": 28,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "CAMERA_RING",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EQUATOR_SEAMS",
+   "verts": 320,
+   "faces": 160,
+   "non_manifold_edges": 320,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_01_NEUTRAL_EyeL",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_01_NEUTRAL_EyeR",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_02_ALEGRE.001",
+   "verts": 117,
+   "faces": 116,
+   "non_manifold_edges": 29,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_02_ALEGRE_EyeL",
+   "verts": 58,
+   "faces": 28,
+   "non_manifold_edges": 58,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_02_ALEGRE_EyeR",
+   "verts": 58,
+   "faces": 28,
+   "non_manifold_edges": 58,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_03_GUINO_EyeL",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_03_GUINO_EyeR",
+   "verts": 58,
+   "faces": 28,
+   "non_manifold_edges": 58,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_04_EMOCIONADO.001",
+   "verts": 117,
+   "faces": 116,
+   "non_manifold_edges": 29,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_04_EMOCIONADO_EyeL",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_04_EMOCIONADO_EyeR",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_05_CURIOSO_EyeL",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_05_CURIOSO_EyeR",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_05_CURIOSO_Mouth",
+   "verts": 97,
+   "faces": 96,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrLB_h",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrLB_v",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrLT_h",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrLT_v",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrRB_h",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrRB_v",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrRT_h",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_BrRT_v",
+   "verts": 14,
+   "faces": 6,
+   "non_manifold_edges": 14,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_Core",
+   "verts": 65,
+   "faces": 64,
+   "non_manifold_edges": 16,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_Target",
+   "verts": 80,
+   "faces": 40,
+   "non_manifold_edges": 80,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_Tick1",
+   "verts": 6,
+   "faces": 2,
+   "non_manifold_edges": 6,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_Tick2",
+   "verts": 6,
+   "faces": 2,
+   "non_manifold_edges": 6,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_Tick3",
+   "verts": 6,
+   "faces": 2,
+   "non_manifold_edges": 6,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_06_ANALIZANDO_Tick4",
+   "verts": 6,
+   "faces": 2,
+   "non_manifold_edges": 6,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_07_SATISFECHO.001",
+   "verts": 117,
+   "faces": 116,
+   "non_manifold_edges": 29,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_07_SATISFECHO_EyeL",
+   "verts": 58,
+   "faces": 28,
+   "non_manifold_edges": 58,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_07_SATISFECHO_EyeR",
+   "verts": 58,
+   "faces": 28,
+   "non_manifold_edges": 58,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_08_SORPRENDIDO_EyeL",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_08_SORPRENDIDO_EyeR",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_08_SORPRENDIDO_Mouth",
+   "verts": 81,
+   "faces": 80,
+   "non_manifold_edges": 20,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_09_PENSATIVO_Dot1",
+   "verts": 113,
+   "faces": 112,
+   "non_manifold_edges": 28,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_09_PENSATIVO_Dot2",
+   "verts": 113,
+   "faces": 112,
+   "non_manifold_edges": 28,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_09_PENSATIVO_Dot3",
+   "verts": 113,
+   "faces": 112,
+   "non_manifold_edges": 28,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_10_ALEGRE_VISTA_PRINCIPAL.001",
+   "verts": 117,
+   "faces": 116,
+   "non_manifold_edges": 29,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_10_ALEGRE_VISTA_PRINCIPAL_EyeL",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "EXP_10_ALEGRE_VISTA_PRINCIPAL_EyeR",
+   "verts": 58,
+   "faces": 28,
+   "non_manifold_edges": 58,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "FRONT_ACCENT_BORDER",
+   "verts": 289,
+   "faces": 288,
+   "non_manifold_edges": 48,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "FRONT_ACCENT_GRAY_PLATE",
+   "verts": 289,
+   "faces": 288,
+   "non_manifold_edges": 48,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "FRONT_ACCENT_LEFT_STRIPE",
+   "verts": 246,
+   "faces": 200,
+   "non_manifold_edges": 90,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "FRONT_ACCENT_PLATE",
+   "verts": 289,
+   "faces": 288,
+   "non_manifold_edges": 48,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "FRONT_ACCENT_SLOT",
+   "verts": 289,
+   "faces": 288,
+   "non_manifold_edges": 48,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "FRONT_LED_DIFFUSER",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "FRONT_LED_FRAME",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "MODULE_LEFT",
+   "verts": 1730,
+   "faces": 1824,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "MODULE_RIGHT",
+   "verts": 1730,
+   "faces": 1824,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "PANEL_BORDER_A",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_BORDER_B",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_GAP_FRONT_LOW",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_GAP_FRONT_LOW_R",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_GAP_FRONT_VL",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_GAP_FRONT_VR",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_GAP_REAR_LOW",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_GAP_REAR_VL",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "PANEL_GAP_REAR_VR",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_BELT_LIGHT_L",
+   "verts": 41,
+   "faces": 40,
+   "non_manifold_edges": 20,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_BELT_LIGHT_R",
+   "verts": 41,
+   "faces": 40,
+   "non_manifold_edges": 20,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_LED_DIFFUSER",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_LED_FRAME",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_ORANGE_PANEL",
+   "verts": 287,
+   "faces": 240,
+   "non_manifold_edges": 92,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_PANEL_BORDER",
+   "verts": 82,
+   "faces": 40,
+   "non_manifold_edges": 82,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_PLATE",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "REAR_PLATE_SLOT",
+   "verts": 81,
+   "faces": 80,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SCREW_01",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_02",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_03",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_04",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_05",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_06",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_07",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_08",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_09",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_10",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_11",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_12",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_13",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_14",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_15",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_16",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_17",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_18",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_19",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_20",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_21",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_22",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_23",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_24",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_25",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_26",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_27",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_28",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_29",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_30",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_31",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_32",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_33",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_34",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_35",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_36",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_37",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_38",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_39",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_40",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_41",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_42",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_43",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_44",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_45",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_46",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SCREW_SOURCE",
+   "verts": 66,
+   "faces": 80,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SENSOR_DETAIL_HOUSING",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SENSOR_DETAIL_LENS",
+   "verts": 41,
+   "faces": 40,
+   "non_manifold_edges": 20,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SHELL_BELT_FRONT",
+   "verts": 682,
+   "faces": 610,
+   "non_manifold_edges": 142,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SHELL_BELT_REAR",
+   "verts": 682,
+   "faces": 610,
+   "non_manifold_edges": 142,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SHELL_BOTTOM",
+   "verts": 1200,
+   "faces": 1080,
+   "non_manifold_edges": 240,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SHELL_FRONT",
+   "verts": 1302,
+   "faces": 1220,
+   "non_manifold_edges": 162,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SHELL_REAR",
+   "verts": 1302,
+   "faces": 1220,
+   "non_manifold_edges": 162,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SHELL_TOP",
+   "verts": 4440,
+   "faces": 4320,
+   "non_manifold_edges": 240,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_CENTER_LEFT",
+   "verts": 866,
+   "faces": 960,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SIDE_CENTER_RIGHT",
+   "verts": 866,
+   "faces": 960,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "SIDE_CONNECTOR_LEFT",
+   "verts": 218,
+   "faces": 288,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_CONNECTOR_RIGHT",
+   "verts": 218,
+   "faces": 288,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FASTENER_LEFT_1",
+   "verts": 26,
+   "faces": 36,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FASTENER_LEFT_2",
+   "verts": 26,
+   "faces": 36,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FASTENER_LEFT_3",
+   "verts": 26,
+   "faces": 36,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FASTENER_RIGHT_1",
+   "verts": 26,
+   "faces": 36,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FASTENER_RIGHT_2",
+   "verts": 26,
+   "faces": 36,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FASTENER_RIGHT_3",
+   "verts": 26,
+   "faces": 36,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FLANGE_LEFT",
+   "verts": 1152,
+   "faces": 1152,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_FLANGE_RIGHT",
+   "verts": 1152,
+   "faces": 1152,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_RING_EMISSIVE_LEFT",
+   "verts": 1152,
+   "faces": 1152,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_RING_EMISSIVE_RIGHT",
+   "verts": 1152,
+   "faces": 1152,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_SENSOR_LENS_LEFT",
+   "verts": 146,
+   "faces": 216,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "SIDE_SENSOR_LENS_RIGHT",
+   "verts": 146,
+   "faces": 216,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "STRUCTURAL_RINGS",
+   "verts": 320,
+   "faces": 160,
+   "non_manifold_edges": 320,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "STUDIO_SHADOW_DISC",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 48,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "THRUSTER_EMISSION_CORE",
+   "verts": 1010,
+   "faces": 1080,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "THRUSTER_HALO",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 48,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "THRUSTER_HOUSING",
+   "verts": 218,
+   "faces": 288,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "THRUSTER_INNER_RINGS",
+   "verts": 1152,
+   "faces": 1152,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "THRUSTER_NECK",
+   "verts": 146,
+   "faces": 216,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "THRUSTER_NOZZLE",
+   "verts": 1152,
+   "faces": 1152,
+   "non_manifold_edges": 0,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": true
+  },
+  {
+   "name": "TOP_ORANGE_STRIPE_A_1",
+   "verts": 246,
+   "faces": 200,
+   "non_manifold_edges": 90,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "TOP_ORANGE_STRIPE_A_2",
+   "verts": 246,
+   "faces": 200,
+   "non_manifold_edges": 90,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "TOP_ORANGE_STRIPE_A_3",
+   "verts": 246,
+   "faces": 200,
+   "non_manifold_edges": 90,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "TOP_ORANGE_STRIPE_B_1",
+   "verts": 246,
+   "faces": 200,
+   "non_manifold_edges": 90,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "TOP_ORANGE_STRIPE_B_2",
+   "verts": 246,
+   "faces": 200,
+   "non_manifold_edges": 90,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "TOP_ORANGE_STRIPE_B_3",
+   "verts": 246,
+   "faces": 200,
+   "non_manifold_edges": 90,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_RECESS_L",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_RECESS_R",
+   "verts": 161,
+   "faces": 160,
+   "non_manifold_edges": 40,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_L1",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_L2",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_L3",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_L4",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_L5",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_R1",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_R2",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_R3",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_R4",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VENT_SLAT_R5",
+   "verts": 49,
+   "faces": 48,
+   "non_manifold_edges": 24,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VISOR_FRAME",
+   "verts": 896,
+   "faces": 768,
+   "non_manifold_edges": 256,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VISOR_GLASS",
+   "verts": 2945,
+   "faces": 2944,
+   "non_manifold_edges": 128,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VISOR_INNER_BORDER",
+   "verts": 512,
+   "faces": 384,
+   "non_manifold_edges": 256,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VISOR_RECESS",
+   "verts": 384,
+   "faces": 256,
+   "non_manifold_edges": 256,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VISOR_REFLECTION",
+   "verts": 287,
+   "faces": 240,
+   "non_manifold_edges": 92,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  },
+  {
+   "name": "VISOR_REFLECTION_SMALL",
+   "verts": 119,
+   "faces": 96,
+   "non_manifold_edges": 44,
+   "degenerate_faces": 0,
+   "materials": 1,
+   "expect_closed": false
+  }
+ ],
+ "duplicate_names": [],
+ "invalid_drivers": [],
+ "modifier_errors": [],
+ "counts": {
+  "mesh_objects": 190,
+  "materials": 30,
+  "expressions": 10,
+  "controllers": 8,
+  "cameras": 9,
+  "lights": 5
+ }
+}

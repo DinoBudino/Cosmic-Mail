@@ -1,10 +1,9 @@
+import type { MissionId } from '../data/missions'
 import { useEffect, useRef } from 'react'
 import {
   LATER_LINE,
   OFF_TRAIL_LINE,
-  SAMPLE_LENS_LINE,
   STEP_ENTRY_LINES,
-  CALIBRATION_SAMPLE,
   areFreeScansAllowed,
   hasReachedStation,
   hasWalkedEnough,
@@ -12,7 +11,9 @@ import {
   isOutsideCorridor,
   isRadarVisible,
   isScannerUnlocked,
+  needsArrivalBriefing,
   type ProtocolStep,
+  hasPriorFieldWork,
 } from '../data/arrivalProtocol'
 import { getEnvironmentalSite } from '../data/environmentalSites'
 import { getMission } from '../data/missions'
@@ -23,14 +24,15 @@ import {
   getApproachedCue,
   getArchiveCue,
   getComponentCue,
-  getCompletionCues,
+  getCompletionCue,
   getDetectedCue,
-  getFullScanReadyCue,
+  getHuntClueCue,
+  getHuntTarget,
   getIdentifiedCue,
-  getLetterPreparedCue,
   getMissionEntryCue,
   getNewComponentIds,
   getReturnToShipCue,
+  getScannerPromptCue,
   getSoftHintCue,
   scannedComponentCount,
   stageForProgress,
@@ -43,10 +45,10 @@ import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import {
+  isCoarsePointer,
   requestProtocolLine,
   MISSION_APPROACH_RADIUS,
   MISSION_DETECT_RADIUS,
-  MISSION_NARRATIVE_ID,
 } from './missionNarrative'
 import { stopPipVoice } from './pipVoice'
 import { getCurrentProtocolStep } from './protocolStep'
@@ -66,7 +68,7 @@ import {
 /** True once the explorer is identified: far-sighting lines are then stale. */
 function isMissionDiscovered(): boolean {
   return Boolean(
-    useJourneyStore.getState().save?.missions[MISSION_NARRATIVE_ID]?.discovered,
+    useJourneyStore.getState().save?.missions[SPIRIT_SITE.missionId]?.discovered,
   )
 }
 
@@ -81,10 +83,49 @@ function isMissionDiscovered(): boolean {
  * (`inspectSpirit`, called from SpiritInteraction). Only then can PIP say
  * Spirit's name.
  *
- * Repetition discipline: every cue has a stable id. Narrative lines are
- * once per visit, scan-start is once per component, interruptions have a
- * cooldown, and ambient lines are rare and capped.
+ * Guidance discipline: one action at a time. Arriving → "press E"; once
+ * identified → "take out the scanner"; scanner out → one clue per part.
+ * Every cue has a stable id, so nothing repeats within a visit.
  */
+/**
+ * After the last part: PIP finishes the explanation and the celebration,
+ * the scan station ends, the scanner goes away and the archive tablet opens
+ * with the recovered memory. Nothing to walk to, nothing extra to scan.
+ */
+function openTabletAfter(cueId: string | null, missionId: MissionId): void {
+  const startedAt = performance.now()
+  let unsubscribe: (() => void) | null = null
+  let done = false
+  const open = () => {
+    if (done) return
+    done = true
+    unsubscribe?.()
+    window.clearTimeout(safety)
+    const game = useGameStore.getState()
+    game.setScanStation(false)
+    if (game.scannerEquipped) game.unequipScanner()
+    if (game.archiveView === 'none') game.openArchive('smart-letter', missionId)
+  }
+  const pending = () => {
+    if (!cueId) return false
+    const state = useNarrativeStore.getState()
+    return (
+      state.current?.id === cueId ||
+      state.queue.some((line) => line.id === cueId)
+    )
+  }
+  const check = () => {
+    if (pending()) return
+    // A short beat of celebration before the panel slides in.
+    const wait = Math.max(0, 1400 - (performance.now() - startedAt))
+    window.setTimeout(open, wait)
+  }
+  // Never stuck: the tablet opens even if the voice hangs.
+  const safety = window.setTimeout(open, 25_000)
+  unsubscribe = useNarrativeStore.subscribe(check)
+  check()
+}
+
 export function MissionNarrativeController() {
   const save = useJourneyStore((state) => state.save)
   const archiveView = useGameStore((state) => state.archiveView)
@@ -97,8 +138,8 @@ export function MissionNarrativeController() {
   )
   const activeSiteId = useGameStore((state) => state.activeSiteId)
 
-  const mission = getMission(MISSION_NARRATIVE_ID)
-  const progress = save?.missions[MISSION_NARRATIVE_ID] ?? null
+  const mission = getMission(SPIRIT_SITE.missionId)
+  const progress = save?.missions[SPIRIT_SITE.missionId] ?? null
   const stage = stageForProgress(progress)
 
   const enteredRef = useRef(false)
@@ -134,7 +175,14 @@ export function MissionNarrativeController() {
   useEffect(() => {
     if (enteredRef.current || !save) return
     enteredRef.current = true
-    const cue = getMissionEntryCue(mission, progress)
+    // A fresh landing gets the guided arrival briefing instead of the
+    // short entry line (MarsBriefing owns PIP's voice until it ends).
+    const briefing = needsArrivalBriefing({
+      progress,
+      flags: useNarrativeStore.getState().protocol,
+      priorFieldWork: hasPriorFieldWork(save, SPIRIT_SITE.missionId),
+    })
+    const cue = briefing ? null : getMissionEntryCue(mission, progress)
     if (cue) useNarrativeStore.getState().enqueue(cue)
     // A restored mission is free exploration: field notes are the goal now.
     const notes = getFieldNotesView({
@@ -176,7 +224,7 @@ export function MissionNarrativeController() {
     const tick = () => {
       const currentSave = useJourneyStore.getState().save
       if (!currentSave) return
-      const currentProgress = currentSave.missions[MISSION_NARRATIVE_ID]
+      const currentProgress = currentSave.missions[SPIRIT_SITE.missionId]
       if (!currentProgress || currentProgress.transmittedAt) return
 
       const game = useGameStore.getState()
@@ -206,9 +254,11 @@ export function MissionNarrativeController() {
       }
       guideTimingRef.current = timing
 
-      // Reading modals and site panels own the screen; no world dialogue and
-      // no proactive help while the player is reading.
+      // Reading modals, site panels and the arrival briefing own the screen;
+      // no world dialogue and no proactive help while the player is reading
+      // (the idle clock restarts, so no hint fires the moment they close).
       if (
+        game.marsBriefingStep !== null ||
         game.settingsOpen ||
         game.scannerOpen ||
         game.scannerRecordsOpen ||
@@ -258,7 +308,7 @@ export function MissionNarrativeController() {
       }
 
       // Inspection ring: this is the valid identification event, and it only
-      // counts close to the ground so jet boots cannot skip it. The save is
+      // counts close to the ground. The save is
       // updated first, then PIP may reconnect the historical record.
       if (!approachedRef.current && withinApproach) {
         approachedRef.current = true
@@ -266,7 +316,7 @@ export function MissionNarrativeController() {
         const wasDiscovered = Boolean(currentProgress.discovered)
         if (!wasDiscovered) {
           emitAudio('pipCurious')
-          const approached = getApproachedCue(mission)
+          const approached = getApproachedCue(mission, isCoarsePointer())
           if (approached) {
             narrative.enqueue({ ...approached, cancelWhen: isMissionDiscovered })
           }
@@ -289,6 +339,29 @@ export function MissionNarrativeController() {
       ) {
         environmentalIntroShownRef.current = true
         narrative.enqueue(getFirstEnvironmentalScanCue())
+      }
+
+      // Parts hunt (M4): once the scanner is out, PIP gives the clue for the
+      // part to find now. One clue per part, and only when PIP is free, so
+      // it always comes after the story of the part just found.
+      const huntTarget = getHuntTarget(mission, currentProgress)
+      // The save effect must have queued the story of the last part first.
+      const storyQueued =
+        previousScannedRef.current.length ===
+        currentProgress.scannedComponentIds.length
+      if (
+        huntTarget &&
+        storyQueued &&
+        game.scannerEquipped &&
+        !game.historicalExplanationId &&
+        narrative.queue.length === 0 &&
+        (!narrative.current ||
+          narrative.current.id === `${mission.id}:scanner-prompt`)
+      ) {
+        const clue = getHuntClueCue(mission, huntTarget.id)
+        if (clue && narrative.enqueue(clue)) {
+          narrative.react('hint', undefined, 2000)
+        }
       }
 
       // The reticle label, the scanner panel and the objective bar own the
@@ -362,25 +435,56 @@ export function MissionNarrativeController() {
       if (!currentSave) return
       const narrative = useNarrativeStore.getState()
       const game = useGameStore.getState()
-      const currentProgress = currentSave.missions[MISSION_NARRATIVE_ID]
+      const currentProgress = currentSave.missions[SPIRIT_SITE.missionId]
 
       // Ephemeral facts earned by playing; only before the explorer is known.
       if (!currentProgress?.discovered) {
         if (!narrative.protocol.walked && hasWalkedEnough(playerPosition)) {
           narrative.markProtocol('walked')
         }
+        // The practice rock is a few steps from the landing: reaching it
+        // also counts as the first walk, so the child goes straight to it.
         const afterWalk = useNarrativeStore.getState().protocol
-        if (
-          afterWalk.walked &&
-          !afterWalk.stationReached &&
-          hasReachedStation(playerPosition)
-        ) {
+        if (!afterWalk.stationReached && hasReachedStation(playerPosition)) {
+          if (!afterWalk.walked) narrative.markProtocol('walked')
           narrative.markProtocol('stationReached')
         }
       }
 
+      // Saves that stopped before the old full recognition scan: the hunt is
+      // done, so the memory is recovered now (no extra scan any more).
+      if (
+        currentProgress &&
+        !currentProgress.memoryRecoveredAt &&
+        stageForProgress(currentProgress) === 'ready_for_full_scan'
+      ) {
+        useJourneyStore.getState().completeFullScan(SPIRIT_SITE.missionId)
+      }
+
       const step = getCurrentProtocolStep(currentSave)
-      game.setRadarUnlocked(isRadarVisible(step))
+
+      // Scan station: the parts hunt happens right in front of the explorer,
+      // with a still view, until all three parts are found.
+      const nearExplorer =
+        Math.hypot(
+          playerPosition.x - SPIRIT_SITE.position.x,
+          playerPosition.z - SPIRIT_SITE.position.z,
+        ) <=
+        MISSION_APPROACH_RADIUS + 1.5
+      const huntOn =
+        step === 'M4' &&
+        Boolean(currentProgress?.discovered) &&
+        !currentProgress?.memoryRecoveredAt
+      const station =
+        huntOn &&
+        game.scannerEquipped &&
+        game.scannerMissionId === SPIRIT_SITE.missionId &&
+        (game.scanStation || nearExplorer)
+      if (station !== game.scanStation) game.setScanStation(station)
+
+      game.setRadarUnlocked(
+        isRadarVisible(step, useNarrativeStore.getState().protocol),
+      )
       game.setScannerLocked(!isScannerUnlocked(step))
       game.setLandmarksLocked(!areFreeScansAllowed(step))
       narrative.setAmbientAllowed(areFreeScansAllowed(step))
@@ -422,15 +526,6 @@ export function MissionNarrativeController() {
         if (game.nearbySiteId && game.landmarksLocked) {
           requestProtocolLine(LATER_LINE, 30_000)
         }
-        if (
-          step === 'M2' &&
-          game.scannerEquipped &&
-          game.scannerEnvironmentalId === CALIBRATION_SAMPLE.id &&
-          game.scannerLens !== CALIBRATION_SAMPLE.lens
-        ) {
-          // The sample's lens is explained once, in the open.
-          requestProtocolLine(SAMPLE_LENS_LINE, Number.MAX_SAFE_INTEGER)
-        }
       }
     }
     tick()
@@ -460,6 +555,17 @@ export function MissionNarrativeController() {
           },
           5200,
         )
+        // PIP leads the next move: take out the scanner (the clue for the
+        // first part follows once it is out).
+        if (!useGameStore.getState().scannerEquipped) {
+          const prompt = getScannerPromptCue(mission, isCoarsePointer())
+          if (prompt) {
+            useNarrativeStore.getState().enqueue({
+              ...prompt,
+              cancelWhen: () => useGameStore.getState().scannerEquipped,
+            })
+          }
+        }
       }
     }
 
@@ -480,13 +586,14 @@ export function MissionNarrativeController() {
       }
       if (scannedComponentCount(progress) === mission.components.length) {
         emitAudio('pipCelebrate')
-        for (const cue of getCompletionCues(mission)) narrative.enqueue(cue)
-        const ready = getFullScanReadyCue(mission)
-        if (ready) narrative.enqueue(ready)
+        const done = getCompletionCue(mission)
+        const queued = done ? narrative.enqueue(done) : false
+        narrative.react('celebrate', undefined, 2600)
+        openTabletAfter(queued && done ? done.id : null, mission.id)
       }
       useNarrativeStore
         .getState()
-        .markSpoken(`${MISSION_NARRATIVE_ID}:target-detected`)
+        .markSpoken(`${SPIRIT_SITE.missionId}:target-detected`)
     }
 
     const hasLetter = Boolean(progress?.smartLetterCreatedAt)
@@ -495,11 +602,9 @@ export function MissionNarrativeController() {
       // it is open; the world gets it once after the player closes it.
       if (archiveView === 'none') {
         previousLetterRef.current = true
-        const narrative = useNarrativeStore.getState()
-        const cue = getLetterPreparedCue(mission)
-        if (cue) narrative.enqueue(cue)
+        // The tablet already said "Sealed!": the world only points home.
         const back = getReturnToShipCue(mission)
-        if (back) narrative.enqueue(back)
+        if (back) useNarrativeStore.getState().enqueue(back)
       }
     } else if (!hasLetter) {
       previousLetterRef.current = false
@@ -562,7 +667,7 @@ export function MissionNarrativeController() {
   // The archive overlays own PIP's panel; world dialogue yields to them.
   useEffect(() => {
     const openForMission =
-      archiveView === 'smart-letter' && archiveMissionId === MISSION_NARRATIVE_ID
+      archiveView === 'smart-letter' && archiveMissionId === SPIRIT_SITE.missionId
 
     if (openForMission && !archiveWasOpenRef.current) {
       useNarrativeStore.getState().clearDialogue()

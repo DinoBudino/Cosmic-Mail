@@ -5,11 +5,10 @@ import {
   getApproachedCue,
   getArchiveCue,
   getComponentCue,
-  getCompletionCues,
+  getCompletionCue,
   getDetectedCue,
-  getFullScanCompleteCues,
-  getFullScanReadyCue,
-  getFullScanStartedCue,
+  getHuntClueCue,
+  getHuntTarget,
   getHintCue,
   getIdentifiedCue,
   getLetterPreparedCue,
@@ -17,12 +16,8 @@ import {
   getNewComponentIds,
   getPendingComponents,
   getReturnToShipCue,
-  getScannerEquippedCue,
   getScannerPromptCue,
-  getScanInterruptedCue,
-  getScanStartedCue,
   getSoftHintCue,
-  getTargetDetectedCue,
   scannedComponentCount,
   type NarrativeProgress,
 } from './missionNarrative'
@@ -56,7 +51,7 @@ describe('Spirit narrative rules', () => {
       mission,
       progress(ALL, { memoryRecoveredAt: 100 }),
     )
-    expect(memory?.text).toBe(mission.narrative?.fullScanComplete[1])
+    expect(memory?.text).toMatch(/seal the letter/i)
 
     const letter = getMissionEntryCue(
       mission,
@@ -118,20 +113,26 @@ describe('Spirit narrative rules', () => {
     expect(getIdentifiedCue(mission)?.priority).toBe('discovery')
   })
 
-  it('reacts to reticle, hold and interruption without duplicating ids', () => {
-    expect(getTargetDetectedCue(mission)?.text).toBe(
-      mission.narrative?.targetDetected,
-    )
-    const started = getScanStartedCue(mission, ALL[0])
-    expect(started?.text).toBe(mission.narrative?.scanStarted)
-    expect(started?.componentId).toBe(ALL[0])
-    expect(started?.id).toBe(`${mission.id}:scan-start:${ALL[0]}`)
-    expect(getScanStartedCue(mission, ALL[1])?.id).not.toBe(started?.id)
+  it('runs the parts hunt: one clue per part, in order, after discovery', () => {
+    expect(getHuntTarget(mission, progress([]))).toBeNull()
+    const found = { ...progress([]), discovered: true }
+    const first = getHuntTarget(mission, found)
+    expect(first?.id).toBe(mission.components[0]!.id)
+    const clue = getHuntClueCue(mission, first!.id)
+    expect(clue?.id).toBe(`${mission.id}:clue:${first!.id}`)
+    expect(clue?.componentId).toBe(first!.id)
+    const next = getHuntTarget(mission, {
+      ...found,
+      scannedComponentIds: [first!.id],
+    })
+    expect(next?.id).toBe(mission.components[1]!.id)
+    expect(getHuntClueCue(mission, next!.id)?.id).not.toBe(clue?.id)
+  })
 
-    const interrupted = getScanInterruptedCue(mission)
-    expect(interrupted?.text).toBe(mission.narrative?.scanInterrupted)
-    expect(interrupted?.once).toBe(false)
-    expect(interrupted?.priority).toBe('hint')
+  it('makes the touch approach line say Inspect', () => {
+    expect(getApproachedCue(mission, true)?.text).toBe(
+      mission.narrative?.approachedTouch,
+    )
   })
 
   it('offers capped ambient observations', () => {
@@ -149,22 +150,27 @@ describe('Spirit narrative rules', () => {
     expect(unknown?.once).toBe(false)
     expect(unknown?.priority).toBe('hint')
 
+    // After discovery the first answer repeats the hunt clue: it points at
+    // the part (glow) but never says its name.
     const discovered = getHintCue(
       mission,
       progress([], { discovered: true }),
     )
-    expect(discovered?.componentId).toBeUndefined()
+    expect(discovered?.componentId).toBe(ALL[0])
+    expect(discovered?.text).toBe(mission.components[0]!.huntClue?.line)
     expect(discovered?.text).not.toMatch(/pancam|mini-tes|rock abrasion/i)
   })
 
-  it('escalates hints from orientation to context to direct help', () => {
-    const orientation = getHintCue(mission, progress([], { discovered: true }), 0)
-    expect(orientation?.text).toBe(mission.narrative?.hintOrientation)
-    expect(orientation?.componentId).toBeUndefined()
-
-    const context = getHintCue(mission, progress([], { discovered: true }), 1)
-    expect(context?.text).toBe(mission.narrative?.hintContext)
-    expect(context?.componentId).toBeUndefined()
+  it('escalates hunt hints from clue to nudge to direct help', () => {
+    const found = progress([], { discovered: true })
+    expect(getHintCue(mission, found, 0)?.text).toBe(
+      mission.components[0]!.huntClue?.line,
+    )
+    const nudge = getHintCue(mission, found, 1)
+    expect(nudge?.componentId).toBe(ALL[0])
+    expect(nudge?.text).toBe(
+      mission.components[0]!.pipHint ?? mission.components[0]!.pipDirectHint,
+    )
 
     const direct = getHintCue(
       mission,
@@ -176,46 +182,35 @@ describe('Spirit narrative rules', () => {
     expect(direct?.once).toBe(false)
   })
 
+  it('keeps orientation and context hints before discovery', () => {
+    expect(getHintCue(mission, progress([]), 0)?.text).toBe(
+      mission.narrative?.hintOrientation,
+    )
+    expect(getHintCue(mission, progress([]), 1)?.text).toBe(
+      mission.narrative?.hintContext,
+    )
+  })
+
   it('uses a separate id for a proactive soft hint', () => {
     const soft = getSoftHintCue(mission, progress([], { discovered: true }))
-    expect(soft?.text).toBe(mission.narrative?.hintContext)
+    expect(soft?.componentId).toBe(ALL[0])
     expect(soft?.id).toMatch(/soft-hint/)
     expect(soft?.priority).toBe('hint')
   })
 
-  it('points to the full scan and the letter at the right stages', () => {
-    const fullScan = getHintCue(mission, progress(ALL, { discovered: true }))
-    expect(fullScan?.text).toBe(
-      'Every part is recognized. Open the full recognition scan when you are ready; it studies the complete explorer, not a single part.',
-    )
-    expect(fullScan?.componentId).toBeUndefined()
-
+  it('points to the letter once the memory is back', () => {
     const letter = getHintCue(
       mission,
       progress(ALL, { memoryRecoveredAt: 100 }),
     )
-    expect(letter?.text).toMatch(/prepare the smart letter/i)
+    expect(letter?.text).toMatch(/seal the letter/i)
     expect(letter?.componentId).toBeUndefined()
   })
 
-  it('queues completion and full-scan invitation lines in order', () => {
-    const cues = getCompletionCues(mission)
-    expect(cues.map((cue) => cue.text)).toEqual([
-      ...(mission.narrative?.completed ?? []),
-    ])
-    expect(cues).toHaveLength(2)
-    expect(new Set(cues.map((cue) => cue.id)).size).toBe(2)
-
-    expect(getFullScanReadyCue(mission)?.text).toBe(
-      mission.narrative?.fullScanReady,
-    )
-    expect(getFullScanStartedCue(mission)?.text).toBe(
-      mission.narrative?.fullScanStarted,
-    )
-    const recovered = getFullScanCompleteCues(mission)
-    expect(recovered.map((cue) => cue.text)).toEqual([
-      ...(mission.narrative?.fullScanComplete ?? []),
-    ])
+  it('celebrates the last part once, then hands over to the tablet', () => {
+    const done = getCompletionCue(mission)
+    expect(done?.text).toBe(mission.narrative?.completed)
+    expect(done?.expression).toBe('celebrating')
     expect(getLetterPreparedCue(mission)?.text).toBe(
       mission.narrative?.letterPrepared,
     )
@@ -235,25 +230,20 @@ describe('Spirit narrative rules', () => {
     expect(getApproachedCue(mission)?.text).toBe(
       mission.narrative?.approached,
     )
-    expect(getScannerEquippedCue(mission)?.text).toBe(
-      mission.narrative?.scannerEquipped,
-    )
     expect(getIdentifiedCue(mission)?.expression).toBe('excited')
-    expect(getFullScanStartedCue(mission)?.expression).toBe('focused')
-    expect(getScanInterruptedCue(mission)?.expression).toBe('concerned')
   })
 
   it('switches the archive PIP line by stage without duplication', () => {
     expect(getArchiveCue(mission, progress([]))).toMatchObject({
       kind: 'locked',
-      text: mission.narrative?.fullScanReady,
+      text: mission.narrative?.revisitInProgress,
     })
     expect(getArchiveCue(mission, progress(ALL))).toMatchObject({
       kind: 'locked',
     })
     expect(
       getArchiveCue(mission, progress(ALL, { memoryRecoveredAt: 100 })),
-    ).toMatchObject({ kind: 'memory' })
+    ).toMatchObject({ kind: 'memory', text: mission.narrative?.memoryRecovered })
     expect(
       getArchiveCue(
         mission,

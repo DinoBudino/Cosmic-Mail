@@ -4,10 +4,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { SPIRIT_SITE } from '../data/spiritSite'
-import { isFlightUnlocked } from '../game/flight'
-import { setTouchBoot, setTouchMove, setTouchRun } from '../game/input'
+import { setTouchMove, setTouchRun } from '../game/input'
 import { useGameStore } from '../store/gameStore'
-import { useJourneyStore } from '../store/journeyStore'
 
 export function TouchControls() {
   const settingsOpen = useGameStore((state) => state.settingsOpen)
@@ -22,11 +20,8 @@ export function TouchControls() {
   const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
   const scannerLocked = useGameStore((state) => state.scannerLocked)
+  const scanStation = useGameStore((state) => state.scanStation)
   const equipScanner = useGameStore((state) => state.equipScanner)
-  const progress = useJourneyStore(
-    (state) => state.save?.missions[SPIRIT_SITE.missionId] ?? null,
-  )
-  const flightLocked = progress != null && !isFlightUnlocked(progress)
   // Equipping the scanner never hides or freezes the touch joystick; only
   // modal panels that need reading block movement.
   const paused =
@@ -56,7 +51,6 @@ export function TouchControls() {
   useEffect(() => {
     return () => {
       setTouchMove(0, 0)
-      setTouchBoot(false)
       setTouchRun(false)
     }
   }, [])
@@ -104,6 +98,9 @@ export function TouchControls() {
     reset()
   }
 
+  // At the scan station the child only aims: no walking pad.
+  if (scanStation) return null
+
   return (
     <div className="touch-controls">
       <div
@@ -130,29 +127,6 @@ export function TouchControls() {
         >
           Scanner
         </button>
-      )}
-      {!flightLocked && (
-      <button
-        type="button"
-        className="touch-boost"
-        aria-label={
-          flightLocked
-            ? 'Jet boots locked during the ground survey'
-            : 'Hold to use jet boots'
-        }
-        disabled={flightLocked}
-        onPointerDown={(event) => {
-          if (paused || flightLocked) return
-          event.currentTarget.setPointerCapture(event.pointerId)
-          setTouchBoot(true)
-        }}
-        onPointerUp={() => setTouchBoot(false)}
-        onPointerCancel={() => setTouchBoot(false)}
-        onLostPointerCapture={() => setTouchBoot(false)}
-        onContextMenu={(event) => event.preventDefault()}
-      >
-        Boost
-      </button>
       )}
     </div>
   )

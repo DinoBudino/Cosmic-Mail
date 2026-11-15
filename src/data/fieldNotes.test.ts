@@ -52,13 +52,24 @@ describe('field notes content', () => {
 })
 
 describe('field notes projection', () => {
-  it('starts fully locked', () => {
+  it('starts fully locked with only what is on the ground today', () => {
     const view = getFieldNotesView({
       environmentalDiscoveries: [],
       memorialVisits: [],
     })
-    expect(view.totalCount).toBe(8)
+    // Volcanic rocks and layered outcrops; soil/wind marks and the other
+    // missions' memorials are no longer on this map.
+    expect(view.totalCount).toBe(2)
     expect(view.unlockedCount).toBe(0)
+  })
+
+  it('keeps notes an older save already earned', () => {
+    const view = getFieldNotesView({
+      environmentalDiscoveries: ['env-soil-landing'],
+      memorialVisits: ['viking1'],
+    })
+    expect(view.totalCount).toBe(4)
+    expect(view.unlockedCount).toBe(2)
   })
 
   it('unlocks a category note from any of its sites and counts them', () => {

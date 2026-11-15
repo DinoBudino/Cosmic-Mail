@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  ACTIVE_MISSION_IDS,
   DESTINATION_IDS,
   MISSIONS,
   MISSION_IDS,
@@ -21,9 +23,10 @@ function isNasaUrl(url: string): boolean {
 }
 
 describe('mission catalog', () => {
-  it('defines exactly the three MVP missions, one per destination', () => {
-    expect(MISSIONS).toHaveLength(3)
-    expect(MISSIONS.map((mission) => mission.id)).toEqual([...MISSION_IDS])
+  it('defines the MVP missions with two Mars explorers, Opportunity and Spirit', () => {
+    expect(MISSIONS).toHaveLength(4)
+    expect(new Set(MISSIONS.map((mission) => mission.id))).toEqual(new Set(MISSION_IDS))
+    expect(ACTIVE_MISSION_IDS).toEqual(['surveyor-3', 'opportunity', 'spirit'])
     expect(new Set(MISSIONS.map((mission) => mission.destination)).size).toBe(
       DESTINATION_IDS.length,
     )
@@ -34,7 +37,7 @@ describe('mission catalog', () => {
 
   it('assigns the approved machines to Moon, Mars and Deep Space', () => {
     expect(getMissionForDestination('moon').machineName).toBe('Surveyor 3')
-    expect(getMissionForDestination('mars').machineName).toBe('Spirit')
+    expect(getMissionForDestination('mars').machineName).toBe('Opportunity')
     expect(getMissionForDestination('deep-space').machineName).toBe('Pioneer 10')
     expect(getMissionForDestination('deep-space').worldMode).toBe('hologram')
     expect(getMissionForDestination('moon').worldMode).toBe('surface')
@@ -59,7 +62,7 @@ describe('mission catalog', () => {
       }
     }
 
-    expect(componentIds.size).toBe(9)
+    expect(componentIds.size).toBe(12)
   })
 
   it('keeps the historical record, sources and PIP narrative separate', () => {
@@ -93,14 +96,14 @@ describe('mission catalog', () => {
     }
   })
 
-  it('provides a spatial hotspot for every Spirit pilot component', () => {
-    const spirit = getMission('spirit')
-    expect(spirit.components.every((component) => component.hotspot)).toBe(
+  it('provides a spatial hotspot for every Mars (Opportunity) component', () => {
+    const mars = getMission('opportunity')
+    expect(mars.components.every((component) => component.hotspot)).toBe(
       true,
     )
     expect(
       new Set(
-        spirit.components.map(
+        mars.components.map(
           (component) =>
             `${component.hotspot?.x}:${component.hotspot?.y}`,
         ),
@@ -125,7 +128,7 @@ describe('mission catalog', () => {
     expect(pioneer.contentStatus).toBe('pending-review')
     expect(pioneer.reviewNote).toBeTruthy()
     expect(getMission('surveyor-3').contentStatus).toBe('source-checked')
-    expect(getMission('spirit').contentStatus).toBe('source-checked')
+    expect(getMission('opportunity').contentStatus).toBe('source-checked')
     expect(
       MISSIONS.flatMap((mission) => mission.components).every(
         (component) => component.validation === 'source-checked',
@@ -143,33 +146,37 @@ describe('mission catalog', () => {
       ]) {
         expect(dimension.length).toBeGreaterThan(40)
       }
-      expect(mission.reconstruction.status).toBe('script-draft')
+      const { status, video } = mission.reconstruction
+      expect(status).toBe(video ? 'video' : 'script-draft')
+      if (video) {
+        expect(existsSync(new URL(`../../public/${video}`, import.meta.url))).toBe(true)
+      }
       expect(mission.reconstruction.lines.length).toBeGreaterThanOrEqual(4)
       expect(mission.reconstruction.title.toLowerCase()).toContain(
         'reconstruction',
       )
     }
-    expect(getMission('spirit').completionStory).toContain('never be forgotten')
+    expect(getMission('opportunity').reconstruction.video).toBe('video/opportunity-720p.webm')
+    expect(getMission('spirit').reconstruction.video).toBe('video/spirit-720p.webm')
+    expect(getMission('opportunity').completionStory).toContain('never be forgotten')
   })
 
-  it('keeps the Spirit narrative reusable and free of invented claims', () => {
-    const spirit = getMission('spirit')
-    const narrative = spirit.narrative
+  it('keeps the Mars narrative reusable and free of invented claims', () => {
+    const mars = getMission('opportunity')
+    const narrative = mars.narrative
     expect(narrative).toBeDefined()
     expect(narrative!.entered.length).toBeGreaterThan(0)
     expect(narrative!.detected.length).toBeGreaterThan(0)
     expect(narrative!.approached.length).toBeGreaterThan(0)
-    expect(narrative!.scannerEquipped.length).toBeGreaterThan(0)
-    expect(narrative!.completed).toHaveLength(2)
-    expect(narrative!.fullScanReady.length).toBeGreaterThan(0)
-    expect(narrative!.fullScanComplete).toHaveLength(2)
-    expect(narrative!.fullScanComplete[0]).toContain('MEMORIA RECUPERADA')
+    expect(narrative!.approachedTouch.length).toBeGreaterThan(0)
+    expect(narrative!.completed.length).toBeGreaterThan(0)
+    expect(narrative!.memoryRecovered.length).toBeGreaterThan(0)
     expect(narrative!.letterPrepared.length).toBeGreaterThan(0)
     expect(narrative!.genericHint.length).toBeGreaterThan(0)
     expect(narrative!.revisitInProgress.length).toBeGreaterThan(0)
     expect(narrative!.revisitLetterReady.length).toBeGreaterThan(0)
     expect(narrative!.revisitTransmitted.length).toBeGreaterThan(0)
-    for (const component of spirit.components) {
+    for (const component of mars.components) {
       expect(component.pipHint?.length ?? 0).toBeGreaterThan(0)
     }
   })
@@ -193,10 +200,9 @@ describe('mission catalog', () => {
           mission.narrative.approached,
           mission.narrative.scannerPromptDesktop,
           mission.narrative.scannerPromptTouch,
-          mission.narrative.scannerEquipped,
-          ...mission.narrative.completed,
-          ...mission.narrative.fullScanComplete,
-          mission.narrative.fullScanReady,
+          mission.narrative.approachedTouch,
+          mission.narrative.completed,
+          mission.narrative.memoryRecovered,
           mission.narrative.letterPrepared,
           mission.narrative.genericHint,
           mission.narrative.revisitInProgress,
@@ -230,5 +236,24 @@ describe('mission catalog', () => {
     expect(isMissionId('spirit')).toBe(true)
     expect(isMissionId('apollo-11')).toBe(false)
     expect(isMissionId(3)).toBe(false)
+  })
+
+  it('tells Opportunity from the sourced record, without the invented last words', () => {
+    const mars = getMission('opportunity')
+    const all = [
+      mars.summary,
+      mars.pipBriefing,
+      ...Object.values(mars.smartLetter),
+      ...mars.reconstruction.lines,
+      ...mars.components.flatMap((c) => [c.historicalRecord, c.pipLine]),
+      ...(mars.distractors ?? []).flatMap((d) => [d.historicalRecord, d.pipNote]),
+    ].join(' ')
+    // NASA sources never contain this phrase; it must not be presented as
+    // the rover's last message.
+    expect(all).not.toMatch(/battery is low|getting dark/i)
+    expect(mars.smartLetter.trajectory).toContain('Meridiani Planum')
+    expect(mars.smartLetter.missionEnd).toContain('10 June 2018')
+    expect(mars.smartLetter.missionEnd).toContain('13 February 2019')
+    expect(mars.sources.every((source) => isNasaUrl(source.url))).toBe(true)
   })
 })

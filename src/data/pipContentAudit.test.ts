@@ -4,13 +4,12 @@ import {
   INSPECT_FIRST_LINE,
   LATER_LINE,
   OFF_TRAIL_LINE,
-  SAMPLE_LENS_LINE,
   SCANNER_LOCKED_LINE,
+  STATION_STAY_LINE,
   STEP_ENTRY_LINES,
   getProtocolHint,
 } from './arrivalProtocol'
 import { ENVIRONMENTAL_SITES } from './environmentalSites'
-import { REBUILD_STEP_LINE } from './fullScanReconstruction'
 import {
   MAX_ENV_WORDS,
   countWords,
@@ -51,13 +50,12 @@ describe('PIP content limits', () => {
   it('keeps every protocol, reconstruction and calibration line compliant', () => {
     const lines = [
       ...Object.values(STEP_ENTRY_LINES).map((l) => l!.text),
-      SAMPLE_LENS_LINE.text,
       SCANNER_LOCKED_LINE.text,
       OFF_TRAIL_LINE.text,
       LATER_LINE.text,
       INSPECT_FIRST_LINE.text,
       CALIBRATE_FIRST_LINE.text,
-      REBUILD_STEP_LINE,
+      STATION_STAY_LINE.text,
       ...(['M0', 'M1', 'M2', 'M3'] as const).flatMap((step) =>
         [false, true].map((touch) => getProtocolHint(step, touch)!),
       ),

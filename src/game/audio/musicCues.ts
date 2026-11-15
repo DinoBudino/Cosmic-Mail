@@ -61,11 +61,11 @@ export type ScenePhase =
   | 'registration'
   | 'hub'
   | 'launching'
+  | 'orbit'
   | 'playing'
 
 export type SceneArchiveView =
   | 'none'
-  | 'full-scan'
   | 'smart-letter'
   | 'reconstruction'
 
@@ -104,8 +104,12 @@ export function sceneMusicFor(input: SceneMusicInput): MusicCueId {
 
   if (input.phase === 'launching') return 'launch'
 
+  // Mars orbit: space music, unless the archive tablet is open.
+  if (input.phase === 'orbit') {
+    return input.archiveView === 'smart-letter' ? 'smartLetter' : 'deepSpace'
+  }
+
   // Playing. Archive overlays take priority over the ambient planet bed.
-  if (input.archiveView === 'full-scan') return 'memory'
   if (input.archiveView === 'smart-letter') return 'smartLetter'
   if (input.archiveView === 'reconstruction') return 'reconstruction'
 

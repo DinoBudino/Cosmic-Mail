@@ -12,6 +12,7 @@ import {
   inCabinStage,
   launchClock,
   launchTimeline,
+  liftoffFlash,
   showEscapeVelocityFact,
   stageAt,
   type LaunchStageId,
@@ -126,6 +127,12 @@ export function LaunchSequence() {
   return (
     <section className="launch" aria-label="Launch sequence">
       <div className="launch__vignette" aria-hidden="true" />
+      {/* White flash that covers the cut from the cabin to the exterior. */}
+      <div
+        className="launch__flash"
+        aria-hidden="true"
+        style={{ opacity: liftoffFlash(elapsed, reducedMotion) }}
+      />
 
       {inCabinStage(elapsed, reducedMotion) && (
         <p className="launch__caption pip-bubble-wrap-like">

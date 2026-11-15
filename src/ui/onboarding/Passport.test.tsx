@@ -9,7 +9,7 @@ import { Passport } from './Passport'
 
 function showProgress(progress: Partial<MissionProgress>) {
   const save = createJourney('Ada', 1000)
-  save.missions.spirit = {
+  save.missions.opportunity = {
     ...createMissionProgress(),
     discovered: true,
     ...progress,
@@ -31,7 +31,7 @@ describe('Passport progressive disclosure', () => {
 
   it('shows only fragment progress while investigating', () => {
     const html = showProgress({
-      scannedComponentIds: ['spirit-pancam'],
+      scannedComponentIds: ['opportunity-pancam'],
     })
 
     expect(html).toContain('Fragments recognized 1/3')
@@ -42,9 +42,9 @@ describe('Passport progressive disclosure', () => {
   it('reveals memory, letter and delivery only when they really happen', () => {
     const memory = showProgress({
       scannedComponentIds: [
-        'spirit-pancam',
-        'spirit-rock-abrasion-tool',
-        'spirit-mini-tes',
+        'opportunity-pancam',
+        'opportunity-rock-abrasion-tool',
+        'opportunity-mini-tes',
       ],
       fullScanCompletedAt: 10,
       memoryRecoveredAt: 10,
@@ -54,9 +54,9 @@ describe('Passport progressive disclosure', () => {
 
     const letter = showProgress({
       scannedComponentIds: [
-        'spirit-pancam',
-        'spirit-rock-abrasion-tool',
-        'spirit-mini-tes',
+        'opportunity-pancam',
+        'opportunity-rock-abrasion-tool',
+        'opportunity-mini-tes',
       ],
       fullScanCompletedAt: 10,
       memoryRecoveredAt: 10,
@@ -68,9 +68,9 @@ describe('Passport progressive disclosure', () => {
 
     const delivered = showProgress({
       scannedComponentIds: [
-        'spirit-pancam',
-        'spirit-rock-abrasion-tool',
-        'spirit-mini-tes',
+        'opportunity-pancam',
+        'opportunity-rock-abrasion-tool',
+        'opportunity-mini-tes',
       ],
       fullScanCompletedAt: 10,
       memoryRecoveredAt: 10,
@@ -79,6 +79,6 @@ describe('Passport progressive disclosure', () => {
       stampEarned: true,
     })
     expect(delivered).toContain('Delivered to Earth')
-    expect(delivered).toContain('Spirit · Mars')
+    expect(delivered).toContain('Opportunity · Mars')
   })
 })

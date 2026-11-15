@@ -20,17 +20,17 @@ const MOVEMENT_KEYS = new Set([
 ])
 
 const INTERACT_KEY = 'e'
-const BOOT_KEY = ' '
+/** Space does nothing in the world (no jet boots); it is only swallowed so it
+ * never presses a focused button by accident while playing. */
+const SPACE_KEY = ' '
 const RUN_KEY = 'shift'
 const SCANNER_KEY = 'q'
 
 const pressed = new Set<string>()
 const touchAxes: MoveAxes = { x: 0, y: 0 }
-let touchBoot = false
 let touchRun = false
 let interactQueued = false
 let scannerToggleQueued = false
-let scannerLensKeyQueued: string | null = null
 
 /** Normalizes a 2D movement vector so diagonals are not faster. */
 export function normalizeMoveVector(x: number, z: number): MoveVector {
@@ -57,19 +57,9 @@ export function setTouchMove(x: number, y: number): void {
   touchAxes.y = Math.min(1, Math.max(-1, y))
 }
 
-/** Writes the touch jet-boot button (hold) into the shared input state. */
-export function setTouchBoot(held: boolean): void {
-  touchBoot = held
-}
-
 /** Writes the touch full-tilt run flag into the shared input state. */
 export function setTouchRun(run: boolean): void {
   touchRun = run
-}
-
-/** True while Space (or the touch button) is held — edge/hold handled by physics. */
-export function isBootHeld(): boolean {
-  return pressed.has(BOOT_KEY) || touchBoot
 }
 
 /** True while Shift (or a full-tilt touch pad) requests running. */
@@ -89,13 +79,6 @@ export function consumeScannerToggle(): boolean {
   if (!scannerToggleQueued) return false
   scannerToggleQueued = false
   return true
-}
-
-/** The queued lens key ('1' | '2' | '3'), consumed once, or null. */
-export function consumeScannerLensKey(): string | null {
-  const key = scannerLensKeyQueued
-  scannerLensKeyQueued = null
-  return key
 }
 
 /**
@@ -146,11 +129,9 @@ export function clearInput(): void {
   pressed.clear()
   touchAxes.x = 0
   touchAxes.y = 0
-  touchBoot = false
   touchRun = false
   interactQueued = false
   scannerToggleQueued = false
-  scannerLensKeyQueued = null
 }
 
 /** Attaches keyboard listeners once. Returns a cleanup function. */
@@ -171,14 +152,12 @@ export function attachInput(isPaused: () => boolean = () => false): () => void {
       return
     }
 
-    if (key === '1' || key === '2' || key === '3') {
-      if (!event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        scannerLensKeyQueued = key
-      }
+    if (key === SPACE_KEY) {
+      event.preventDefault()
       return
     }
 
-    if (key === BOOT_KEY || key === RUN_KEY) {
+    if (key === RUN_KEY) {
       pressed.add(key)
       event.preventDefault()
       return
@@ -191,7 +170,7 @@ export function attachInput(isPaused: () => boolean = () => false): () => void {
 
   const onKeyUp = (event: KeyboardEvent) => {
     const key = event.key.toLowerCase()
-    if (MOVEMENT_KEYS.has(key) || key === BOOT_KEY || key === RUN_KEY) pressed.delete(key)
+    if (MOVEMENT_KEYS.has(key) || key === RUN_KEY) pressed.delete(key)
   }
 
   const onBlur = () => clearInput()

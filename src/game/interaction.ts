@@ -1,4 +1,4 @@
-import { MARS_OBJECTS, REGION_APPROACH_RADIUS, type MarsObjectId, type WorldPosition } from '../data/marsObjects'
+import { MARS_WORLD_SITES, REGION_APPROACH_RADIUS, type MarsObjectId, type WorldPosition } from '../data/marsObjects'
 import { PATH_WAYPOINTS, PLAYER } from './worldConfig'
 
 /** Outer radii of the visible rings; rendering and interaction share this map. */
@@ -13,7 +13,7 @@ export const SITE_RADII: Readonly<Record<MarsObjectId, number>> = {
 export function findNearbyRegion(position: WorldPosition): MarsObjectId | null {
   let nearest: MarsObjectId | null = null
   let distance = Infinity
-  for (const object of MARS_OBJECTS) {
+  for (const object of MARS_WORLD_SITES) {
     const next = Math.hypot(position.x - object.position.x, position.z - object.position.z)
     if (next <= REGION_APPROACH_RADIUS && next < distance) {
       nearest = object.id
@@ -38,7 +38,7 @@ const TRAVEL_STOP_MARGIN = 0.1
  * inside every interaction ring. Mutates x/z to avoid per-frame allocations.
  */
 export function resolveSiteCollision(position: WorldPosition): void {
-  for (const object of MARS_OBJECTS) {
+  for (const object of MARS_WORLD_SITES) {
     const dx = position.x - object.position.x
     const dz = position.z - object.position.z
     const distance = Math.hypot(dx, dz)
@@ -59,7 +59,7 @@ export function resolveSiteCollision(position: WorldPosition): void {
 export function findNearbySite(position: WorldPosition): MarsObjectId | null {
   let nearest: MarsObjectId | null = null
   let distance = Infinity
-  for (const object of MARS_OBJECTS) {
+  for (const object of MARS_WORLD_SITES) {
     const next = Math.hypot(position.x - object.position.x, position.z - object.position.z)
     if (next <= SITE_RADII[object.id] && next < distance) {
       nearest = object.id
@@ -141,7 +141,8 @@ function targetArcLength(target: WorldPosition): number {
 
 /** Terrain-following travel along the shared route, stopping inside the ring. */
 export function getAutoMove(position: WorldPosition, targetId: MarsObjectId) {
-  const target = MARS_OBJECTS.find((object) => object.id === targetId)!
+  const target = MARS_WORLD_SITES.find((object) => object.id === targetId)
+  if (!target) return { x: 0, z: 0, arrived: true }
   const distance = Math.hypot(target.position.x - position.x, target.position.z - position.z)
   const remaining = distance - (SITE_RADII[targetId] - TRAVEL_STOP_MARGIN)
   if (remaining <= 0) return { x: 0, z: 0, arrived: true }
@@ -154,7 +155,7 @@ export function getAutoMove(position: WorldPosition, targetId: MarsObjectId) {
   // Passing through another site: the painted route touches its centre, but
   // the model footprint must be walked around, not through. Steer at a
   // tangent point on the side the player is already on until clear.
-  for (const object of MARS_OBJECTS) {
+  for (const object of MARS_WORLD_SITES) {
     if (object.id === targetId) continue
     const radialX = position.x - object.position.x
     const radialZ = position.z - object.position.z

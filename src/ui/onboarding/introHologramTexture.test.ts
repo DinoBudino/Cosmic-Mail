@@ -3,13 +3,17 @@ import { introHologramSvg } from './introHologramTexture'
 import type { IntroHologramState } from '../../data/onboardingNarrative'
 
 const STATES: IntroHologramState[] = [
+  'mail',
   'stable',
   'losing1',
-  'losing2',
   'losing3',
   'fragmented',
   'recovering',
-  'hint',
+  'offline',
+  'memory',
+  'forgotten',
+  'locations',
+  'route',
   'dossier',
   'letter',
 ]
@@ -31,13 +35,20 @@ describe('intro hologram frames', () => {
 
   it('communicates stable, failed and recovered states differently', () => {
     expect(introHologramSvg('stable')).toContain(
-      'Three anonymous archive files connected',
+      'Many anonymous archive files connected',
     )
     expect(introHologramSvg('fragmented')).toContain(
       'lose their connections and fragment',
     )
-    expect(introHologramSvg('hint')).toContain('location clue')
+    expect(introHologramSvg('memory')).toContain('memory banks')
+    expect(introHologramSvg('locations')).toContain('two remembered places')
+    expect(introHologramSvg('dossier')).toContain('signals gone quiet')
     expect(introHologramSvg('letter')).toContain('smart letter')
+  })
+
+  it('gives every beat its own distinct projection', () => {
+    const frames = STATES.map((state) => introHologramSvg(state))
+    expect(new Set(frames).size).toBe(STATES.length)
   })
 
   it('never reveals a historical machine identity', () => {

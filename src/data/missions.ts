@@ -13,13 +13,30 @@
  */
 
 import { pipLine } from './pipVoiceCatalog'
-import type { ScannerLensId } from './scannerLenses'
 
 export const DESTINATION_IDS = ['moon', 'mars', 'deep-space'] as const
 export type DestinationId = (typeof DESTINATION_IDS)[number]
 
-export const MISSION_IDS = ['surveyor-3', 'spirit', 'pioneer-10'] as const
+export const MISSION_IDS = [
+  'surveyor-3',
+  'spirit',
+  'pioneer-10',
+  'opportunity',
+] as const
 export type MissionId = (typeof MISSION_IDS)[number]
+
+/**
+ * Missions that are part of the game: the Moon and Mars. Mars tells
+ * Opportunity's story (Meridiani Planum). Spirit (the Mars pilot before
+ * Nov 2026) and Deep Space (Pioneer 10) are out of scope; their ids stay in
+ * MISSION_IDS only so older saves keep loading unchanged. Totals, stamps
+ * and the finale count only these.
+ */
+export const ACTIVE_MISSION_IDS: readonly MissionId[] = [
+  'surveyor-3',
+  'opportunity',
+  'spirit',
+]
 
 export type WorldMode = 'surface' | 'hologram'
 
@@ -58,16 +75,22 @@ export interface MissionComponent {
   /** Short spatial hint for the 3D hotspot. */
   scanHint: string
   /**
-   * Scanner lens that recognizes this component, matching how the real
-   * instrument works. Undefined means any lens works (content not yet
-   * designed for lenses).
+   * How the real instrument observed, in a few child-friendly words
+   * (e.g. "It looks"). Shown on the scan result card; the scan itself is
+   * the same single hold for every part.
    */
-  lens?: ScannerLensId
+  howItWorks?: { verb: 'Looks' | 'Touches' | 'Senses heat'; detail: string }
   /**
-   * Graduated Ask PIP lines about the lens. `context` points at the
-   * instrument's function; `direct` may name the way of observing.
+   * The parts hunt: PIP's spoken clue when this part is the one to find,
+   * and a short version for the objective bar. Only used after discovery.
    */
-  lensHints?: { context: string; direct: string }
+  huntClue?: {
+    line: string
+    short: string
+    /** Name on the hunt tracker once found. */
+    label: string
+    icon: 'eye' | 'tool' | 'heat'
+  }
   /** Optional position on the scanner map; falls back to a list. */
   hotspot?: HotspotPosition
   sources: readonly MissionSource[]
@@ -99,30 +122,23 @@ export interface MissionNarrative {
   entered: string
   /** First time the machine enters detection range (identity still hidden). */
   detected: string
-  /** First time the player reaches the inspection ring (identity still hidden). */
+  /**
+   * First time the player reaches the inspection ring (identity still
+   * hidden). It also says the one thing to do next: press E (desktop).
+   */
   approached: string
+  /** Same beat on touch screens ("tap Inspect"). */
+  approachedTouch: string
   /** First valid identification event: PIP reconnects the historical record. */
   identified: string
-  /** Desktop instruction when the player has not equipped the scanner. */
+  /** Right after identification: take out the scanner (desktop). */
   scannerPromptDesktop: string
-  /** Touch instruction when the player has not equipped the scanner. */
+  /** Right after identification: take out the scanner (touch). */
   scannerPromptTouch: string
-  /** First time the physical scanner is equipped. */
-  scannerEquipped: string
-  /** First time the reticle rests on a valid component. */
-  targetDetected: string
-  /** A valid hold-to-scan begins. */
-  scanStarted: string
-  /** A hold-to-scan was released or lost before completing. */
-  scanInterrupted: string
-  /** Two short lines after the third component is recorded. */
-  completed: readonly [string, string]
-  /** Full-object recognition is available; the player must choose it. */
-  fullScanReady: string
-  /** The player holds the full-object recognition scan. */
-  fullScanStarted: string
-  /** Two beats after a valid full recognition scan. */
-  fullScanComplete: readonly [string, string]
+  /** Celebration right after the third (last) part: the memory returns. */
+  completed: string
+  /** The archive tablet opens with the recovered memory: seal the letter. */
+  memoryRecovered: string
   /** The smart letter already exists and can be reviewed or transmitted. */
   letterPrepared: string
   /** The letter is ready and the player must return to Mailwing. */
@@ -152,6 +168,16 @@ export interface SmartLetterContent {
   trajectory: string
   discoveries: string
   missionEnd: string
+  /**
+   * Kid-sized chips for the archive tablet timeline (a few words each).
+   * The long texts above open when the child taps a chip.
+   */
+  timeline?: {
+    launch: string
+    landing: string
+    discovery: string
+    end: string
+  }
 }
 
 /**
@@ -165,7 +191,12 @@ export interface MemoryReconstruction {
   /** Narrated first-person beats. */
   lines: readonly string[]
   /** Production status, surfaced in the UI label. */
-  status: 'script-draft'
+  status: 'script-draft' | 'video'
+  /**
+   * Narrated story video (public/video), with its own subtitles and NASA
+   * credits. When present it replaces the scripted lines in the viewer.
+   */
+  video?: string
 }
 
 export interface MissionDefinition {
@@ -215,6 +246,42 @@ export const SPIRIT_SOURCES: readonly MissionSource[] = [
   {
     label: 'NASA Science — Mars Exploration Rover Spirit',
     url: 'https://science.nasa.gov/mission/mer-spirit/',
+  },
+  {
+    label: 'NASA JPL — Mars Rover Spirit Unearths Surprise Evidence of Wetter Past (2007)',
+    url: 'https://www.jpl.nasa.gov/news/mars-rover-spirit-unearths-surprise-evidence-of-wetter-past/',
+  },
+  {
+    label: 'NASA JPL — NASA Concludes Attempts to Contact Mars Rover Spirit (2011)',
+    url: 'https://www.jpl.nasa.gov/news/nasa-concludes-attempts-to-contact-mars-rover-spirit/',
+  },
+]
+
+/** Official NASA / NASA-JPL sources for Opportunity (checked 2026-11-14). */
+export const OPPORTUNITY_SOURCES: readonly MissionSource[] = [
+  {
+    label: 'NASA Science — Opportunity',
+    url: 'https://science.nasa.gov/mission/mer-opportunity/',
+  },
+  {
+    label: 'NASA/JPL — Opportunity Rover Finds Strong Evidence Meridiani Planum Was Wet (2004)',
+    url: 'https://www.jpl.nasa.gov/news/opportunity-rover-finds-strong-evidence-meridiani-planum-was-wet/',
+  },
+  {
+    label: 'NASA/JPL — NASA Mars Rover Finds Mineral Vein Deposited by Water (2011)',
+    url: 'https://www.jpl.nasa.gov/news/nasa-mars-rover-finds-mineral-vein-deposited-by-water/',
+  },
+  {
+    label: 'NASA/JPL — NASA Rover Opportunity\'s Selfie Shows Clean Machine (2014)',
+    url: 'https://www.jpl.nasa.gov/news/nasa-rover-opportunitys-selfie-shows-clean-machine/',
+  },
+  {
+    label: 'NASA/JPL — Last Images Opportunity Took (PIA22930)',
+    url: 'https://www.jpl.nasa.gov/images/pia22930-last-images-opportunity-took/',
+  },
+  {
+    label: 'NASA/JPL — NASA\'s Opportunity Rover Mission on Mars Comes to End (2019)',
+    url: 'https://www.jpl.nasa.gov/news/nasas-opportunity-rover-mission-on-mars-comes-to-end/',
   },
 ]
 
@@ -309,6 +376,159 @@ export const MISSIONS: readonly MissionDefinition[] = [
     reviewNote: null,
   },
   {
+    id: 'opportunity',
+    destination: 'mars',
+    machineName: 'Opportunity',
+    missionName: 'Opportunity · Mars',
+    yearLabel: '2004–2019',
+    summary:
+      "Opportunity was the second of NASA's twin Mars Exploration Rovers. It landed in Meridiani Planum in January 2004 and searched the rocks for clues about the history of water on Mars.",
+    pipBriefing:
+      'Opportunity was planned for about 90 Martian days, and it explored for almost 15 years. Its cameras and tools read the story of water written in the rocks. Let us look closer.',
+    worldMode: 'surface',
+    components: [
+      {
+        id: 'opportunity-pancam',
+        name: 'Panoramic camera (Pancam)',
+        shortName: 'Pancam',
+        historicalRecord:
+          "The panoramic camera (Pancam) sat on Opportunity's mast and took color images and 360-degree panoramas. Its last images, taken on 10 June 2018, show a faint Sun in a very dark, dusty sky.",
+        pipLine: pipLine('mars-pancam'),
+        pipHint: pipLine('mars-hint-pancam'),
+        pipDirectHint: pipLine('mars-direct-pancam'),
+        howItWorks: { verb: 'Looks', detail: 'A camera that took color pictures and big panoramas.' },
+        huntClue: { line: pipLine('mars-clue-pancam'), short: "Find the rover's eyes · top of the mast", label: 'Eyes', icon: 'eye' },
+        scanHint: 'The pair of cameras at the top of the mast.',
+        hotspot: { x: 62, y: 24 },
+        sources: OPPORTUNITY_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'opportunity-rock-abrasion-tool',
+        name: 'Rock Abrasion Tool (RAT)',
+        shortName: 'RAT',
+        historicalRecord:
+          "The Rock Abrasion Tool (RAT) ground away the dusty outer layer of rocks so Opportunity's instruments could study the fresh rock inside. Over its mission, Opportunity ground into 52 rocks.",
+        pipLine: pipLine('mars-rat'),
+        pipHint: pipLine('mars-hint-rat'),
+        pipDirectHint: pipLine('mars-direct-rat'),
+        howItWorks: { verb: 'Touches', detail: 'A grinder that brushed the dusty skin off rocks.' },
+        huntClue: { line: pipLine('mars-clue-rat'), short: "Find the rock tool · front arm, down low", label: 'Rock tool', icon: 'tool' },
+        scanHint: 'A small tool on the robotic arm.',
+        hotspot: { x: 34, y: 64 },
+        sources: OPPORTUNITY_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'opportunity-mini-tes',
+        name: 'Miniature Thermal Emission Spectrometer (Mini-TES)',
+        shortName: 'Mini-TES',
+        historicalRecord:
+          "Mini-TES measured infrared light from rocks and soil to help identify their minerals. In 2004 it helped detect sulfate minerals at Meridiani Planum, part of the evidence that the area was once soaked in water.",
+        pipLine: pipLine('mars-mini-tes'),
+        pipHint: pipLine('mars-hint-mini-tes'),
+        pipDirectHint: pipLine('mars-direct-mini-tes'),
+        howItWorks: { verb: 'Senses heat', detail: 'It read invisible infrared light to tell minerals apart.' },
+        huntClue: { line: pipLine('mars-clue-mini-tes'), short: "Find the heat reader · the tall mast", label: 'Heat reader', icon: 'heat' },
+        scanHint: 'It looked out through the tall mast, below the cameras.',
+        hotspot: { x: 72, y: 46 },
+        sources: OPPORTUNITY_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    distractors: [
+      {
+        id: 'opportunity-solar-panels',
+        name: 'Solar panels',
+        shortName: 'Solar panels',
+        historicalRecord:
+          'Opportunity was powered by solar panels. In early 2014 the wind blew much of the dust off them, and its daily energy rose from under 375 to over 620 watt-hours.',
+        pipNote:
+          "Solar panels! The wind even cleaned them once. Nice find, but they won't unlock a memory fragment.",
+        sources: OPPORTUNITY_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'opportunity-wheels',
+        name: 'Wheels',
+        shortName: 'Wheels',
+        historicalRecord:
+          'Opportunity rolled on six wheels and drove 45.16 kilometres on Mars, farther than a marathon.',
+        pipNote:
+          "Six wheels carried Opportunity farther than a marathon. They're important, but this is not a memory fragment.",
+        sources: OPPORTUNITY_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'opportunity-antenna',
+        name: 'Antenna',
+        shortName: 'Antenna',
+        historicalRecord:
+          'Opportunity used its antennas to send images and data home to Earth.',
+        pipNote:
+          'Antennas helped Opportunity send its pictures home. Good to know, but not a fragment.',
+        sources: OPPORTUNITY_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    smartLetter: {
+      identity:
+        "Opportunity was the second of NASA's twin Mars Exploration Rovers. Its job was to look in the rocks for clues about the history of water on Mars.",
+      trajectory:
+        'Opportunity launched on 7 July 2003 and landed in Eagle crater, Meridiani Planum, on 25 January 2004 (UTC). It was planned for 90 Martian days, but it explored for almost 15 years and drove 45.16 kilometres.',
+      discoveries:
+        "Opportunity found tiny hematite spheres nicknamed 'blueberries', layered rocks laid down by water and a gypsum vein left by water moving through cracks. It also found the first meteorite identified on another planet.",
+      missionEnd:
+        'In June 2018 a dust storm covering all of Mars blocked the sunlight Opportunity needed. Its last communication was on 10 June 2018. After eight months of attempts, NASA declared the mission complete on 13 February 2019. Opportunity rests in Perseverance Valley.',
+      timeline: {
+        launch: '7 July 2003',
+        landing: 'Meridiani Planum · Jan 2004',
+        discovery: "Water 'blueberries'",
+        end: 'Dust storm · 2018',
+      },
+    },
+    reconstruction: {
+      title: 'Opportunity · First-person reconstruction',
+      status: 'video',
+      video: 'video/opportunity-720p.webm',
+      lines: [
+        'I bounce across the plain inside my airbags and roll to a stop in a tiny crater.',
+        'The rocks around me are full of small round grains. They tell me water was once here.',
+        'I drive on and on, much farther than anyone planned, farther than a marathon.',
+        'At a giant crater I find a bright vein left by water moving through cracks in the ground.',
+        'One day the dust hides the Sun. My team keeps calling, and my discoveries stay with them.',
+      ],
+    },
+    stampId: 'stamp-opportunity',
+    stampLabel: 'Opportunity · Mars',
+    completionStory: pipLine('mars-completion-story'),
+    narrative: {
+      entered: pipLine('mars-arrival'),
+      detected: pipLine('mars-detected'),
+      approached: pipLine('mars-approached'),
+      approachedTouch: pipLine('mars-approached-touch'),
+      identified: pipLine('mars-identified'),
+      scannerPromptDesktop: pipLine('mars-scanner-prompt-desktop'),
+      scannerPromptTouch: pipLine('mars-scanner-prompt-touch'),
+      completed: pipLine('mars-completed-1'),
+      memoryRecovered: pipLine('mars-memory-recovered'),
+      letterPrepared: pipLine('mars-letter-prepared'),
+      returnToShip: pipLine('mars-return-to-ship'),
+      hintOrientation: pipLine('mars-hint-orientation'),
+      hintContext: pipLine('mars-hint-context'),
+      genericHint: pipLine('mars-generic-hint'),
+      ambient: [pipLine('mars-ambient-1'), pipLine('mars-ambient-2')],
+      revisitInProgress: pipLine('mars-revisit-in-progress'),
+      revisitLetterReady: pipLine('mars-revisit-letter-ready'),
+      revisitTransmitted: pipLine('mars-revisit-transmitted'),
+    },
+    sources: OPPORTUNITY_SOURCES,
+    contentStatus: 'source-checked',
+    reviewNote: null,
+  },
+  // Spirit: Opportunity's twin, the second Mars explorer (Gusev Crater).
+  // Older saves with Spirit progress keep loading unchanged.
+  {
     id: 'spirit',
     destination: 'mars',
     machineName: 'Spirit',
@@ -326,15 +546,11 @@ export const MISSIONS: readonly MissionDefinition[] = [
         shortName: 'Pancam',
         historicalRecord:
           "The panoramic camera (Pancam) was mounted on Spirit's mast. It took high-resolution color images and 360-degree stereoscopic views of the Martian terrain.",
-        pipLine: pipLine('mars-pancam'),
+        pipLine: pipLine('spirit-pancam'),
         pipHint: pipLine('mars-hint-pancam'),
         pipDirectHint: pipLine('mars-direct-pancam'),
-        lens: 'visual',
-        lensHints: {
-          context:
-            'Some tools look, some touch and some sense heat. This one is all about looking.',
-          direct: 'This part works like a camera. Try the visual lens (1).',
-        },
+        howItWorks: { verb: 'Looks', detail: 'A camera that took color pictures and big panoramas.' },
+        huntClue: { line: pipLine('mars-clue-pancam'), short: "Find the rover's eyes · top of the mast", label: 'Eyes', icon: 'eye' },
         scanHint: 'The pair of cameras at the top of the mast.',
         hotspot: { x: 62, y: 24 },
         sources: SPIRIT_SOURCES,
@@ -349,12 +565,8 @@ export const MISSIONS: readonly MissionDefinition[] = [
         pipLine: pipLine('mars-rat'),
         pipHint: pipLine('mars-hint-rat'),
         pipDirectHint: pipLine('mars-direct-rat'),
-        lens: 'contact',
-        lensHints: {
-          context:
-            'Some tools look, some touch and some sense heat. This one works by touching rock.',
-          direct: 'This tool touches and grinds stone. Try the contact lens (2).',
-        },
+        howItWorks: { verb: 'Touches', detail: 'A grinder that brushed the dusty skin off rocks.' },
+        huntClue: { line: pipLine('mars-clue-rat'), short: "Find the rock tool · front arm, down low", label: 'Rock tool', icon: 'tool' },
         scanHint: 'A small tool on the robotic arm.',
         hotspot: { x: 34, y: 64 },
         sources: SPIRIT_SOURCES,
@@ -369,14 +581,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
         pipLine: pipLine('mars-mini-tes'),
         pipHint: pipLine('mars-hint-mini-tes'),
         pipDirectHint: pipLine('mars-direct-mini-tes'),
-        lens: 'thermal',
-        lensHints: {
-          context:
-            'Some tools look, some touch and some sense heat. This one reads invisible light.',
-          direct:
-            'This instrument reads heat and infrared light. Try the thermal lens (3).',
-        },
-        scanHint: 'An instrument beside the cameras on the mast.',
+        howItWorks: { verb: 'Senses heat', detail: 'It read invisible infrared light to tell minerals apart.' },
+        huntClue: { line: pipLine('mars-clue-mini-tes'), short: "Find the heat reader · the tall mast", label: 'Heat reader', icon: 'heat' },
+        scanHint: 'It looked out through the tall mast, below the cameras.',
         hotspot: { x: 72, y: 46 },
         sources: SPIRIT_SOURCES,
         validation: 'source-checked',
@@ -421,15 +628,22 @@ export const MISSIONS: readonly MissionDefinition[] = [
       identity:
         'Spirit was one of NASA\'s twin Mars Exploration Rovers. Its purpose was to study Martian rocks and soil for clues about the planet\'s past environment and water.',
       trajectory:
-        'Spirit landed in Gusev Crater on 4 January 2004, on a mission planned to last about 90 days. It drove across plains and hills for years, far longer than expected.',
+        'Spirit launched on 10 June 2003 and landed inside Gusev Crater on 4 January 2004 (UTC). It was planned for about 90 Martian days, but it explored for more than six years and drove 7.73 kilometres.',
       discoveries:
-        'Spirit found mineral and rock evidence that ancient Mars had water-driven environments. Its cameras, rock abrasion tool and Mini-TES let scientists read the history written in the rocks.',
+        'Spirit dug up a patch of nearly pure silica with a stuck wheel. It was likely made by hot springs or steam vents, strong evidence that ancient Mars was much wetter.',
       missionEnd:
-        'In 2009 Spirit became embedded in soft soil. Its last communication with Earth was in March 2010. It remains on Mars, and its discoveries are part of the record of Mars exploration.',
+        'On 1 May 2009 Spirit got stuck in soft soil beside a low plateau called Home Plate. Its last communication was on 22 March 2010, and NASA declared the mission complete on 25 May 2011.',
+      timeline: {
+        launch: '10 June 2003',
+        landing: 'Gusev Crater · Jan 2004',
+        discovery: 'Silica from hot springs',
+        end: 'Silent since 2010',
+      },
     },
     reconstruction: {
       title: 'Spirit · First-person reconstruction',
-      status: 'script-draft',
+      status: 'video',
+      video: 'video/spirit-720p.webm',
       lines: [
         'I land in a crater on a cold, dusty world. I do not know how long I will last.',
         'My wheels carry me across the plain. My cameras look at rocks no one has seen before.',
@@ -440,29 +654,18 @@ export const MISSIONS: readonly MissionDefinition[] = [
     },
     stampId: 'stamp-spirit',
     stampLabel: 'Spirit · Mars',
-    completionStory: pipLine('mars-completion-story'),
+    completionStory: pipLine('spirit-completion-story'),
     narrative: {
       entered: pipLine('mars-arrival'),
       detected: pipLine('mars-detected'),
       approached: pipLine('mars-approached'),
-      identified: pipLine('mars-identified'),
+      approachedTouch: pipLine('mars-approached-touch'),
+      identified: pipLine('spirit-identified'),
       scannerPromptDesktop: pipLine('mars-scanner-prompt-desktop'),
       scannerPromptTouch: pipLine('mars-scanner-prompt-touch'),
-      scannerEquipped: pipLine('mars-scanner-equipped'),
-      targetDetected: pipLine('mars-target-detected'),
-      scanStarted: pipLine('mars-scan-started'),
-      scanInterrupted: pipLine('mars-scan-interrupted'),
-      completed: [
-        pipLine('mars-completed-1'),
-        pipLine('mars-completed-2'),
-      ],
-      fullScanReady: pipLine('mars-full-scan-ready'),
-      fullScanStarted: pipLine('mars-full-scan-started'),
-      fullScanComplete: [
-        pipLine('mars-full-scan-1'),
-        pipLine('mars-full-scan-2'),
-      ],
-      letterPrepared: pipLine('mars-letter-prepared'),
+      completed: pipLine('mars-completed-1'),
+      memoryRecovered: pipLine('mars-memory-recovered'),
+      letterPrepared: pipLine('spirit-letter-prepared'),
       returnToShip: pipLine('mars-return-to-ship'),
       hintOrientation: pipLine('mars-hint-orientation'),
       hintContext: pipLine('mars-hint-context'),

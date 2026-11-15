@@ -8,7 +8,7 @@ import {
   markMissionDiscovered,
 } from '../store/journeyLogic'
 import { createJourney, type JourneySave } from '../store/journeySchema'
-import { MISSIONS, MISSION_IDS } from './missions'
+import { ACTIVE_MISSION_IDS, MISSIONS } from './missions'
 import {
   HUB_RETURNING_LINE,
   NEW_SIGNAL_LINE,
@@ -21,15 +21,14 @@ import {
 } from './sliceClosure'
 
 function deliverSpirit(): JourneySave {
-  let save = markMissionDiscovered(createJourney('Ada', 1000), 'spirit', 1100)
+  let save = markMissionDiscovered(createJourney('Ada', 1000), 'opportunity', 1100)
   for (const [index, component] of MISSIONS.find(
-    (m) => m.id === 'spirit',
+    (m) => m.id === 'opportunity',
   )!.components.entries()) {
-    save = scanComponent(save, 'spirit', component.id, 2000 + index).save
+    save = scanComponent(save, 'opportunity', component.id, 2000 + index).save
   }
-  save = completeFullScan(save, 'spirit', 3000).save
-  save = prepareSmartLetter(save, 'spirit', 4000).save
-  return transmitLetter(save, 'spirit', 5000).save
+  save = prepareSmartLetter(save, 'opportunity', 4000).save
+  return transmitLetter(save, 'opportunity', 5000).save
 }
 
 describe('slice closure after Spirit', () => {
@@ -50,10 +49,10 @@ describe('slice closure after Spirit', () => {
     expect(closure.allRestored).toBe(false)
   })
 
-  it('does not lower the Act III requirement: all three are still needed', () => {
+  it('does not lower the Act III requirement: every story is still needed', () => {
     const save = deliverSpirit()
     expect(areAllMissionsComplete(save)).toBe(false)
-    expect(MISSION_IDS).toHaveLength(3)
+    expect(ACTIVE_MISSION_IDS).toHaveLength(3)
   })
 
   it('never names a machine, planet or mission order in the new signal', () => {
@@ -62,11 +61,10 @@ describe('slice closure after Spirit', () => {
       'Moon',
       'Lunar',
       'Mars',
-      'Deep Space',
       'Pioneer',
       'Surveyor',
     ]
-    for (const text of [NEW_SIGNAL_LINE, restoredLine(1, 3)]) {
+    for (const text of [NEW_SIGNAL_LINE, restoredLine(1, 2)]) {
       for (const name of names) expect(text).not.toContain(name)
     }
     // It promises nothing playable: no unlock is invented.
@@ -75,8 +73,8 @@ describe('slice closure after Spirit', () => {
 
   it('has the hub speak the closure only on a return with deliveries', () => {
     const base = { routeConfirmed: false, hubVisited: true, hubTourDone: true }
-    expect(hubDialogueLines({ ...base, restoredCount: 1, totalStories: 3 })).toEqual(
-      [restoredLine(1, 3), NEW_SIGNAL_LINE],
+    expect(hubDialogueLines({ ...base, restoredCount: 1, totalStories: 2 })).toEqual(
+      [restoredLine(1, 2), NEW_SIGNAL_LINE],
     )
     expect(hubDialogueLines({ ...base, restoredCount: 0 })).toEqual([
       HUB_RETURNING_LINE,
@@ -100,25 +98,25 @@ describe('slice closure after Spirit', () => {
 describe('returning to a restored Mars', () => {
   it('cannot duplicate any delivery step: every call returns the same save', () => {
     const save = deliverSpirit()
-    expect(scanComponent(save, 'spirit', 'spirit-pancam', 9000).save).toBe(save)
-    expect(completeFullScan(save, 'spirit', 9000).save).toBe(save)
-    expect(prepareSmartLetter(save, 'spirit', 9000).save).toBe(save)
-    const again = transmitLetter(save, 'spirit', 9000)
+    expect(scanComponent(save, 'opportunity', 'opportunity-pancam', 9000).save).toBe(save)
+    expect(completeFullScan(save, 'opportunity', 9000).save).toBe(save)
+    expect(prepareSmartLetter(save, 'opportunity', 9000).save).toBe(save)
+    const again = transmitLetter(save, 'opportunity', 9000)
     expect(again.status).toBe('already-transmitted')
     expect(again.save).toBe(save)
-    expect(again.save.missions.spirit.transmittedAt).toBe(5000)
+    expect(again.save.missions.opportunity.transmittedAt).toBe(5000)
   })
 
   it('offers free exploration and field notes through PIP, only once restored', () => {
     const save = deliverSpirit()
-    const cue = getRevisitExploreCue('spirit', save.missions.spirit, 5)
+    const cue = getRevisitExploreCue('opportunity', save.missions.opportunity, 5)
     expect(cue?.text).toMatch(/field notes/i)
     expect(cue?.priority).toBe('ambient')
     expect(
-      getRevisitExploreCue('spirit', save.missions.spirit, 0)?.text,
-    ).toMatch(/already in your passport/i)
+      getRevisitExploreCue('opportunity', save.missions.opportunity, 0)?.text,
+    ).toMatch(/already in your mission album/i)
     expect(
-      getRevisitExploreCue('spirit', createJourney('Ada').missions.spirit, 5),
+      getRevisitExploreCue('opportunity', createJourney('Ada').missions.opportunity, 5),
     ).toBeNull()
   })
 })

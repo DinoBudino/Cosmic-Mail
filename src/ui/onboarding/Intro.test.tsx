@@ -12,7 +12,7 @@ describe('cinematic Intro component', () => {
     useOnboardingStore.setState({ phase: 'intro', boardingStage: 'cabin', dialogueIndex: 0 })
     const html = renderToStaticMarkup(<Intro />)
 
-    expect(html).toContain('Welcome aboard Mailwing')
+    expect(html).toContain('this is Mailwing')
     expect(html).toContain('Replay')
     expect(html).toContain('Skip intro')
     expect(html).toContain('Continue')

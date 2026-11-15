@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getDestination } from '../data/destinations'
 import type { DestinationId } from '../data/missions'
+import { setActiveExplorer, type MarsExplorerId } from '../data/spiritSite'
 import { clearInput } from '../game/input'
 import { useJourneyStore } from './journeyStore'
 
@@ -15,9 +16,14 @@ export type OnboardingPhase =
   | 'registration'
   | 'hub'
   | 'launching'
+  /** Mailwing orbits Mars: the child picks which explorer to visit. */
+  | 'orbit'
   | 'playing'
 
 export type BoardingStage = 'approach' | 'cabin'
+
+/** Section shown on the right page of the mission album. */
+export type AlbumTab = 'missions' | 'stamps' | 'discoveries'
 
 interface OnboardingState {
   phase: OnboardingPhase
@@ -41,6 +47,9 @@ interface OnboardingState {
   markHubVisited: () => void
   passportDetailOpen: boolean
   setPassportDetailOpen: (open: boolean) => void
+  /** Open album section (shared so PIP's guided tour can follow it). */
+  albumTab: AlbumTab
+  setAlbumTab: (tab: AlbumTab) => void
   startNewJourney: () => void
   finishIntro: () => void
   completeRegistration: () => void
@@ -52,6 +61,12 @@ interface OnboardingState {
   finishLaunch: () => void
   /** Return from a surface mission to Mailwing without losing progress. */
   returnToShip: () => void
+  /** Orbit: land at the chosen explorer's site. */
+  landAt: (explorer: MarsExplorerId) => void
+  /** Walk back aboard on Mars: Mailwing climbs back to orbit. */
+  returnToOrbit: () => void
+  /** Leave Mars orbit and go back to the cabin. */
+  leaveOrbit: () => void
   goBack: () => void
   resetPresentation: () => void
 }
@@ -66,6 +81,7 @@ const EMPTY_PRESENTATION = {
   hubVisited: false,
   hubTourDone: false,
   passportDetailOpen: false,
+  albumTab: 'missions' as AlbumTab,
 }
 
 function setDestinationInJourney(destination: DestinationId): void {
@@ -86,8 +102,10 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   },
   setPassportDetailOpen: (passportDetailOpen) => {
     if (passportDetailOpen && get().phase !== 'hub') return
-    set({ passportDetailOpen })
+    // The album always opens on its first section.
+    set(passportDetailOpen ? { passportDetailOpen, albumTab: 'missions' } : { passportDetailOpen })
   },
+  setAlbumTab: (albumTab) => set({ albumTab }),
   markHubVisited: () => set({ hubTourDone: true }),
 
   startNewJourney: () => {
@@ -171,7 +189,39 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   finishLaunch: () => {
     if (get().phase !== 'launching') return
     clearInput()
+    // Mars has two explorers: Mailwing stops in orbit so the child picks one.
+    const destination = useJourneyStore.getState().save?.currentDestination
+    set({ phase: destination === 'mars' ? 'orbit' : 'playing', pipTalking: false })
+  },
+
+  landAt: (explorer) => {
+    if (get().phase !== 'orbit') return
+    clearInput()
+    setActiveExplorer(explorer)
     set({ phase: 'playing', pipTalking: false })
+  },
+
+  returnToOrbit: () => {
+    if (get().phase !== 'playing') return
+    clearInput()
+    set({ phase: 'orbit', pipTalking: false })
+  },
+
+  leaveOrbit: () => {
+    if (get().phase !== 'orbit') return
+    clearInput()
+    set({
+      phase: 'hub',
+      boardingStage: 'cabin',
+      pipTalking: false,
+      dialogueIndex: 0,
+      routeOpen: false,
+      selectedDestination: null,
+      routeConfirmed: false,
+      hubVisited: true,
+      hubTourDone: true,
+      passportDetailOpen: false,
+    })
   },
 
   returnToShip: () => {

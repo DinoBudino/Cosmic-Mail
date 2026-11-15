@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import { getMission } from '../data/missions'
-import { MARS_OBJECTS, REGION_INFO, type MarsObjectId } from '../data/marsObjects'
 import { isStepAtLeast } from '../data/arrivalProtocol'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { useProtocol } from './useProtocol'
@@ -12,35 +10,6 @@ import {
   getMissionStage,
   scannedComponentCount,
 } from './missionStage'
-
-const STATE_DOT_CLASS: Record<string, string> = {
-  landmark: 'mission-dot--available',
-  'coming-soon': 'mission-dot--soon',
-}
-
-function TravelControls() {
-  const [destination, setDestination] = useState<MarsObjectId>('opportunity')
-  const targetId = useGameStore((state) => state.travelTargetId)
-  const startTravel = useGameStore((state) => state.startTravel)
-  const cancelTravel = useGameStore((state) => state.cancelTravel)
-  const target = MARS_OBJECTS.find((site) => site.id === targetId)
-
-  return (
-    <details className="travel-controls">
-      <summary>Travel assistance</summary>
-      <p id="travel-help">Choose a site to walk there automatically. Manual movement, settings or leaving the window stops the trip.</p>
-      <label htmlFor="travel-destination">Destination</label>
-      <select id="travel-destination" value={destination} onChange={(event) => {
-        const site = MARS_OBJECTS.find((item) => item.id === event.target.value)
-        if (site) setDestination(site.id)
-      }} aria-describedby="travel-help">
-        {MARS_OBJECTS.map((site) => <option key={site.id} value={site.id}>{site.name}{site.state === 'coming-soon' ? ' — Coming soon' : ''}</option>)}
-      </select>
-      <button type="button" className="site-action" onClick={() => startTravel(destination)}>Travel to selected site</button>
-      {target && <button type="button" className="site-action" onClick={cancelTravel}>Stop travel to {target.name}</button>}
-    </details>
-  )
-}
 
 /** Mission briefing (top-right): objective + mission list, separate from PIP. */
 export function MissionPanel() {
@@ -150,33 +119,13 @@ export function MissionPanel() {
           onClick={() =>
             useGameStore
               .getState()
-              .openArchive(
-                stage === 'ready_for_full_scan' ? 'full-scan' : 'smart-letter',
-                SPIRIT_SITE.missionId,
-              )
+              .openArchive('smart-letter', SPIRIT_SITE.missionId)
           }
         >
           {archiveCta}
         </button>
       )}
 
-      <details className="mission-other">
-        <summary className="settings-eyebrow mission-subhead">
-          Other Mars sites
-        </summary>
-        <ul className="mission-list">
-          {MARS_OBJECTS.map((site) => (
-            <li key={site.id} className="mission-item">
-              <span className={`mission-dot ${STATE_DOT_CLASS[site.state]}`} aria-hidden="true" />
-              <span className="mission-site">
-                <strong>{site.name}</strong>
-                <small>{REGION_INFO[site.id].regionName}</small>
-              </span>
-            </li>
-          ))}
-        </ul>
-        <TravelControls />
-      </details>
      </details>
     </aside>
   )

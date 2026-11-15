@@ -36,7 +36,12 @@ export default function GameCanvas() {
       camera={{ position: [0, 10, 30], fov: CAMERA.fov, near: 0.1, far: 900 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       fallback={<SceneStatus error />}
-      onCreated={({ gl }) => {
+      onCreated={(state) => {
+        const { gl } = state
+        // Dev-only handle for automated screenshots and checks.
+        if (import.meta.env.DEV) {
+          ;(window as unknown as { __cosmicR3f?: unknown }).__cosmicR3f = state
+        }
         gl.toneMapping = THREE.ACESFilmicToneMapping
         gl.toneMappingExposure = 1.1
         // In this Three.js version PCFShadowMap uses radius-aware filtering.

@@ -1,39 +1,35 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   REGISTRATION_LINE,
-  hubDialogueLines,
+  type HubAwait,
+  type HubDialogueStep,
 } from '../../data/onboardingNarrative'
 import { speakPip, stopPipVoice } from '../../game/pipVoice'
-import { getSliceClosure } from '../../data/sliceClosure'
 import { useGameStore } from '../../store/gameStore'
-import { useJourneyStore } from '../../store/journeyStore'
+import { tourIndexFor, useHubFocus } from '../../store/hubFocus'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { PipAvatar } from '../PipSpeech'
 
-/** PIP's dialogue lines for the current cabin step (written only, no voice). */
-function useDialogueLines(): string[] {
+/** PIP's dialogue steps for the current cabin step. */
+function useDialogueSteps(): HubDialogueStep[] {
   const phase = useOnboardingStore((state) => state.phase)
-  const routeConfirmed = useOnboardingStore((state) => state.routeConfirmed)
-  const hubVisited = useOnboardingStore((state) => state.hubVisited)
-  const hubTourDone = useOnboardingStore((state) => state.hubTourDone)
-  const save = useJourneyStore((state) => state.save)
-  // PIP stays quiet while an archive dialog (letter, delivery) is open, so
-  // the slice-closing lines never talk over the delivery ceremony.
-  const archiveOpen = useGameStore((state) => state.archiveView !== 'none')
-  const closure = getSliceClosure(save)
-  if (phase === 'hub' && archiveOpen) return []
-  if (phase === 'registration') return [REGISTRATION_LINE]
-  if (phase === 'hub') {
-    return hubDialogueLines({
-      routeConfirmed,
-      hubVisited,
-      hubTourDone,
-      restoredCount: closure.restored,
-      totalStories: closure.total,
-    })
+  const focus = useHubFocus()
+  if (phase === 'registration') {
+    return [{ line: REGISTRATION_LINE, target: null, awaits: null, place: 'cabin' }]
   }
-  return []
+  return focus.steps
 }
+
+const AWAIT_HINT: Record<HubAwait, string> = {
+  album: 'Tap the mission album',
+  'tab-stamps': 'Tap Stamps',
+  'tab-discoveries': 'Tap Discoveries',
+  'album-close': 'Tap Back to cabin',
+  nav: 'Tap the navigation screen',
+  destination: 'Tap a place with a signal',
+  confirm: 'Tap Confirm route',
+}
+
 
 /**
  * Typewriter line for PIP. While it runs, PIP "speaks" (his mouth moves
@@ -121,7 +117,7 @@ function PipLine({
  * owns its own subtitle bar; the cabin bubble is used after it.
  */
 export function Cabin({ children }: { children: ReactNode }) {
-  const lines = useDialogueLines()
+  const steps = useDialogueSteps()
   const phase = useOnboardingStore((state) => state.phase)
   const routeOpen = useOnboardingStore((state) => state.routeOpen)
   const passportDetailOpen = useOnboardingStore(
@@ -144,7 +140,7 @@ export function Cabin({ children }: { children: ReactNode }) {
     if (!bubble || !content) return
     const adjust = () => {
       const panel = content.querySelector<HTMLElement>(
-        '.tablet, .shipping-label, .onboarding__panel',
+        '.tablet, .carrier-terminal, .onboarding__panel',
       )
       if (!panel) {
         setLiftPx(0)
@@ -168,8 +164,39 @@ export function Cabin({ children }: { children: ReactNode }) {
     }
   }, [children, phase])
 
-  const line = lines[Math.min(dialogueIndex, Math.max(0, lines.length - 1))] ?? ''
-  const isLastLine = dialogueIndex >= lines.length - 1
+  const stepIndex = Math.min(dialogueIndex, Math.max(0, steps.length - 1))
+  const step = steps[stepIndex] ?? null
+  const line = step?.line ?? ''
+  const awaits = step?.awaits ?? null
+  const isLastLine = dialogueIndex >= steps.length - 1
+
+  const albumTab = useOnboardingStore((state) => state.albumTab)
+  const selectedDestination = useOnboardingStore(
+    (state) => state.selectedDestination,
+  )
+
+  // Guided steps: doing what PIP asks (opening the album, a tab, the
+  // navigation screen, picking a place) is what moves the tour on.
+  useEffect(() => {
+    if (phase !== 'hub' || steps.length === 0) return
+    const next = tourIndexFor(steps, stepIndex, {
+      albumOpen: passportDetailOpen,
+      routeOpen,
+      albumTab,
+      selectedDestination,
+    })
+    if (next !== stepIndex) setDialogueIndex(next)
+  }, [
+    phase,
+    steps,
+    stepIndex,
+    passportDetailOpen,
+    routeOpen,
+    albumTab,
+    selectedDestination,
+    setDialogueIndex,
+  ])
+
   const handleDone = useCallback(() => setTypingDone(true), [])
 
   const [seenLine, setSeenLine] = useState(line)
@@ -184,6 +211,8 @@ export function Cabin({ children }: { children: ReactNode }) {
       setSkipNonce((nonce) => nonce + 1)
       return
     }
+    // A guided step only advances when the child opens the element.
+    if (awaits) return
     if (!isLastLine) {
       setTypingDone(false)
       setDialogueIndex(dialogueIndex + 1)
@@ -192,28 +221,40 @@ export function Cabin({ children }: { children: ReactNode }) {
     if (phase === 'hub') markHubVisited()
   }
 
+  // PIP speaks where the child is: in the cabin, over the open album or
+  // over the navigation close-up (docked at the top so it never covers
+  // what he is explaining).
+  const place = passportDetailOpen ? 'album' : routeOpen ? 'nav' : 'cabin'
+  const stepPlace = step?.place ?? 'cabin'
   const bubbleHidden =
-    phase === 'intro' ||
-    (phase === 'hub' && (passportDetailOpen || routeOpen))
+    phase === 'intro' || (phase === 'hub' && stepPlace !== place)
+  const docked = phase === 'hub' && place !== 'cabin'
 
   return (
     <div className="cabin">
       <div className="boarding__veil" aria-hidden="true" />
 
-      {!bubbleHidden && lines.length > 0 && (
+      {!bubbleHidden && steps.length > 0 && (
         <div
-          className={`pip-bubble-wrap pip-bubble-wrap--${phase}`}
+          className={`pip-bubble-wrap pip-bubble-wrap--${phase}${
+            docked ? ' pip-bubble-wrap--docked' : ''
+          }`}
           ref={bubbleRef}
           style={{
-            transform: liftPx > 0 ? `translateY(${-liftPx}px)` : undefined,
+            transform:
+              !docked && liftPx > 0 ? `translateY(${-liftPx}px)` : undefined,
           }}
         >
           <button
             type="button"
-            className="pip-bubble"
+            className={`pip-bubble${awaits ? ' pip-bubble--awaits' : ''}`}
             onClick={handleBubbleClick}
             aria-label={
-              typingDone && !isLastLine ? 'Continue' : 'PIP is speaking'
+              awaits && typingDone
+                ? AWAIT_HINT[awaits]
+                : typingDone && !isLastLine
+                  ? 'Continue'
+                  : 'PIP is speaking'
             }
           >
             <PipAvatar />
@@ -225,10 +266,18 @@ export function Cabin({ children }: { children: ReactNode }) {
                 skipNonce={skipNonce}
                 onDone={handleDone}
               />
-              {typingDone && !isLastLine && (
-                <span className="pip-bubble__next" aria-hidden="true">
-                  ▸
+              {awaits ? (
+                <span className="pip-bubble__task">
+                  <span className="pip-bubble__task-dot" aria-hidden="true" />
+                  {AWAIT_HINT[awaits]}
                 </span>
+              ) : (
+                typingDone &&
+                !isLastLine && (
+                  <span className="pip-bubble__next" aria-hidden="true">
+                    ▸
+                  </span>
+                )
               )}
             </span>
           </button>

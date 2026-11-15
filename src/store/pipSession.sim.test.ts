@@ -3,7 +3,6 @@ import {
   CALIBRATE_FIRST_LINE,
   LATER_LINE,
   OFF_TRAIL_LINE,
-  SAMPLE_LENS_LINE,
   STEP_ENTRY_LINES,
 } from '../data/arrivalProtocol'
 import { REPEAT_WINDOW_MS } from '../data/pipDialogPolicy'
@@ -110,7 +109,6 @@ describe('PIP session simulation (policy only, not a playthrough)', () => {
       protocol(OFF_TRAIL_LINE, 30_000),
       protocol(OFF_TRAIL_LINE, 36_000),
       at(45_000, enq(STEP_ENTRY_LINES.M2!.id, STEP_ENTRY_LINES.M2!.text, 'mission', { tier: 0 })),
-      protocol(SAMPLE_LENS_LINE, 55_000),
       at(65_000, enq(STEP_ENTRY_LINES.M3!.id, STEP_ENTRY_LINES.M3!.text, 'mission', { tier: 0 })),
       protocol(CALIBRATE_FIRST_LINE, 70_000),
       at(80_000, enq('detected', 'Something is over there.', 'discovery')),

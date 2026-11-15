@@ -9,11 +9,11 @@ import {
   ROUTE_READY_LINE,
   TRANSMISSION_DESTINATION,
   TRANSMISSION_SUCCESS_LINE,
-  estimatePipLineMs,
   HUB_ASSIGNMENT_LINE,
   hubDialogueLines,
-  introAutoAdvanceForMode,
-  introAutoAdvanceMs,
+  hubDialogueSteps,
+  HUB_TOUR_STEPS,
+  isHubTourActive,
   introBeatForLine,
   introCameraForLine,
   introEmotionForLine,
@@ -58,7 +58,7 @@ describe('Proposal A onboarding beat sheet', () => {
       /lost its connection/i.test(beat.line),
     )
     const explanation = INTRO_BEATS.findIndex((beat) =>
-      /trying to reconnect/i.test(beat.line),
+      /trying to fix them/i.test(beat.line),
     )
 
     expect(firstLoss).toBeGreaterThan(0)
@@ -70,7 +70,7 @@ describe('Proposal A onboarding beat sheet', () => {
   it('syncs every beat with an expression, hologram and camera shot', () => {
     expect(introEmotionForLine(0)).toBe('welcome')
     expect(introEmotionForLine(3)).toBe('surprised')
-    expect(introEmotionForLine(5)).toBe('confused')
+    expect(introEmotionForLine(5)).toBe('worried')
     expect(introEmotionForLine(7)).toBe('worried')
     expect(introEmotionForLine(9)).toBe('thoughtful')
     expect(introEmotionForLine(11)).toBe('happy')
@@ -81,7 +81,7 @@ describe('Proposal A onboarding beat sheet', () => {
     expect(introHologramForLine(4)).toBe('losing3')
     expect(introHologramForLine(5)).toBe('fragmented')
     expect(introHologramForLine(6)).toBe('recovering')
-    expect(introHologramForLine(10)).toBe('hint')
+    expect(introHologramForLine(10)).toBe('locations')
     expect(introHologramForLine(12)).toBe('dossier')
     expect(introHologramForLine(13)).toBe('letter')
 
@@ -94,33 +94,46 @@ describe('Proposal A onboarding beat sheet', () => {
     expect(introCameraForLine(12, true)).toBe('welcome')
   })
 
-  it('auto-advances reactions but waits for the final invitation', () => {
-    expect(introAutoAdvanceMs(0)).toBeGreaterThan(estimatePipLineMs(introBeatForLine(0).line))
-    expect(introAutoAdvanceMs(INTRO_BEATS.length - 1)).toBeNull()
-    expect(introAutoAdvanceForMode(0, true)).toBeNull()
-    expect(introAutoAdvanceForMode(0, false)).toBeGreaterThan(0)
-    expect(INTRO_BEATS.every((beat) => typeof beat.autoAdvance === 'boolean')).toBe(
-      true,
-    )
+  it('is fully player-paced and ends on the invitation', () => {
+    for (const beat of INTRO_BEATS) {
+      expect(beat).not.toHaveProperty('autoAdvance')
+    }
     expect(introBeatForLine(INTRO_BEATS.length - 1).line).toMatch(
-      /Will you help me bring their stories back\?/,
+      /will you help me bring their stories home\?/,
     )
+  })
+
+  it('pairs each line with a projection that shows what it says', () => {
+    const byLine = (pattern: RegExp) =>
+      introBeatForLine(INTRO_BEATS.findIndex((beat) => pattern.test(beat.line)))
+    expect(byLine(/Cosmic Mail/).hologram).toBe('mail')
+    expect(byLine(/my own memories are missing/).hologram).toBe('memory')
+    expect(byLine(/my own memories are missing/).emotion).toBe('sad')
+    expect(byLine(/I can't remember/).hologram).toBe('forgotten')
+    expect(byLine(/two places/).hologram).toBe('locations')
+    expect(byLine(/two places/).emotion).toBe('excited')
+    expect(byLine(/fix their stories/).hologram).toBe('route')
+    expect(byLine(/signals have gone quiet/).hologram).toBe('dossier')
+    // Consecutive beats never repeat the same projection.
+    for (let i = 1; i < INTRO_BEATS.length; i += 1) {
+      expect(INTRO_BEATS[i]!.hologram).not.toBe(INTRO_BEATS[i - 1]!.hologram)
+    }
   })
 
   it('establishes the Archive fault and PIP fragmentation', () => {
     expect(ALL_TEXT).toMatch(/Cosmic Archive/i)
     expect(ALL_TEXT).toMatch(/connection/i)
-    expect(ALL_TEXT).toMatch(/pieces don’t match/i)
-    expect(ALL_TEXT).toMatch(/my own records are missing/i)
-    expect(ALL_TEXT).toMatch(/I can’t remember/i)
-    expect(ALL_TEXT).toMatch(/old locations/i)
-    expect(ALL_TEXT).toMatch(/put their stories back together/i)
-    expect(ALL_TEXT).toMatch(/smart letter|Cosmic Mail Carrier/i)
+    expect(ALL_TEXT).toMatch(/pieces don't fit/i)
+    expect(ALL_TEXT).toMatch(/my own memories are missing/i)
+    expect(ALL_TEXT).toMatch(/I can't remember/i)
+    expect(ALL_TEXT).toMatch(/two places/i)
+    expect(ALL_TEXT).toMatch(/fix their stories/i)
+    expect(ALL_TEXT).toMatch(/Carrier ID/i)
     expect(ALL_TEXT).toMatch(/Earth/i)
   })
 
-  it('does not reveal Surveyor 3, Spirit or Pioneer 10 before discovery', () => {
-    expect(ALL_TEXT).not.toMatch(/Surveyor|Spirit|Pioneer/i)
+  it('does not reveal Surveyor 3, Opportunity, Spirit or Pioneer 10 before discovery', () => {
+    expect(ALL_TEXT).not.toMatch(/Surveyor|Opportunity|Spirit|Pioneer/i)
   })
 
   it('contains no retired B or hero/power narrative language', () => {
@@ -147,10 +160,9 @@ describe('Proposal A onboarding beat sheet', () => {
   })
 
   it('connects accepting the mission with registration', () => {
-    expect(REGISTRATION_LINE).toBe(
-      "Then let's make it official! Every Cosmic Mail Carrier needs a name.",
-    )
-    expect(HUB_ASSIGNMENT_LINE).toContain('passport')
+    expect(REGISTRATION_LINE).toMatch(/Carrier ID/)
+    expect(HUB_ASSIGNMENT_LINE).toContain('mission album')
+    expect(ALL_TEXT).not.toMatch(/passport/i)
   })
 
   it('does not greet a first-time carrier as if they had returned', () => {
@@ -161,7 +173,7 @@ describe('Proposal A onboarding beat sheet', () => {
     })
     expect(firstVisit[0]).toBe(HUB_ASSIGNMENT_LINE)
     expect(firstVisit.join(' ')).not.toContain('Welcome back')
-    expect(firstVisit).toHaveLength(5)
+    expect(firstVisit).toHaveLength(HUB_TOUR_STEPS.length)
 
     expect(
       hubDialogueLines({
@@ -178,6 +190,38 @@ describe('Proposal A onboarding beat sheet', () => {
         hubTourDone: true,
       }),
     ).toEqual([HUB_RETURNING_LINE])
+  })
+
+  it('guides the child through the album and the navigation screen', () => {
+    const first = { routeConfirmed: false, hubVisited: false, hubTourDone: false }
+    const steps = hubDialogueSteps(first)
+    expect(isHubTourActive(first)).toBe(true)
+    // The album comes before navigation, and each one must be opened.
+    const albumWait = steps.findIndex((step) => step.awaits === 'album')
+    const navWait = steps.findIndex((step) => step.awaits === 'nav')
+    expect(albumWait).toBeGreaterThan(0)
+    expect(navWait).toBeGreaterThan(albumWait)
+    expect(steps[albumWait]!.target).toBe('album')
+    expect(steps[navWait]!.target).toBe('nav')
+    // PIP explains every album section and the navigation screen from
+    // inside, and the child has to tap each part.
+    for (const awaited of ['tab-stamps', 'tab-discoveries', 'album-close', 'destination', 'confirm']) {
+      expect(steps.some((step) => step.awaits === awaited)).toBe(true)
+    }
+    const places = steps.map((step) => step.place)
+    expect(places.indexOf('album')).toBe(albumWait + 1)
+    expect(places.indexOf('nav')).toBe(navWait + 1)
+    // The tour ends on confirming the route, which hands over to the red button.
+    expect(steps[steps.length - 1]!.awaits).toBe('confirm')
+    // Navigation is never described as a single destination.
+    expect(steps.map((step) => step.line).join(' ')).not.toMatch(/Mars|Moon|closest/)
+
+    const ready = hubDialogueSteps({ ...first, routeConfirmed: true })
+    expect(ready).toEqual([
+      { line: ROUTE_READY_LINE, target: 'button', awaits: null, place: 'cabin' },
+    ])
+    expect(isHubTourActive({ ...first, routeConfirmed: true })).toBe(false)
+    expect(isHubTourActive({ ...first, hubTourDone: true })).toBe(false)
   })
 
   it('personalizes the registration welcome line safely', () => {

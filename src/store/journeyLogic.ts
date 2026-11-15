@@ -9,7 +9,7 @@
  */
 
 import {
-  MISSION_IDS,
+  ACTIVE_MISSION_IDS,
   findComponent,
   findMission,
   type DestinationId,
@@ -169,12 +169,19 @@ export function scanComponent(
     }
   }
 
+  const scannedIds = [...progress.scannedComponentIds, componentId]
+  const nextCount = new Set(scannedIds).size
+  // The last part recovers the explorer's memory in the same event: there is
+  // no separate full recognition scan any more.
+  const complete =
+    nextCount >= mission.components.length &&
+    progress.memoryRecoveredAt === null
   const nextProgress: MissionProgress = {
     ...progress,
-    scannedComponentIds: [...progress.scannedComponentIds, componentId],
+    scannedComponentIds: scannedIds,
+    ...(complete ? { fullScanCompletedAt: now, memoryRecoveredAt: now } : {}),
   }
   const nextSave = setMissionProgress(save, missionId, nextProgress, now)
-  const nextCount = new Set(nextProgress.scannedComponentIds).size
 
   return {
     save: nextSave,
@@ -488,13 +495,13 @@ export function markMissionDiscovered(
 
 /** Unique stamp ids, derived from transmitted progress (no duplicate list). */
 export function getEarnedStampIds(save: JourneySave): MissionId[] {
-  return MISSION_IDS.filter(
+  return ACTIVE_MISSION_IDS.filter(
     (missionId) => getMissionProgress(save, missionId).transmittedAt !== null,
   )
 }
 
 export function areAllMissionsComplete(save: JourneySave): boolean {
-  return getEarnedStampIds(save).length === MISSION_IDS.length
+  return getEarnedStampIds(save).length === ACTIVE_MISSION_IDS.length
 }
 
 export function setCurrentDestination(

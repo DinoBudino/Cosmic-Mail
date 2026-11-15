@@ -20,14 +20,10 @@ export function scannedComponentCount(
  */
 export function getArchiveCtaLabel(stage: MissionStage): string | null {
   switch (stage) {
-    case 'ready_for_full_scan':
-      return 'Full recognition scan'
-    case 'memory_recovered':
-      return 'Prepare smart letter'
+    // memory_recovered: the objective bar carries "Open tablet" itself.
     case 'smart_letter_ready':
-      return 'Read smart letter'
     case 'transmitted':
-      return 'Review smart letter'
+      return 'Open tablet'
     default:
       return null
   }

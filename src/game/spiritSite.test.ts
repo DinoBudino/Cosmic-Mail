@@ -12,7 +12,7 @@ import {
 describe('Spirit pilot site', () => {
   it('points to the Spirit mission and stays inside the playable radius', () => {
     const mission = getMission(SPIRIT_SITE.missionId)
-    expect(mission.machineName).toBe('Spirit')
+    expect(mission.machineName).toBe('Opportunity')
     expect(SPIRIT_SITE.destination).toBe('mars')
     expect(Math.hypot(SPIRIT_SITE.position.x, SPIRIT_SITE.position.z)).toBeLessThan(
       WORLD.playRadius,

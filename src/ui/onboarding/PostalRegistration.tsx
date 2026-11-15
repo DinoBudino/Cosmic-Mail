@@ -13,8 +13,9 @@ import { useOnboardingStore } from '../../store/onboardingStore'
 type SignStage = 'signing' | 'sealing' | 'farewell' | 'departing'
 
 /**
- * Postal registration: a physical shipping label, the carrier's name and
- * the seal. The name is persisted only through JourneySave.
+ * Carrier registration: a holographic terminal on the cabin console that
+ * builds the child's Carrier ID (the badge kept in the mission album)
+ * from their name. The name is persisted only through JourneySave.
  */
 export function PostalRegistration() {
   const goBack = useOnboardingStore((state) => state.goBack)
@@ -100,9 +101,9 @@ export function PostalRegistration() {
         Register as a Cosmic Mail Carrier
       </h1>
 
-      <div className="shipping-label-stage">
+      <div className="carrier-stage">
         <form
-          className={`shipping-label is-arriving${sealed ? ' is-sealed' : ''}${
+          className={`carrier-terminal is-arriving${sealed ? ' is-sealed' : ''}${
             stage === 'departing' ? ' is-departing' : ''
           }`}
           onSubmit={(event) => {
@@ -110,29 +111,65 @@ export function PostalRegistration() {
             sealAndContinue()
           }}
         >
-          <div className="shipping-label__header">
-            <span>Cosmic Mail</span>
-            <span className="shipping-label__stamp" aria-hidden="true">
-              ✦
+          <span className="carrier-terminal__corner carrier-terminal__corner--tl" aria-hidden="true" />
+          <span className="carrier-terminal__corner carrier-terminal__corner--tr" aria-hidden="true" />
+          <span className="carrier-terminal__corner carrier-terminal__corner--bl" aria-hidden="true" />
+          <span className="carrier-terminal__corner carrier-terminal__corner--br" aria-hidden="true" />
+
+          <header className="carrier-terminal__header">
+            <span className="carrier-terminal__led" aria-hidden="true" />
+            <span>Cosmic Mail · Carrier ID</span>
+            <span className="carrier-terminal__status">
+              {stage === 'signing'
+                ? valid
+                  ? 'Ready'
+                  : 'Waiting for name'
+                : stage === 'sealing'
+                  ? 'Scanning'
+                  : 'ID active'}
             </span>
+          </header>
+
+          {/* Live preview of the badge the album will keep. */}
+          <div
+            className={`carrier-card${valid ? ' is-valid' : ''}`}
+            aria-hidden="true"
+          >
+            <div className="carrier-card__photo">
+              <span className="carrier-card__planet" />
+              <span className="carrier-card__ring" />
+            </div>
+            <div className="carrier-card__info">
+              <span className="carrier-card__label">Carrier</span>
+              <span className="carrier-card__name">
+                {normalizedName || 'Your name'}
+              </span>
+              <span className="carrier-card__label">Ship</span>
+              <span className="carrier-card__value">Mailwing · CM-01</span>
+            </div>
+            <span className="carrier-card__check">
+              {stage === 'farewell' || stage === 'departing' ? '✓' : ''}
+            </span>
+            <span className="carrier-card__scan" />
           </div>
 
           <div
-            className={`shipping-label__field shipping-label__signature${
-              valid ? ' is-valid' : ''
-            }`}
+            className={`carrier-terminal__field${valid ? ' is-valid' : ''}`}
           >
-            <label htmlFor="carrier-name">From</label>
+            <label htmlFor="carrier-name">
+              <span className="carrier-terminal__step">1</span>
+              Type your name
+            </label>
             <input
               ref={inputRef}
               id="carrier-name"
-              className="shipping-label__input"
+              className="carrier-terminal__input"
               type="text"
               value={name}
               maxLength={MAX_PLAYER_NAME_LENGTH}
               autoComplete="off"
               spellCheck={false}
-              placeholder="Your name..."
+              placeholder="Your name"
               onChange={(event) => {
                 if (!signatureSoundPlayed.current && event.target.value.length > 0) {
                   signatureSoundPlayed.current = true
@@ -144,68 +181,47 @@ export function PostalRegistration() {
               aria-describedby="signature-hint"
               aria-invalid={name.length > 0 && !valid}
             />
-            <span className="shipping-label__ink" aria-hidden="true" />
           </div>
 
-          <div className="shipping-label__field">
-            <span className="shipping-label__static-label">Service</span>
-            <span className="shipping-label__static-value">Cosmic Mail</span>
-          </div>
-
-          <div className="shipping-label__field">
-            <span className="shipping-label__static-label">Destination</span>
-            <span className="shipping-label__static-value">Earth Archive</span>
-          </div>
-
-          <div className="shipping-label__field">
-            <span className="shipping-label__static-label">Assignment</span>
-            <span className="shipping-label__static-value">
-              Cosmic Archive Memory Recovery
-            </span>
-          </div>
-
-          <div className="shipping-label__field shipping-label__field--row">
-            <span className="shipping-label__static-value shipping-label__fragile">
-              Fragile: memories that must find their way home
-            </span>
-            <span className="shipping-label__barcode" aria-hidden="true" />
-          </div>
-
-          <div className="shipping-label__postmark" aria-hidden="true">
-            <span className="shipping-label__postmark-envelope">✉</span>
-            <span className="shipping-label__postmark-text">COSMIC MAIL</span>
-            <span className="shipping-label__postmark-star">✦</span>
-          </div>
-
-          <p className="shipping-label__ink-mark" aria-hidden="true" />
+          <ul className="carrier-terminal__facts">
+            <li>
+              <span>Job</span>
+              Bring explorer stories home
+            </li>
+            <li>
+              <span>Saved in</span>
+              Your mission album
+            </li>
+          </ul>
 
           <p
             id="signature-hint"
-            className="shipping-label__hint"
+            className="carrier-terminal__hint"
             aria-live="polite"
           >
             {!valid && name.length > 0
-              ? 'At least two letters, carrier.'
+              ? 'Use at least two letters.'
               : ''}
           </p>
 
           {error && (
-            <p className="shipping-label__hint" role="alert">
+            <p className="carrier-terminal__hint" role="alert">
               {error}
             </p>
           )}
 
           <button
             type="submit"
-            className="menu__option shipping-label__cta"
+            className="carrier-terminal__cta"
             disabled={!valid || sealed}
           >
-            {sealed ? 'Sealed!' : 'Seal & Continue'}
+            <span className="carrier-terminal__step">2</span>
+            {sealed ? 'Carrier ID created' : 'Create my Carrier ID'}
           </button>
         </form>
 
         {(stage === 'farewell' || stage === 'departing') && (
-          <p className="shipping-label__welcome" role="status">
+          <p className="carrier-stage__welcome" role="status">
             {registrationWelcomeLine(normalizedName)}
           </p>
         )}

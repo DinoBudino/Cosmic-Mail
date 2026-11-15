@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { getActiveExplorer, setActiveExplorer } from '../data/spiritSite'
 import { useJourneyStore } from './journeyStore'
 import { useOnboardingStore } from './onboardingStore'
 
@@ -104,8 +105,6 @@ describe('new onboarding flow', () => {
 
     onboarding.selectDestination('moon')
     expect(useOnboardingStore.getState().selectedDestination).toBeNull()
-    onboarding.selectDestination('deep-space')
-    expect(useOnboardingStore.getState().selectedDestination).toBeNull()
 
     onboarding.selectDestination('mars')
     expect(useOnboardingStore.getState().selectedDestination).toBe('mars')
@@ -138,10 +137,22 @@ describe('new onboarding flow', () => {
     expect(useOnboardingStore.getState().phase).toBe('launching')
     expect(useJourneyStore.getState().save?.onboardingComplete).toBe(true)
 
+    // Mars: Mailwing stops in orbit so the child picks an explorer.
     useOnboardingStore.getState().finishLaunch()
-    expect(useOnboardingStore.getState().phase).toBe('playing')
+    expect(useOnboardingStore.getState().phase).toBe('orbit')
     useOnboardingStore.getState().finishLaunch()
+    expect(useOnboardingStore.getState().phase).toBe('orbit')
+
+    useOnboardingStore.getState().landAt('spirit')
     expect(useOnboardingStore.getState().phase).toBe('playing')
+    expect(getActiveExplorer()).toBe('spirit')
+
+    // Walking back aboard climbs to orbit; leaving orbit returns to the cabin.
+    useOnboardingStore.getState().returnToOrbit()
+    expect(useOnboardingStore.getState().phase).toBe('orbit')
+    useOnboardingStore.getState().leaveOrbit()
+    expect(useOnboardingStore.getState().phase).toBe('hub')
+    setActiveExplorer('opportunity')
   })
 
   it('keeps route open only in the hub', () => {

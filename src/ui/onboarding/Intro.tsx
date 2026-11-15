@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ARCHIVE_LABELS,
   INTRO_BEATS,
-  introAutoAdvanceForMode,
   introBeatForLine,
   introMomentForLine,
   type IntroMoment,
@@ -30,9 +29,9 @@ const SCENE_LABEL: Record<IntroMoment, string> = {
 
 /**
  * Cinematic introduction over the existing cabin. It never reveals the
- * names of the historical machines. Short reaction beats advance on their
- * own after they are read; every beat can also be advanced manually, the
- * last invitation waits for the player, and Replay/Skip stay available.
+ * names of the historical machines. Every line is player-paced: PIP speaks,
+ * and the dialogue only moves on when the player presses Continue (or the
+ * bubble's keyboard focus). Replay and Skip stay available.
  */
 export function Intro() {
   const finishIntro = useOnboardingStore((state) => state.finishIntro)
@@ -50,8 +49,6 @@ export function Intro() {
   const beat = introBeatForLine(lineIndex)
   const moment = introMomentForLine(lineIndex)
   const isFinalLine = lineIndex === lastLine
-  // Reduced motion also means user-paced reading: no automatic cuts.
-  const autoAdvanceMs = introAutoAdvanceForMode(lineIndex, reducedMotion)
   const scenePosition = SCENE_ORDER.indexOf(moment) + 1
 
   const advance = useCallback(() => {
@@ -75,29 +72,12 @@ export function Intro() {
     setPipTalking(true)
     const talkMs = Math.min(7200, 1200 + beat.line.length * 42)
     const mouthTimer = window.setTimeout(() => setPipTalking(false), talkMs)
-    const advanceTimer =
-      autoAdvanceMs === null
-        ? null
-        : window.setTimeout(() => {
-            if (lineIndex < lastLine) setDialogueIndex(lineIndex + 1)
-          }, autoAdvanceMs)
 
     return () => {
       window.clearTimeout(mouthTimer)
-      if (advanceTimer !== null) window.clearTimeout(advanceTimer)
       setPipTalking(false)
     }
-  }, [
-    beat.line,
-    lineIndex,
-    lastLine,
-    autoAdvanceMs,
-    replayNonce,
-    voiceName,
-    voiceEnabled,
-    setPipTalking,
-    setDialogueIndex,
-  ])
+  }, [beat.line, replayNonce, voiceName, voiceEnabled, setPipTalking])
 
   useEffect(() => () => stopPipVoice(), [])
 
@@ -175,11 +155,6 @@ export function Intro() {
           </button>
         </div>
 
-        {autoAdvanceMs !== null && (
-          <span className="cine__auto-note" aria-hidden="true">
-            Continues automatically · press Continue to move on
-          </span>
-        )}
       </div>
 
       <span className="sr-only" aria-live="polite">

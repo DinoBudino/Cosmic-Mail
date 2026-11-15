@@ -10,6 +10,8 @@ export interface PipVoiceLineRecord {
   key: string
   text: string
   speed: number
+  /** Optional pitch lift applied by the Kokoro generator. */
+  pitch?: number
   category: string
 }
 

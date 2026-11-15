@@ -217,7 +217,7 @@ export function getTerrainHeight(x: number, z: number): number {
   // A long, low rise instead of a nearby circular wall: the playable area
   // ends well before the decorative ridge becomes steep.
   height += smoothstep(112, 168, distanceFromCenter) * 6
-  height += smoothstep(158, 230, distanceFromCenter) * 15
+  height += smoothstep(158, 230, distanceFromCenter) * 6
   return height
 }
 
