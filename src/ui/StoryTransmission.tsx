@@ -21,8 +21,9 @@ import { PipAvatar } from './PipSpeech'
  * 1. An incoming-transmission screen (PIP narrates the video, so the
  *    archive "opens a line" first).
  * 2. The story video, edge to edge. It ends on its own "Record saved".
- * 3. Right there the child taps "Send to Earth": the record flies from the
- *    planet to Earth and the explorer's stamp appears. The real, idempotent
+ * 3. Right away the record flies from the planet to Earth and the
+ *    explorer's stamp lands in the album ("Send to Earth" only shows if
+ *    the signal slips). The real, idempotent
  *    transmission is saved the moment the record leaves.
  *
  * All screens are tech screens (no paper). The story can't be skipped.
@@ -149,7 +150,7 @@ export function StoryTransmission({
   // 3. PIP's lines after the video.
   useEffect(() => {
     const key =
-      phase === 'record' && !alreadySent
+      phase === 'record' && !alreadySent && failed
         ? 'story-send-ready'
         : phase === 'delivered'
           ? lastStory && !alreadySent
@@ -160,7 +161,7 @@ export function StoryTransmission({
     speakPip(pipLine(key), voiceEnabled, 'excited')
     const frame = window.requestAnimationFrame(() => actionRef.current?.focus())
     return () => window.cancelAnimationFrame(frame)
-  }, [phase, alreadySent, voiceEnabled, lastStory])
+  }, [phase, alreadySent, voiceEnabled, lastStory, failed])
 
   /** After the last story, Mailwing flies straight home to the finale. */
   const flyHome = () => {
@@ -202,6 +203,16 @@ export function StoryTransmission({
     emitAudio('transmissionStarted')
     setPhase('sending')
   }
+
+  // The story ends and the record flies home at once: PIP already said
+  // the message was ready before the video. The button only shows if the
+  // signal slips, so the child can try again.
+  const autoSent = useRef(false)
+  useEffect(() => {
+    if (phase !== 'record' || alreadySent || autoSent.current) return
+    autoSent.current = true
+    send()
+  })
 
   // The record's flight: a tiny rAF loop moves the capsule and its sparks.
   useEffect(() => {
@@ -332,7 +343,7 @@ export function StoryTransmission({
         </div>
       )}
 
-      {phase === 'record' && (
+      {phase === 'record' && (alreadySent || failed) && (
         <div className="story-tx__panel" role="status">
           <p className="story-tx__pip-line">
             <PipAvatar />
