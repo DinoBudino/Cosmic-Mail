@@ -23,10 +23,10 @@ function isNasaUrl(url: string): boolean {
 }
 
 describe('mission catalog', () => {
-  it('defines two explorers per world: Surveyor 3 and Eagle on the Moon, Opportunity and Spirit on Mars', () => {
-    expect(MISSIONS).toHaveLength(5)
+  it('defines the explorers: Surveyor 3 and Eagle on the Moon, Opportunity, Spirit and Viking 1 on Mars', () => {
+    expect(MISSIONS).toHaveLength(6)
     expect(new Set(MISSIONS.map((mission) => mission.id))).toEqual(new Set(MISSION_IDS))
-    expect(ACTIVE_MISSION_IDS).toEqual(['surveyor-3', 'apollo-11', 'opportunity', 'spirit'])
+    expect(ACTIVE_MISSION_IDS).toEqual(['surveyor-3', 'apollo-11', 'opportunity', 'spirit', 'viking-1'])
     expect(new Set(MISSIONS.map((mission) => mission.destination)).size).toBe(
       DESTINATION_IDS.length,
     )
@@ -62,7 +62,7 @@ describe('mission catalog', () => {
       }
     }
 
-    expect(componentIds.size).toBe(15)
+    expect(componentIds.size).toBe(18)
   })
 
   it('keeps the historical record, sources and PIP narrative separate', () => {

@@ -49,7 +49,11 @@ export interface LunarSite {
   explorerGround: 'flat' | 'slope'
   /** Direction toward the Sun (world, normalized on use). */
   sun: { x: number; y: number; z: number }
-  /** Direction toward Earth (world, normalized on use). */
+  /**
+   * Direction toward Earth (world, normalized on use). The azimuth is the
+   * real one for the site; the height is lowered to about 28 deg (really
+   * about 66 deg) so Earth stays inside a normal game view.
+   */
   earth: { x: number; y: number; z: number }
 }
 
@@ -70,8 +74,8 @@ export const LUNAR_SITES: Readonly<Record<MoonExplorerId, LunarSite>> = {
     // long shadows pointing west.
     sun: { x: 0.95, y: 0.24, z: 0.18 },
     // Seen from 0.7 N, 23.5 E, Earth hangs about 23 deg from the zenith,
-    // toward the west.
-    earth: { x: -0.4, y: 0.915, z: 0.01 },
+    // toward the west (drawn lower, see LunarSite.earth).
+    earth: { x: -0.883, y: 0.469, z: 0.01 },
   },
   'surveyor-3': {
     landmarks: [
@@ -85,8 +89,8 @@ export const LUNAR_SITES: Readonly<Record<MoonExplorerId, LunarSite>> = {
     explorerGround: 'slope',
     sun: { x: 0.93, y: 0.27, z: -0.22 },
     // From 3.0 S, 23.4 W, Earth is about 23 deg from the zenith, toward the
-    // east and a little north.
-    earth: { x: 0.4, y: 0.915, z: -0.05 },
+    // east and a little north (drawn lower, see LunarSite.earth).
+    earth: { x: 0.882, y: 0.469, z: -0.06 },
   },
 }
 

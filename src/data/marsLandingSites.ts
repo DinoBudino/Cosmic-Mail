@@ -32,6 +32,14 @@ export const MARS_LANDING_SITES: readonly MarsLandingSite[] = [
     longitude: 175.47,
     line: pipLine('orbit-gusev'),
   },
+  {
+    // NASA: 22.483 N, 47.94 W
+    explorer: 'viking-1',
+    place: 'Chryse Planitia',
+    latitude: 22.483,
+    longitude: 312.06,
+    line: pipLine('orbit-chryse'),
+  },
 ]
 
 /**

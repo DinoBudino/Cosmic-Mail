@@ -39,11 +39,12 @@ describe('Mars orbit', () => {
     expect(getLandingSiteProgress(sealed, 'spirit')).toBe(0)
   })
 
-  it('offers two NASA landing sites, Opportunity and Spirit', () => {
-    expect(MARS_LANDING_SITES.map((s) => s.explorer)).toEqual(['opportunity', 'spirit'])
+  it('offers three NASA landing sites: Opportunity, Spirit and Viking 1', () => {
+    expect(MARS_LANDING_SITES.map((s) => s.explorer)).toEqual(['opportunity', 'spirit', 'viking-1'])
     expect(MARS_LANDING_SITES.map((s) => s.place)).toEqual([
       'Meridiani Planum',
       'Gusev Crater',
+      'Chryse Planitia',
     ])
   })
 
@@ -51,7 +52,7 @@ describe('Mars orbit', () => {
     const save = createJourney('Ada', 1000)
     for (const site of MARS_LANDING_SITES) {
       expect(getLandingSiteState(save, site.explorer)).toBe('unknown')
-      expect(site.line).not.toMatch(/Opportunity|Spirit/)
+      expect(site.line).not.toMatch(/Opportunity|Spirit|Viking/)
     }
   })
 
@@ -69,6 +70,8 @@ describe('Mars orbit', () => {
     expect(getOrbitGuidance(save).suggested).toBe('spirit')
 
     save = finish(save, 'spirit', true)
+    expect(getOrbitGuidance(save).suggested).toBe('viking-1')
+    save = finish(save, 'viking-1', true)
     expect(getOrbitGuidance(save).allDone).toBe(true)
   })
 

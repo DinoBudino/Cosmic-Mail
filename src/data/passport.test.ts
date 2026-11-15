@@ -44,6 +44,7 @@ describe('Cosmic Passport projection', () => {
       'apollo-11',
       'opportunity',
       'spirit',
+      'viking-1',
     ])
     expect(view.transmittedCount).toBe(0)
   })
@@ -131,7 +132,7 @@ describe('Cosmic Passport projection', () => {
   })
 
   it('gives Spirit its own stamp: one stamp per explorer, not per place', () => {
-    const deliver = (save: ReturnType<typeof createJourney>, missionId: 'opportunity' | 'spirit') => {
+    const deliver = (save: ReturnType<typeof createJourney>, missionId: 'opportunity' | 'spirit' | 'viking-1') => {
       let next = markMissionDiscovered(save, missionId, 1100)
       for (const component of getMission(missionId).components.slice(0, 3)) {
         next = scanComponent(next, missionId, component.id, 1200).save
@@ -146,11 +147,14 @@ describe('Cosmic Passport projection', () => {
     expect(summary.current?.missionId).toBe('spirit')
 
     const both = deliver(one, 'spirit')
-    const view = getPassportView(both)
-    expect(view.stamps).toBe(2)
+    expect(getPassportView(both).stamps).toBe(2)
     expect(getStoryForMission(both, 'spirit')?.stampLabel).toBe('Spirit · Mars')
+    expect(getDestinationSummary(getPassportView(both), 'mars').restored).toBe(false)
+    const all = deliver(both, 'viking-1')
+    const view = getPassportView(all)
+    expect(view.stamps).toBe(3)
     summary = getDestinationSummary(view, 'mars')
     expect(summary.restored).toBe(true)
-    expect(summary.explorers).toBe('Opportunity · Spirit')
+    expect(summary.explorers).toBe('Opportunity · Spirit · Viking 1')
   })
 })

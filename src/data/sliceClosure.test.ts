@@ -40,11 +40,11 @@ describe('slice closure after Spirit', () => {
     expect(getSliceClosure(null).label).toBeNull()
   })
 
-  it('reports 1 of 4 stories restored and a new signal', () => {
+  it('reports 1 of 5 stories restored and a new signal', () => {
     const closure = getSliceClosure(deliverSpirit())
     expect(closure.restored).toBe(1)
-    expect(closure.total).toBe(4)
-    expect(closure.label).toBe('1 of 4 stories restored')
+    expect(closure.total).toBe(5)
+    expect(closure.label).toBe('1 of 5 stories restored')
     expect(closure.newSignal).toBe(true)
     expect(closure.allRestored).toBe(false)
   })
@@ -52,7 +52,7 @@ describe('slice closure after Spirit', () => {
   it('does not lower the Act III requirement: every story is still needed', () => {
     const save = deliverSpirit()
     expect(areAllMissionsComplete(save)).toBe(false)
-    expect(ACTIVE_MISSION_IDS).toHaveLength(4)
+    expect(ACTIVE_MISSION_IDS).toHaveLength(5)
   })
 
   it('never names a machine, planet or mission order in the new signal', () => {

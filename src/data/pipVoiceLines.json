@@ -630,7 +630,7 @@
   },
   {
     "key": "orbit-intro",
-    "text": "Look, it's Mars! Two old explorers are hiding down there, tap a glowing spot to pick one!",
+    "text": "Look, it's Mars! Three old explorers are hiding down there, tap a glowing spot to pick one!",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
@@ -665,21 +665,21 @@
   },
   {
     "key": "orbit-next",
-    "text": "One story saved! Let's visit the other explorer, tap the glowing spot!",
+    "text": "Another story saved! Let's visit the next explorer, tap a glowing spot!",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
   },
   {
     "key": "orbit-done-site",
-    "text": "We already saved this story! Let's try the other spot.",
+    "text": "We already saved this story! Let's try another spot.",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
   },
   {
     "key": "orbit-all-done",
-    "text": "Both stories are safe! Let's fly home to the cabin, explorer.",
+    "text": "Every story here is safe! Let's fly home to the cabin, explorer.",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
@@ -1168,22 +1168,162 @@
     "pitch": 1.05
   },
   {
-    "key": "hub-restored-1-of-4",
-    "text": "1 of 4 stories restored. Great work, carrier!",
+    "key": "viking-identified",
+    "text": "Beep boop, I remember now! This is Viking 1, one of the first explorers to search for life on Mars.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-clue-cameras",
+    "text": "Clue one: find the lander's eyes! Two round cameras stand on top of its body.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-clue-arm",
+    "text": "Clue two: find the digging arm! It reaches out from the front, down low.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-clue-antenna",
+    "text": "Last clue: find the dish! It sits on a mast, pointed at the sky.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-cameras",
+    "text": "Click! These cameras took the very first picture ever made on the ground of Mars.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-arm",
+    "text": "Scoop! This arm dug up Martian soil so the tiny labs inside could look for signs of life.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-antenna",
+    "text": "Beep beep! This dish sent Viking's pictures and weather reports straight home to Earth.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-hint-cameras",
+    "text": "Psst! Look on top of the body for two round towers!",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-hint-arm",
+    "text": "Psst! Look at the front, down low, for a long arm!",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-hint-antenna",
+    "text": "Psst! Look up high for a round dish!",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-direct-cameras",
+    "text": "The eyes are still missing! Aim at the two round cameras and hold the scan button.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-direct-arm",
+    "text": "The arm is still missing! Aim at the long arm in front and hold the scan button.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-direct-antenna",
+    "text": "The dish is still missing! Aim at the round dish up high and hold the scan button.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-hint-context",
+    "text": "Its tools are the cameras on top, the arm in front and the dish up high. Aim there and hold to scan!",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-generic-hint",
+    "text": "Try your scanner on the cameras, the arm and the dish, explorer!",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-letter-prepared",
+    "text": "Sealed! Tap Watch its story to see Viking's adventure.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "viking-completion-story",
+    "text": "We did it! Viking 1 is quiet now, but its search for life still inspires explorers today.",
+    "speed": 1.06,
+    "category": "viking",
+    "pitch": 1.05
+  },
+  {
+    "key": "orbit-chryse",
+    "text": "That's Chryse Planitia, a wide golden plain. Someone is waiting there!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-viking-1-landing-legs",
+    "text": "Sturdy legs with round feet! Important, but they won't unlock a memory fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-restored-1-of-5",
+    "text": "1 of 5 stories restored. Great work, carrier!",
     "speed": 1.06,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
-    "key": "hub-restored-2-of-4",
-    "text": "2 of 4 stories restored. Great work, carrier!",
+    "key": "hub-restored-2-of-5",
+    "text": "2 of 5 stories restored. Great work, carrier!",
     "speed": 1.06,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
-    "key": "hub-restored-3-of-4",
-    "text": "3 of 4 stories restored. Great work, carrier!",
+    "key": "hub-restored-3-of-5",
+    "text": "3 of 5 stories restored. Great work, carrier!",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-restored-4-of-5",
+    "text": "4 of 5 stories restored. Great work, carrier!",
     "speed": 1.06,
     "category": "onboarding",
     "pitch": 1.05

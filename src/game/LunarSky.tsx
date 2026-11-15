@@ -11,32 +11,86 @@ import { QUALITY_PRESETS, type Quality } from './worldConfig'
 const SceneEffects = lazy(() => import('./SceneEffects'))
 
 const EARTH_DAY = `${import.meta.env.BASE_URL}textures/earth/earth-day.jpg`
+const EARTH_NIGHT = `${import.meta.env.BASE_URL}textures/earth/earth-night.jpg`
 /** Sky shell radius: everything on it follows the camera. */
 const SKY = 400
 /**
  * Earth seen from the Moon spans about 1.9 deg (four times the Sun). On a
- * game screen that disc is too small to notice, so it is drawn twice as
- * large (the only scale liberty in the sky). It is lit by the same Sun as
- * the ground, so its phase is the real one for the scene's Sun direction.
+ * game screen that disc is too small to notice, so it is drawn three times
+ * as large, and lower in the sky than it really is (see LunarSite.earth):
+ * the two liberties taken so children can find it. It is lit by the same
+ * Sun as the ground, so its phase is the real one for the scene's Sun.
  */
-const EARTH_DISPLAY_SCALE = 2
+const EARTH_DISPLAY_SCALE = 3
 const EARTH_RADIUS = SKY * Math.tan((1.9 / 2) * (Math.PI / 180)) * EARTH_DISPLAY_SCALE
 /** The Sun is about 0.53 deg across. */
 const SUN_RADIUS = SKY * Math.tan((0.53 / 2) * (Math.PI / 180))
 
-function Earth({ direction }: { direction: THREE.Vector3 }) {
-  const day = useLoader(THREE.TextureLoader, EARTH_DAY)
+/**
+ * Earth's own shader: the sunlit side bright (Earth reflects far more light
+ * than the gray Moon), city lights faint on the night side, and a blue
+ * fringe of air along the limb, so the disc reads as Earth at any phase.
+ */
+const EARTH_VERTEX = `varying vec2 vUv; varying vec3 vNormalW; varying vec3 vNormalV; varying vec3 vView;
+void main() {
+  vUv = uv;
+  vNormalW = normalize(mat3(modelMatrix) * normal);
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vNormalV = normalize(normalMatrix * normal);
+  vView = normalize(-mv.xyz);
+  gl_Position = projectionMatrix * mv;
+}`
+const EARTH_FRAGMENT = `uniform sampler2D uDay; uniform sampler2D uNight; uniform vec3 uSun;
+varying vec2 vUv; varying vec3 vNormalW; varying vec3 vNormalV; varying vec3 vView;
+void main() {
+  float light = dot(normalize(vNormalW), normalize(uSun));
+  float lit = smoothstep(-0.08, 0.25, light);
+  vec3 day = texture2D(uDay, vUv).rgb * (0.25 + 1.45 * max(light, 0.0));
+  vec3 night = texture2D(uNight, vUv).rgb * vec3(1.0, 0.85, 0.6) * 0.55 + vec3(0.02, 0.035, 0.07);
+  vec3 color = mix(night, day, lit);
+  float rim = pow(1.0 - max(dot(vNormalV, vView), 0.0), 3.0);
+  color += vec3(0.3, 0.55, 1.0) * rim * (0.35 + 0.65 * lit);
+  gl_FragColor = vec4(color, 1.0);
+  #include <colorspace_fragment>
+}`
+
+function Earth({ direction, sun }: { direction: THREE.Vector3; sun: THREE.Vector3 }) {
+  const [day, night] = useLoader(THREE.TextureLoader, [EARTH_DAY, EARTH_NIGHT])
+  const glow = useMemo(() => makeGlowTexture(), [])
   const material = useMemo(() => {
-    const map = day.clone()
-    map.colorSpace = THREE.SRGBColorSpace
-    map.needsUpdate = true
-    return new THREE.MeshStandardMaterial({ map, roughness: 0.7, metalness: 0, fog: false })
-  }, [day])
+    const dayMap = day.clone()
+    dayMap.colorSpace = THREE.SRGBColorSpace
+    dayMap.needsUpdate = true
+    const nightMap = night.clone()
+    nightMap.colorSpace = THREE.SRGBColorSpace
+    nightMap.needsUpdate = true
+    return new THREE.ShaderMaterial({
+      uniforms: { uDay: { value: dayMap }, uNight: { value: nightMap }, uSun: { value: sun.clone() } },
+      vertexShader: EARTH_VERTEX,
+      fragmentShader: EARTH_FRAGMENT,
+      toneMapped: false,
+    })
+  }, [day, night, sun])
   const position = useMemo(() => direction.clone().multiplyScalar(SKY * 0.95), [direction])
   return (
-    <mesh position={position} material={material} rotation={[0.41, 0, 0]}>
-      <sphereGeometry args={[EARTH_RADIUS, 48, 32]} />
-    </mesh>
+    <group position={position}>
+      {/* Soft blue halo of air behind the disc. */}
+      <sprite scale={[EARTH_RADIUS * 3.2, EARTH_RADIUS * 3.2, 1]} renderOrder={-16}>
+        <spriteMaterial
+          map={glow ?? undefined}
+          color="#5f9cff"
+          transparent
+          opacity={0.45}
+          depthWrite={false}
+          fog={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </sprite>
+      <mesh material={material} rotation={[0.41, 0, 0]}>
+        <sphereGeometry args={[EARTH_RADIUS, 48, 32]} />
+      </mesh>
+    </group>
   )
 }
 
@@ -81,7 +135,7 @@ export function LunarSky({ quality }: { quality: Quality }) {
           />
         </sprite>
         <Suspense fallback={null}>
-          <Earth direction={earth} />
+          <Earth direction={earth} sun={sun} />
         </Suspense>
       </group>
 

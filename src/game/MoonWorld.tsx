@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { EnvironmentalObjects } from './EnvironmentalObjects'
 import { LandedShip } from './LandedShip.tsx'
-import { LunarLander } from './LunarLander'
+import { LanderExplorer } from './LanderExplorer'
 import { LunarSky } from './LunarSky'
 import { LunarTerrain } from './LunarTerrain'
 import { Player } from './Player'
@@ -25,7 +25,7 @@ export function MoonWorld() {
         <EnvironmentalObjects practiceOnly />
       </Suspense>
       <Suspense fallback={null}>
-        <LunarLander />
+        <LanderExplorer />
       </Suspense>
       <Suspense fallback={null}>
         <LandedShip />

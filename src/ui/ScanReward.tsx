@@ -66,6 +66,15 @@ function RewardIcon({ celebration }: { celebration: ScanCelebration }) {
       </svg>
     )
   }
+  if (celebration.verb === 'Sends') {
+    return (
+      <svg {...common}>
+        <path d="M8 9a17 17 0 0 0 23 23Z" />
+        <path d="M20 20l8-8" />
+        <path d="M27 6a10 10 0 0 1 7 7M25 2a15 15 0 0 1 11 11" />
+      </svg>
+    )
+  }
   if (celebration.verb === 'Remembers') {
     return (
       <svg {...common}>

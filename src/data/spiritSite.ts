@@ -26,9 +26,9 @@ export interface MissionSite {
   placeholderNote: string
 }
 
-/** The two Mars Exploration Rovers the game visits (one landing each). */
-export type MarsExplorerId = Extract<MissionId, 'opportunity' | 'spirit'>
-export const MARS_EXPLORER_IDS: readonly MarsExplorerId[] = ['opportunity', 'spirit']
+/** The Mars explorers the game visits (one landing each): the twin rovers and Viking 1. */
+export type MarsExplorerId = Extract<MissionId, 'opportunity' | 'spirit' | 'viking-1'>
+export const MARS_EXPLORER_IDS: readonly MarsExplorerId[] = ['opportunity', 'spirit', 'viking-1']
 
 /** The two machines left on the Moon that the game visits. */
 export type MoonExplorerId = Extract<MissionId, 'surveyor-3' | 'apollo-11'>
@@ -89,6 +89,16 @@ const FOOTPRINTS: Readonly<Record<ExplorerId, ExplorerFootprint>> = {
     pipMessage: 'There! Something is resting in the dust.',
     placeholderNote:
       'Stylized model of the Mars Exploration Rover design shared by Spirit and Opportunity. Its scan content and NASA sources are real.',
+  },
+  'viking-1': {
+    label: 'Viking 1',
+    interactionRadius: 6.5,
+    collisionRadius: 2.3,
+    ringRadius: 5.2,
+    cameraClearance: 3.6,
+    pipMessage: 'There! Something is resting in the dust.',
+    placeholderNote:
+      'Model of the Viking 1 lander provided by the team. Its scan content and NASA sources are real.',
   },
   'surveyor-3': {
     label: 'Surveyor 3',
@@ -167,6 +177,8 @@ const STATION_VIEWS: Readonly<Record<WorldId | ExplorerId, ScanStationView>> = {
   moon: { direction: { x: 0.2, z: 1 }, distance: 5, eyeHeight: 1.5, lookHeight: 0.95 },
   opportunity: { direction: { x: 0.95, z: 0.7 }, distance: 4.4, eyeHeight: 1.55, lookHeight: 1.05 },
   spirit: { direction: { x: 0.95, z: 0.7 }, distance: 4.4, eyeHeight: 1.55, lookHeight: 1.05 },
+  // Cameras on top, the arm in front and the dish: a 3/4 front view.
+  'viking-1': { direction: { x: 0.55, z: 1 }, distance: 4.8, eyeHeight: 1.7, lookHeight: 1.0 },
   // Camera, scoop and the radar under the frame, seen from the south.
   'surveyor-3': { direction: { x: 0.15, z: 1 }, distance: 4.9, eyeHeight: 1.35, lookHeight: 0.85 },
   // South-west: the probe on the south pad, the engine between the legs
@@ -229,9 +241,17 @@ const EAGLE_PARTS: readonly PartAnchor[] = [
   { part: 'plaque', position: [0, 2.25, 2.73], hitSize: [0.5, 0.5, 0.45], hitOffset: [0, 0, 0] },
 ]
 
+// Lander-local, model public/models/viking-1.glb (arm and cameras face +Z).
+const VIKING_PARTS: readonly PartAnchor[] = [
+  { part: 'cameras', position: [-0.05, 1.22, 0.06], hitSize: [1.3, 0.6, 0.5], hitOffset: [0, 0, 0] },
+  { part: 'sampler-arm', position: [0.02, 0.56, 1.14], hitSize: [0.7, 1.0, 1.9], hitOffset: [0, 0, 0] },
+  { part: 'high-gain-antenna', position: [-0.01, 1.42, -0.18], hitSize: [0.9, 0.95, 0.8], hitOffset: [0, 0, 0] },
+]
+
 const PART_ANCHORS: Readonly<Record<ExplorerId, readonly PartAnchor[]>> = {
   opportunity: ROVER_PARTS,
   spirit: ROVER_PARTS,
+  'viking-1': VIKING_PARTS,
   'surveyor-3': SURVEYOR_PARTS,
   'apollo-11': EAGLE_PARTS,
 }

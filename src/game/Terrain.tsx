@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { WorldPosition } from '../data/marsObjects'
-import { SPIRIT_SITE } from '../data/spiritSite'
+import { getActiveExplorer, SPIRIT_SITE } from '../data/spiritSite'
 import { mulberry32 } from './random'
 import {
   buildRockGeometry,
@@ -506,7 +506,8 @@ export function Terrain({ quality }: TerrainProps) {
         />
       </mesh>
       <Rocks quality={quality} />
-      <RoverTracks />
+      {/* Wheel ruts only lead to a rover: Viking 1 never drove. */}
+      {getActiveExplorer() !== 'viking-1' && <RoverTracks />}
       <FootprintTrail />
     </group>
   )

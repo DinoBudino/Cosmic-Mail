@@ -23,6 +23,7 @@ export const MISSION_IDS = [
   'pioneer-10',
   'opportunity',
   'apollo-11',
+  'viking-1',
 ] as const
 export type MissionId = (typeof MISSION_IDS)[number]
 
@@ -38,6 +39,7 @@ export const ACTIVE_MISSION_IDS: readonly MissionId[] = [
   'apollo-11',
   'opportunity',
   'spirit',
+  'viking-1',
 ]
 
 export type WorldMode = 'surface' | 'hologram'
@@ -82,7 +84,7 @@ export interface MissionComponent {
    * the same single hold for every part.
    */
   howItWorks?: {
-    verb: 'Looks' | 'Touches' | 'Senses heat' | 'Measures' | 'Pushes' | 'Remembers'
+    verb: 'Looks' | 'Touches' | 'Senses heat' | 'Measures' | 'Pushes' | 'Remembers' | 'Sends'
     detail: string
   }
   /**
@@ -94,7 +96,7 @@ export interface MissionComponent {
     short: string
     /** Name on the hunt tracker once found. */
     label: string
-    icon: 'eye' | 'tool' | 'heat' | 'radar' | 'engine' | 'plaque'
+    icon: 'eye' | 'tool' | 'heat' | 'radar' | 'engine' | 'plaque' | 'antenna'
   }
   /** Optional position on the scanner map; falls back to a list. */
   hotspot?: HotspotPosition
@@ -305,6 +307,22 @@ export const APOLLO_11_GEAR_SOURCES: readonly MissionSource[] = [
   {
     label: 'NASA — Apollo Lunar Module Landing Gear (W. F. Rogers, 1973)',
     url: 'https://ntrs.nasa.gov/api/citations/19730010151/downloads/19730010151.pdf',
+  },
+]
+
+/** Official NASA sources for Viking 1 (checked 2026-11-14). */
+export const VIKING_1_SOURCES: readonly MissionSource[] = [
+  {
+    label: 'NASA Science — Viking 1',
+    url: 'https://science.nasa.gov/mission/viking-1/',
+  },
+  {
+    label: 'NASA NSSDCA — Viking 1 Lander (1975-075C)',
+    url: 'https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1975-075C',
+  },
+  {
+    label: 'NASA/JPL Photojournal — First Photograph Taken on the Surface of Mars (PIA00381)',
+    url: 'https://photojournal.jpl.nasa.gov/catalog/PIA00381',
   },
 ]
 
@@ -955,6 +973,134 @@ export const MISSIONS: readonly MissionDefinition[] = [
       revisitTransmitted: pipLine('mars-revisit-transmitted'),
     },
     sources: SPIRIT_SOURCES,
+    contentStatus: 'source-checked',
+    reviewNote: null,
+  },
+  {
+    id: 'viking-1',
+    destination: 'mars',
+    machineName: 'Viking 1',
+    missionName: 'Viking 1 · Mars',
+    yearLabel: '1976–1982',
+    summary:
+      "Viking 1 was one of NASA's twin Viking landers. It landed on Chryse Planitia in July 1976, took the first photograph ever made on the surface of Mars and tested the soil for signs of life.",
+    pipBriefing:
+      'Viking 1 was one of the first explorers to search for life on Mars. Its cameras, its arm and its antenna tell that story. Let us look closer.',
+    worldMode: 'surface',
+    components: [
+      {
+        id: 'viking-1-cameras',
+        name: 'Facsimile cameras',
+        shortName: 'Cameras',
+        historicalRecord:
+          'Viking 1 carried two cylindrical scanning cameras. Minutes after landing on 20 July 1976 it took the first photograph ever made on the surface of Mars, and later a 300-degree panorama of its landing site.',
+        pipLine: pipLine('viking-cameras'),
+        pipHint: pipLine('viking-hint-cameras'),
+        pipDirectHint: pipLine('viking-direct-cameras'),
+        howItWorks: { verb: 'Looks', detail: 'Two scanning cameras that built pictures one strip at a time.' },
+        huntClue: { line: pipLine('viking-clue-cameras'), short: "Find the lander's eyes · two round towers on top", label: 'Eyes', icon: 'eye' },
+        scanHint: 'Two round camera towers on top of the lander.',
+        hotspot: { x: 50, y: 30 },
+        sources: VIKING_1_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'viking-1-sampler-arm',
+        name: 'Surface sampler arm',
+        shortName: 'Sampler arm',
+        historicalRecord:
+          "Viking 1's robot arm scooped up its first soil samples on 28 July 1976 and delivered them to a biology laboratory and a gas chromatograph mass spectrometer. The test for organic compounds was negative, and the soil turned out to be rich in sulfur.",
+        pipLine: pipLine('viking-arm'),
+        pipHint: pipLine('viking-hint-arm'),
+        pipDirectHint: pipLine('viking-direct-arm'),
+        howItWorks: { verb: 'Touches', detail: 'A long arm with a scoop that fed soil to tiny labs inside.' },
+        huntClue: { line: pipLine('viking-clue-arm'), short: 'Find the digging arm · front, down low', label: 'Arm', icon: 'tool' },
+        scanHint: 'A long arm reaching out from the front of the lander.',
+        hotspot: { x: 40, y: 72 },
+        sources: VIKING_1_SOURCES,
+        validation: 'source-checked',
+      },
+      {
+        id: 'viking-1-high-gain-antenna',
+        name: 'High-gain antenna',
+        shortName: 'Dish antenna',
+        historicalRecord:
+          'A steerable high-gain dish antenna on a boom let Viking 1 send its pictures and data directly to Earth, using a 20-watt S-band radio transmitter.',
+        pipLine: pipLine('viking-antenna'),
+        pipHint: pipLine('viking-hint-antenna'),
+        pipDirectHint: pipLine('viking-direct-antenna'),
+        howItWorks: { verb: 'Sends', detail: 'A dish that aimed radio messages straight at Earth.' },
+        huntClue: { line: pipLine('viking-clue-antenna'), short: 'Find the dish · on its mast, up high', label: 'Dish', icon: 'antenna' },
+        scanHint: 'The round dish antenna on its mast.',
+        hotspot: { x: 62, y: 22 },
+        sources: VIKING_1_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    distractors: [
+      {
+        id: 'viking-1-landing-legs',
+        name: 'Landing legs and footpads',
+        shortName: 'Legs',
+        historicalRecord:
+          "Viking 1 stood on landing legs with round footpads. Its first photograph on Mars showed one of its own footpads resting in the dust.",
+        pipNote:
+          "Sturdy legs with round feet! Important, but they won't unlock a memory fragment.",
+        sources: VIKING_1_SOURCES,
+        validation: 'source-checked',
+      },
+    ],
+    smartLetter: {
+      identity:
+        "Viking 1 was a NASA lander, one of twin spacecraft sent to Mars. Its biggest job was to test the soil for signs of life.",
+      trajectory:
+        'Viking 1 launched on 20 August 1975 and landed on the western slopes of Chryse Planitia on 20 July 1976. Its orbiter stayed above, taking pictures of Mars.',
+      discoveries:
+        'Minutes after landing it took the first photograph ever made on the surface of Mars. Its arm scooped soil for life experiments: the test for organic compounds was negative, and the soil was rich in sulfur.',
+      missionEnd:
+        'Viking 1 worked on Mars for more than six years. On 11 November 1982 a faulty command sent from Earth interrupted communications, and the lander was never heard from again.',
+      timeline: {
+        launch: '20 August 1975',
+        landing: 'Chryse Planitia · Jul 1976',
+        discovery: 'First photo from Mars',
+        end: 'Last signal · 1982',
+      },
+    },
+    reconstruction: {
+      title: 'Viking 1 · First-person reconstruction',
+      status: 'video',
+      video: 'video/viking-720p.webm',
+      lines: [
+        'I land on a golden plain after weeks of searching for a safe spot.',
+        'Minutes later I take a picture of my own foot in the red dust.',
+        'My arm scoops the soil and my tiny labs look for signs of life.',
+        'For six years I send home pictures and weather reports.',
+      ],
+    },
+    stampId: 'stamp-viking-1',
+    stampLabel: 'Viking 1 · Mars',
+    completionStory: pipLine('viking-completion-story'),
+    narrative: {
+      entered: pipLine('mars-arrival'),
+      detected: pipLine('mars-detected'),
+      approached: pipLine('moon-approached'),
+      approachedTouch: pipLine('moon-approached-touch'),
+      identified: pipLine('viking-identified'),
+      scannerPromptDesktop: pipLine('mars-scanner-prompt-desktop'),
+      scannerPromptTouch: pipLine('mars-scanner-prompt-touch'),
+      completed: pipLine('mars-completed-1'),
+      memoryRecovered: pipLine('mars-memory-recovered'),
+      letterPrepared: pipLine('viking-letter-prepared'),
+      returnToShip: pipLine('mars-return-to-ship'),
+      hintOrientation: pipLine('mars-hint-orientation'),
+      hintContext: pipLine('viking-hint-context'),
+      genericHint: pipLine('viking-generic-hint'),
+      ambient: [pipLine('mars-ambient-1'), pipLine('mars-ambient-2')],
+      revisitInProgress: pipLine('mars-revisit-in-progress'),
+      revisitLetterReady: pipLine('mars-revisit-letter-ready'),
+      revisitTransmitted: pipLine('mars-revisit-transmitted'),
+    },
+    sources: VIKING_1_SOURCES,
     contentStatus: 'source-checked',
     reviewNote: null,
   },

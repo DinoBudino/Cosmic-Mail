@@ -6,6 +6,8 @@ import { Player } from './Player'
 import { ScannerBeam } from './ScannerBeam'
 import { ScannerController } from './ScannerController'
 import { ScanFx } from './ScanFx'
+import { getActiveExplorer } from '../data/spiritSite'
+import { LanderExplorer } from './LanderExplorer'
 import { MerRover } from './MerRover'
 import { LandedShip } from './LandedShip.tsx'
 import { Terrain } from './Terrain'
@@ -21,7 +23,8 @@ export function MarsWorld() {
         <EnvironmentalObjects />
       </Suspense>
       <Suspense fallback={null}>
-        <MerRover />
+        {/* Viking 1 is a lander; Spirit and Opportunity share the rover model. */}
+        {getActiveExplorer() === 'viking-1' ? <LanderExplorer /> : <MerRover />}
       </Suspense>
       <Suspense fallback={null}>
         <LandedShip />
