@@ -10,6 +10,8 @@ import {
   type RockInstance,
 } from './landscape'
 import { playerPosition } from './playerPosition'
+import { useMarsRockGeometries, useMarsSurface } from './marsSurface'
+import { terrainNormal } from './terrainSurface'
 import {
   distanceToSurveyTrail,
   getRegionWeight,
@@ -145,73 +147,6 @@ const REGIONAL_TINTS = [
   { siteId: 'viking1', color: new THREE.Color(PALETTE.rockDark), strength: 0.3 },
 ] as const
 
-/**
- * Fine surface grain for the terrain. The mesh resolution (~1.56 u per
- * vertex) cannot carry texture by vertex colors alone, so a small tiled
- * canvas texture multiplies subtle palette-toned grain over the vertex
- * colors — one draw call, no shaders, identical on High and Low.
- */
-function makeTerrainTexture(): THREE.CanvasTexture | null {
-  const size = 256
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const context = canvas.getContext('2d')
-  if (!context) return null
-  const random = mulberry32(0x9e57)
-  context.fillStyle = '#F4ECE4'
-  context.fillRect(0, 0, size, size)
-  const tones = ['#E7B98D', '#D9895C', '#F2CDB4', '#69534D', '#C77A4E']
-  // Toroidal drawing: every mark is also drawn in the neighbouring tiles,
-  // so soft blotches never get clipped at the tile edge and the repeating
-  // texture has no visible seams (no squares).
-  const drawWrapped = (draw: (x: number, y: number) => void, x: number, y: number) => {
-    for (const offsetX of [-size, 0, size]) {
-      for (const offsetY of [-size, 0, size]) {
-        draw(x + offsetX, y + offsetY)
-      }
-    }
-  }
-  for (let index = 0; index < 70; index += 1) {
-    const x = random() * size
-    const y = random() * size
-    const radius = 30 + random() * 60
-    const tone = tones[Math.floor(random() * tones.length)]!
-    drawWrapped((cx, cy) => {
-      const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, radius)
-      gradient.addColorStop(0, `${tone}1F`)
-      gradient.addColorStop(1, `${tone}00`)
-      context.fillStyle = gradient
-      context.beginPath()
-      context.arc(cx, cy, radius, 0, Math.PI * 2)
-      context.fill()
-    }, x, y)
-  }
-  for (let index = 0; index < 1600; index += 1) {
-    const x = random() * size
-    const y = random() * size
-    const radius = 1.5 + random() * 3.5
-    const tone = tones[Math.floor(random() * tones.length)]!
-    drawWrapped((cx, cy) => {
-      const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, radius)
-      gradient.addColorStop(0, `${tone}30`)
-      gradient.addColorStop(1, `${tone}00`)
-      context.fillStyle = gradient
-      context.beginPath()
-      context.arc(cx, cy, radius, 0, Math.PI * 2)
-      context.fill()
-    }, x, y)
-  }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.wrapS = THREE.RepeatWrapping
-  texture.wrapT = THREE.RepeatWrapping
-  texture.repeat.set(56, 56)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  texture.needsUpdate = true
-  return texture
-}
-
 function extendHorizon(value: number): number {
   return Math.abs(value) <= WORLD.playRadius
     ? value
@@ -229,6 +164,7 @@ function buildTerrainGeometry(): THREE.PlaneGeometry {
   geometry.rotateX(-Math.PI / 2)
 
   const position = geometry.attributes.position
+  const uv = geometry.attributes.uv!
   if (!position) return geometry
 
   for (let index = 0; index < position.count; index += 1) {
@@ -237,6 +173,8 @@ function buildTerrainGeometry(): THREE.PlaneGeometry {
     const z = extendHorizon(position.getZ(index))
     const height = getTerrainHeight(x, z)
     position.setXYZ(index, x, height, z)
+    // Six metres per tile, including the stretched horizon skirt.
+    uv.setXY(index, x / 6, -z / 6)
   }
   geometry.computeVertexNormals()
   const normals = geometry.getAttribute('normal')
@@ -287,6 +225,11 @@ function buildTerrainGeometry(): THREE.PlaneGeometry {
         1 - THREE.MathUtils.smoothstep(pathDistance, 0.6, 3.2)
       color.lerp(TERRAIN_COLORS.path, pathBlend * 0.3)
     }
+    // Albedo already contains the dust colour; vertex colours only modulate
+    // broad geology, avoiding a second red tint and visibly repeated tiles.
+    color.r = THREE.MathUtils.clamp(color.r / TERRAIN_COLORS.mid.r, 0.55, 1.35)
+    color.g = THREE.MathUtils.clamp(color.g / TERRAIN_COLORS.mid.g, 0.55, 1.35)
+    color.b = THREE.MathUtils.clamp(color.b / TERRAIN_COLORS.mid.b, 0.55, 1.35)
     color.toArray(colors, index * 3)
   }
 
@@ -296,21 +239,55 @@ function buildTerrainGeometry(): THREE.PlaneGeometry {
   return geometry
 }
 
-function RockBatch({ rocks, variant, detail }: { rocks: RockInstance[]; variant: number; detail: number }) {
+/** Match the rendered triangles, including the stretched decorative skirt,
+ * so centimetre-scale stones stay embedded instead of hovering over it. */
+function surfaceHeight(terrain: THREE.PlaneGeometry, x: number, z: number): number {
+  const unstretch = (value: number) => Math.abs(value) <= WORLD.playRadius
+    ? value
+    : Math.sign(value) * (WORLD.playRadius + (Math.abs(value) - WORLD.playRadius) / 3.5)
+  const spacing = WORLD.terrainSize / WORLD.terrainSegments
+  const row = WORLD.terrainSegments + 1
+  const gx = (unstretch(x) + WORLD.terrainSize / 2) / spacing
+  const gz = (unstretch(z) + WORLD.terrainSize / 2) / spacing
+  const ix = Math.floor(gx), iz = Math.floor(gz)
+  const u = gx - ix, v = gz - iz
+  const a = iz * row + ix
+  const vertices = terrain.getAttribute('position')
+  const h00 = vertices.getY(a), h10 = vertices.getY(a + 1)
+  const h01 = vertices.getY(a + row), h11 = vertices.getY(a + row + 1)
+  return u + v <= 1
+    ? h00 + (h10 - h00) * u + (h01 - h00) * v
+    : h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v)
+}
+
+function RockBatch({ rocks, variant, detail, terrain }: {
+  rocks: RockInstance[]; variant: number; detail: number; terrain: THREE.PlaneGeometry
+}) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
-  const geometry = useMemo(() => buildRockGeometry(variant, detail), [variant, detail])
-  useEffect(() => () => geometry.dispose(), [geometry])
+  const authored = useMarsRockGeometries()
+  const surface = useMarsSurface('basalt')
+  const pebble = useMemo(() => detail < 3 ? buildRockGeometry(variant, detail) : null, [variant, detail])
+  const geometry = pebble ?? authored[variant]!
+  useEffect(() => () => pebble?.dispose(), [pebble])
 
   useLayoutEffect(() => {
     const mesh = meshRef.current
     if (!mesh) return
 
     const dummy = new THREE.Object3D()
+    const up = new THREE.Vector3(0, 1, 0)
     for (let index = 0; index < rocks.length; index += 1) {
       const rock = rocks[index]
       if (!rock) continue
-      dummy.position.set(rock.x, rock.y, rock.z)
-      dummy.rotation.set(rock.tilt, rock.rotation, rock.tilt * 0.6)
+      const embedOffset = rock.y - getTerrainHeight(rock.x, rock.z)
+      const ground = surfaceHeight(terrain, rock.x, rock.z)
+      // Turn each boulder onto the slope normal and sink it a touch. Without
+      // this a flat-bottomed rock shows daylight under its downhill edge.
+      dummy.quaternion.setFromUnitVectors(up, terrainNormal(rock.x, rock.z))
+      dummy.rotateY(rock.rotation)
+      dummy.rotateX(rock.tilt * 0.35)
+      dummy.rotateZ(rock.tilt * 0.2)
+      dummy.position.set(rock.x, ground + embedOffset - rock.scale * 0.08, rock.z)
       dummy.scale.set(rock.scale * rock.stretchX, rock.scale * rock.stretchY, rock.scale * rock.stretchZ)
       dummy.updateMatrix()
       mesh.setMatrixAt(index, dummy.matrix)
@@ -321,7 +298,7 @@ function RockBatch({ rocks, variant, detail }: { rocks: RockInstance[]; variant:
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
-  }, [rocks])
+  }, [rocks, terrain])
 
   return (
     <instancedMesh
@@ -331,30 +308,79 @@ function RockBatch({ rocks, variant, detail }: { rocks: RockInstance[]; variant:
       castShadow
       receiveShadow
     >
-      <meshStandardMaterial roughness={0.94} metalness={0.02} vertexColors />
+      <meshStandardMaterial {...surface} roughness={1} metalness={0} vertexColors={!!pebble} />
     </instancedMesh>
   )
 }
 
 /** Rocks at least this scale use the detailed geometry. */
-const ROCK_DETAIL_SCALE = 0.7
+const ROCK_DETAIL_SCALE = 0.25
 
-function Rocks({ quality }: { quality: Quality }) {
+function Rocks({ quality, terrain }: { quality: Quality; terrain: THREE.PlaneGeometry }) {
   const count = QUALITY_PRESETS[quality].rockCount
   const batches = useMemo(() => {
     const rocks = createRocks(count)
     // Large rocks get the detailed shape; pebbles the light one.
     return [0, 1, 2].flatMap((variant) => [
       { variant, detail: 3, rocks: rocks.filter((rock) => rock.variant === variant && rock.scale >= ROCK_DETAIL_SCALE) },
-      { variant, detail: 2, rocks: rocks.filter((rock) => rock.variant === variant && rock.scale < ROCK_DETAIL_SCALE) },
+      { variant, detail: 1, rocks: rocks.filter((rock) => rock.variant === variant && rock.scale < ROCK_DETAIL_SCALE) },
     ])
   }, [count])
   return (
     <group>
       {batches.map((batch) => (
-        <RockBatch key={`${batch.variant}-${batch.detail}`} rocks={batch.rocks} variant={batch.variant} detail={batch.detail} />
+        <RockBatch key={`${batch.variant}-${batch.detail}`} rocks={batch.rocks} variant={batch.variant} detail={batch.detail} terrain={terrain} />
       ))}
     </group>
+  )
+}
+
+/** Small, non-colliding chips form patchy lag deposits rather than a uniform
+ * field of boulders. One extra instanced draw call, deterministic on both tiers. */
+function Gravel({ quality, terrain }: { quality: Quality; terrain: THREE.PlaneGeometry }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null)
+  const geometry = useMemo(() => buildRockGeometry(2, 0), [])
+  const count = quality === 'high' ? 12000 : 4500
+  const UP = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current
+    if (!mesh) return
+    const random = mulberry32(0x6a7e1)
+    const dummy = new THREE.Object3D()
+    const color = new THREE.Color()
+    let placed = 0
+    for (let i = 0; i < count * 5 && placed < count; i += 1) {
+      const x = (random() - .5) * WORLD.playRadius * 2
+      const z = (random() - .5) * WORLD.playRadius * 2
+      if (Math.hypot(x, z) > WORLD.playRadius) continue
+      const deposit = .5 + Math.sin(x * .16 + Math.sin(z * .11) * 2) * .5
+      if (random() > .22 + deposit * .68) continue
+      const size = .018 + random() ** 2 * .09
+      // Tiny chips must sit on the actual rendered triangle, not the analytic
+      // heightfield between vertices (which can leave centimetre-scale gaps).
+      const ground = surfaceHeight(terrain, x, z)
+      dummy.quaternion.setFromUnitVectors(UP, terrainNormal(x, z))
+      dummy.rotateY(random() * Math.PI * 2)
+      dummy.rotateX((random() - .5) * .3)
+      dummy.position.set(x, ground + size * .04, z)
+      dummy.scale.set(size * 1.4, size * .48, size)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(placed, dummy.matrix)
+      color.set(PALETTE.rockDark).lerp(TERRAIN_COLORS.light, random() * .55)
+      mesh.setColorAt(placed, color)
+      placed += 1
+    }
+    mesh.count = placed
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    mesh.computeBoundingSphere()
+  }, [count, terrain, UP])
+  return (
+    <instancedMesh key={count} ref={meshRef} args={[geometry, undefined, count]} receiveShadow>
+      <meshStandardMaterial roughness={1} metalness={0} vertexColors />
+    </instancedMesh>
   )
 }
 
@@ -485,29 +511,31 @@ export function FootprintTrail({
 
 export function Terrain({ quality }: TerrainProps) {
   const geometry = useMemo(() => buildTerrainGeometry(), [])
-  const terrainTexture = useMemo(() => makeTerrainTexture(), [])
+  const surface = useMarsSurface('regolith')
 
   useEffect(() => {
     return () => geometry.dispose()
   }, [geometry])
-
-  useEffect(() => {
-    return () => terrainTexture?.dispose()
-  }, [terrainTexture])
 
   return (
     <group>
       <mesh geometry={geometry} receiveShadow>
         <meshStandardMaterial
           vertexColors
-          map={terrainTexture ?? undefined}
-          roughness={0.96}
-          metalness={0.02}
+          {...surface}
+          roughness={1}
+          metalness={0}
         />
       </mesh>
+<<<<<<< Updated upstream
       <Rocks quality={quality} />
       {/* Wheel ruts only lead to a rover: Viking 1 never drove. */}
       {getActiveExplorer() !== 'viking-1' && <RoverTracks />}
+=======
+      <Rocks quality={quality} terrain={geometry} />
+      <Gravel quality={quality} terrain={geometry} />
+      <RoverTracks />
+>>>>>>> Stashed changes
       <FootprintTrail />
     </group>
   )

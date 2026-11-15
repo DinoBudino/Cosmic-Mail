@@ -11,7 +11,7 @@ import {
   getTerrainHeight,
   getTerrainSlope,
 } from './terrainHeight'
-import { PALETTE, PATH_WAYPOINTS, PLAYER, WORLD } from './worldConfig'
+import { PALETTE, PATH_WAYPOINTS, PLAYER, QUALITY_PRESETS, WORLD } from './worldConfig'
 
 function hash3(x: number, y: number, z: number, seed: number): number {
   let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647) ^ Math.imul(seed, 144665)
@@ -56,7 +56,6 @@ export function buildTintedRockGeometry(variant: number, detail: number, dustCol
   const seed = 17 + variant * 31
   const base = mergeVertices(new THREE.IcosahedronGeometry(1, detail))
   base.deleteAttribute('normal')
-  base.deleteAttribute('uv')
   const position = base.getAttribute('position')
   const random = mulberry32(0x40c4 + variant * 977)
   const cuts = Array.from({ length: 3 + variant }, () => {
@@ -194,7 +193,7 @@ export function createRocks(count: number): RockInstance[] {
       }
     }
     if (nearSite) continue
-    if (getTerrainSlope(x, z) > 0.62) continue
+    if (getTerrainSlope(x, z) > 0.45) continue
 
     // Regional character (Fase 4 · Paso 3): Viking's rocks are larger and
     // darker, InSight's are small and dust-pale, Opportunity's are often
@@ -211,12 +210,12 @@ export function createRocks(count: number): RockInstance[] {
     const inRegion = nearestDistance < 17
     const region = inRegion ? nearestSite : null
 
-    const isBoulder = random() < 0.05
-    let scale = isBoulder ? 1.2 + random() * 0.9 : 0.18 + random() * 0.8
+    const isBoulder = random() < 0.012
+    let scale = isBoulder ? 0.95 + random() * 0.75 : 0.065 + random() ** 1.6 * 0.32
     if (region === 'viking1') scale *= 1.3
     if (region === 'insight') scale *= 0.8
     if (region === 'ingenuity') scale *= 0.85
-    const stretchY = 0.4 + random() * 0.45
+    const stretchY = 0.32 + random() * 0.36
     const color = new THREE.Color(PALETTE.rockDark).lerp(new THREE.Color(PALETTE.rockLight), random())
     if (region === 'viking1') color.lerp(new THREE.Color(PALETTE.rockDark), 0.45)
     if (region === 'insight') color.lerp(new THREE.Color(PALETTE.dust), 0.4)
@@ -254,7 +253,7 @@ export function createRocks(count: number): RockInstance[] {
     if (Math.hypot(x, z) > WORLD.playRadius) continue
     if (Math.hypot(x - WORLD.spawn.x, z - WORLD.spawn.z) < 4) continue
     if (Math.hypot(x - MAILWING_LANDING.position.x, z - MAILWING_LANDING.position.z) < 8.5) continue
-    if (getTerrainSlope(x, z) > 0.62) continue
+    if (getTerrainSlope(x, z) > 0.45) continue
     let nearSite = false
     for (const object of MARS_OBJECTS) {
       const clearance = SITE_ROCK_CLEARANCE[object.id] ?? 9.5
@@ -264,7 +263,7 @@ export function createRocks(count: number): RockInstance[] {
       }
     }
     if (nearSite) continue
-    const scale = 0.85 + (index % 3) * 0.15
+    const scale = 0.48 + (index % 3) * 0.09
     rocks.push({
       x,
       y: getTerrainHeight(x, z) + scale * 0.7 * 0.42,
@@ -284,9 +283,9 @@ export function createRocks(count: number): RockInstance[] {
   // a natural way, inviting the player to choose a left or right route while
   // keeping the painted survey trail clear.
   const passageBoulders = [
-    { x: 0.5, z: 21, scale: 1.9, variant: 0 },
-    { x: -2.5, z: 12, scale: 1.55, variant: 1 },
-    { x: 19, z: 30, scale: 1.15, variant: 2 },
+    { x: 0.5, z: 21, scale: 1.05, variant: 0 },
+    { x: -2.5, z: 12, scale: 0.9, variant: 1 },
+    { x: 19, z: 30, scale: 0.78, variant: 2 },
   ] as const
   for (const boulder of passageBoulders) {
     const x = boulder.x
@@ -329,10 +328,15 @@ const boulderCaches = new Map<string, BoulderObstacle[]>()
  * The cache is keyed by count: High and Low quality each keep a stable list
  * without rebuilding every frame when the two systems alternate calls.
  */
+<<<<<<< Updated upstream
 export function getBoulderObstacles(count = 150): BoulderObstacle[] {
   // Keyed by landing too: each world (and each Moon site) has its own rocks.
   const key = `${getActiveExplorer()}:${count}`
   const cached = boulderCaches.get(key)
+=======
+export function getBoulderObstacles(count = QUALITY_PRESETS.high.rockCount): BoulderObstacle[] {
+  const cached = boulderCaches.get(count)
+>>>>>>> Stashed changes
   if (cached) return cached
   const list = createRocks(count)
     .filter((rock) => rock.scale >= 0.8)
@@ -353,7 +357,7 @@ export function getBoulderObstacles(count = 150): BoulderObstacle[] {
 export function resolveBoulderCollision(
   position: { x: number; z: number },
   airborne = 0,
-  count = 150,
+  count = QUALITY_PRESETS.high.rockCount,
 ): void {
   const groundY = getTerrainHeight(position.x, position.z)
   for (const boulder of getBoulderObstacles(count)) {

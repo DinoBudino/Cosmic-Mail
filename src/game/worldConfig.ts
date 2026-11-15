@@ -21,11 +21,11 @@ export const QUALITY_PRESETS: Record<Quality, QualityPreset> = {
     dpr: [1, 2],
     shadows: true,
     postprocessing: true,
-    rockCount: 150,
+    rockCount: 900,
     dustCount: 460,
     starCount: 1800,
-    fogNear: 54,
-    fogFar: 280,
+    fogNear: 85,
+    fogFar: 580,
     shadowMapSize: 2048,
   },
   low: {
@@ -33,11 +33,11 @@ export const QUALITY_PRESETS: Record<Quality, QualityPreset> = {
     dpr: [1, 1.25],
     shadows: false,
     postprocessing: false,
-    rockCount: 64,
+    rockCount: 360,
     dustCount: 170,
     starCount: 650,
-    fogNear: 50,
-    fogFar: 255,
+    fogNear: 75,
+    fogFar: 550,
     shadowMapSize: 1024,
   },
 }
@@ -46,8 +46,8 @@ export const QUALITY_PRESETS: Record<Quality, QualityPreset> = {
  * Planetary Exploration 2.0 — a compact but open-handed Mars expedition.
  * The landing zone sits south of the map; the survey passage crosses a
  * raised geological shelf, and the explorer site lies about 120 m away.
- * The terrain continues as decorative hills far beyond the playable radius,
- * so the horizon reads as landscape rather than a circular wall.
+ * A broad crater floor contains the expedition; the distant, eroded inner
+ * walls and irregular rim surround both explorer landings.
  */
 export const WORLD = {
   terrainSize: 480,
@@ -157,41 +157,37 @@ export const SCANNER = {
   firstPersonPitchMax: 0.72,
 } as const
 
-/**
- * Mars palette (art direction, Nov 2026): #F47B38 · #D9895C · #E7B98D ·
- * #69534D · #F2CDB4, plus a few in-between shades for depth. Warm dust
- * tones only: no violet rocks or pink skies, so the planet reads like the
- * NASA images children will meet later.
- */
+/** Muted ferric dust, charcoal rock and a pale suspended-dust sky,
+ * guided by the rover surface references. Scanner accents remain legible. */
 export const PALETTE = {
-  skyZenith: '#C98A60',
-  skyUpper: '#D9895C',
-  skyMid: '#E2AA80',
-  skyHorizon: '#F2CDB4',
-  skyBelow: '#E7B98D',
-  skyFloor: '#69534D',
-  fog: '#E7B98D',
-  sun: '#FFE6CF',
-  ambient: '#F2CDB4',
-  hemiSky: '#E7B98D',
-  hemiGround: '#69534D',
-  terrainDark: '#8A5B45',
-  terrainMid: '#C9774A',
-  terrainLight: '#D9895C',
-  terrainHigh: '#E7B98D',
-  path: '#E2A47A',
-  rockDark: '#69534D',
-  rockLight: '#A9725A',
+  skyZenith: '#B6A393',
+  skyUpper: '#C3AD9B',
+  skyMid: '#D2BCAB',
+  skyHorizon: '#DED0C2',
+  skyBelow: '#BA9D87',
+  skyFloor: '#655750',
+  fog: '#CBB099',
+  sun: '#FFF2E4',
+  ambient: '#D9C9BA',
+  hemiSky: '#D4C5B7',
+  hemiGround: '#66534A',
+  terrainDark: '#705448',
+  terrainMid: '#A4785A',
+  terrainLight: '#B88A65',
+  terrainHigh: '#C2A080',
+  path: '#B18A68',
+  rockDark: '#514C49',
+  rockLight: '#948174',
   accent: '#F47B38',
-  dust: '#F2CDB4',
+  dust: '#BDA18A',
   beaconAvailable: '#F47B38',
   beaconSoon: '#D9895C',
   starWarm: '#FFF0E0',
   starCool: '#F2CDB4',
   moon: '#F2CDB4',
   moonGlow: '#F2CDB4',
-  skyGlowWarm: '#F2CDB4',
-  skyGlowCool: '#D9895C',
+  skyGlowWarm: '#E4D1BE',
+  skyGlowCool: '#A9A4A0',
 } as const
 
 export const SUN_DIRECTION = { x: -0.62, y: 0.32, z: -0.72 } as const

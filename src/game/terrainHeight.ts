@@ -172,6 +172,27 @@ function rawHeight(x: number, z: number): number {
   )
 }
 
+/**
+ * Vast impact basin shared by the two explorer landings. Its talus apron
+ * starts outside the walking area. Vary both rim radius and elevation so
+ * the enclosing skyline reads as eroded geology, not a perfect ring.
+ */
+export function getCraterRelief(x: number, z: number): number {
+  const distance = Math.hypot(x, z)
+  if (distance <= 130) return 0
+  const angle = Math.atan2(z, x)
+  const rimRadius = 258 + Math.sin(angle * 3 + .6) * 17 + Math.sin(angle * 7 - .8) * 8
+  const rimHeight = 76 + Math.sin(angle * 4 + .4) * 12 + Math.sin(angle * 9) * 6
+  const apron = smoothstep(130, 184, distance) * 9
+  const innerWall = smoothstep(168, rimRadius, distance)
+  const outerSlope = 1 - smoothstep(rimRadius + 8, rimRadius + 135, distance) * .76
+  // Gullies widen towards the floor and fade at the crest.
+  const gullies = Math.pow(.5 + .5 * Math.sin(angle * 31 + Math.sin(angle * 8) * 1.6 + distance * .013), 4)
+  const erosion = gullies * Math.sin(innerWall * Math.PI) * 9
+  const brokenFace = fbm(x * .035, z * .035, 83, 3) * 4 * innerWall
+  return apron + (innerWall * rimHeight - erosion + brokenFace) * outerSlope
+}
+
 interface FlattenZone {
   x: number
   z: number
@@ -218,11 +239,7 @@ export function getTerrainHeight(x: number, z: number): number {
     height = lerp(height, zone.height, blend)
   }
 
-  const distanceFromCenter = Math.hypot(x, z)
-  // A long, low rise instead of a nearby circular wall: the playable area
-  // ends well before the decorative ridge becomes steep.
-  height += smoothstep(112, 168, distanceFromCenter) * 6
-  height += smoothstep(158, 230, distanceFromCenter) * 6
+  height += getCraterRelief(x, z)
   return height
 }
 

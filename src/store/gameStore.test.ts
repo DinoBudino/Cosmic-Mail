@@ -478,11 +478,14 @@ describe('touch scan latch', () => {
 
 describe('scan station', () => {
   it('locks the child in place only while active, and is never persisted', () => {
-    const before = localStorage?.length ?? 0
+    // This suite runs in the node environment, where localStorage can be absent.
+    const storageLength = () =>
+      typeof localStorage === 'undefined' ? 0 : localStorage.length
+    const before = storageLength()
     useGameStore.getState().setScanStation(true)
     expect(useGameStore.getState().scanStation).toBe(true)
     useGameStore.getState().setScanStation(false)
     expect(useGameStore.getState().scanStation).toBe(false)
-    expect(localStorage?.length ?? 0).toBe(before)
+    expect(storageLength()).toBe(before)
   })
 })

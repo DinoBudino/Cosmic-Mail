@@ -59,7 +59,7 @@ import {
   getTerrainSlope,
   slopeSpeedFactor,
 } from './terrainHeight'
-import { CAMERA, PLAYER, SCANNER, WORLD } from './worldConfig'
+import { CAMERA, PLAYER, QUALITY_PRESETS, SCANNER, WORLD } from './worldConfig'
 
 /**
  * Lifts the camera over terrain between the player and the desired position.
@@ -376,7 +376,7 @@ export function Player() {
     resolveBoulderCollision(
       player.position,
       playerAir,
-      quality === 'low' ? 64 : 150,
+      QUALITY_PRESETS[quality].rockCount,
     )
     resolveEnvironmentalCollision(player.position, playerAir)
 

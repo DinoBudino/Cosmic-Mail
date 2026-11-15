@@ -7,6 +7,7 @@ import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import { ScanMarkers } from './ScanMarkers'
 import { getTerrainHeight } from './terrainHeight'
+import { TerrainRing } from './TerrainRing'
 import { PALETTE } from './worldConfig'
 
 /**
@@ -162,14 +163,14 @@ export function MerRover() {
       position={[SPIRIT_SITE.position.x, groundY, SPIRIT_SITE.position.z]}
       userData={{ scannerRoot: true }}
     >
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.04, 0]}
+      <TerrainRing
+        x={SPIRIT_SITE.position.x}
+        z={SPIRIT_SITE.position.z}
+        baseY={groundY}
+        innerRadius={SPIRIT_SITE.ringRadius - 0.18}
+        outerRadius={SPIRIT_SITE.ringRadius}
         userData={{ scannerIgnore: true }}
       >
-        <ringGeometry
-          args={[SPIRIT_SITE.ringRadius - 0.18, SPIRIT_SITE.ringRadius, 48]}
-        />
         <meshBasicMaterial
           ref={ringMaterial}
           color={PALETTE.beaconAvailable}
@@ -178,7 +179,7 @@ export function MerRover() {
           depthWrite={false}
           side={THREE.DoubleSide}
         />
-      </mesh>
+      </TerrainRing>
 
       <mesh ref={marker} position={[0, 2.75, 0]} userData={{ scannerIgnore: true }}>
         <octahedronGeometry args={[0.16, 0]} />

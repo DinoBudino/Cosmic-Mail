@@ -4,6 +4,7 @@ import { SPIRIT_SITE } from '../data/spiritSite'
 import {
   distanceToPath,
   distanceToSurveyTrail,
+  getCraterRelief,
   getTerrainHeight,
   getTerrainSlope,
   slopeSpeedFactor,
@@ -149,6 +150,36 @@ describe('getTerrainSlope', () => {
       expect(
         getTerrainSlope(object.position.x, object.position.z),
       ).toBeLessThan(0.05)
+    }
+  })
+})
+
+describe('enclosing crater', () => {
+  it('surrounds the expedition with an elevated rim in every direction', () => {
+    const crests: number[] = []
+    for (let degrees = 0; degrees < 360; degrees += 10) {
+      const angle = degrees * Math.PI / 180
+      let crest = -Infinity
+      for (let radius = 210; radius <= 300; radius += 5) {
+        crest = Math.max(crest, getTerrainHeight(Math.cos(angle) * radius, Math.sin(angle) * radius))
+      }
+      expect(crest).toBeGreaterThan(55)
+      crests.push(crest)
+    }
+    expect(Math.max(...crests) - Math.min(...crests)).toBeGreaterThan(15)
+  })
+
+  it('keeps the crater wall outside the playable floor and continuous at the apron', () => {
+    for (let degrees = 0; degrees < 360; degrees += 15) {
+      const angle = degrees * Math.PI / 180
+      for (const radius of [0, 60, WORLD.playRadius, 130]) {
+        expect(getCraterRelief(Math.cos(angle) * radius, Math.sin(angle) * radius)).toBeCloseTo(0, 10)
+      }
+      for (let radius = 130; radius < 400; radius += 2) {
+        const here = getCraterRelief(Math.cos(angle) * radius, Math.sin(angle) * radius)
+        const next = getCraterRelief(Math.cos(angle) * (radius + .05), Math.sin(angle) * (radius + .05))
+        expect(Math.abs(next - here)).toBeLessThan(.2)
+      }
     }
   })
 })

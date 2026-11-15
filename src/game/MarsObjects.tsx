@@ -8,6 +8,7 @@ import {
 } from '../data/marsObjects'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { getTerrainHeight } from './terrainHeight'
+import { TerrainRing } from './TerrainRing'
 import { PALETTE } from './worldConfig'
 import { SITE_RADII } from './interaction'
 
@@ -419,8 +420,13 @@ function Beacon({ object }: { object: MarsObject }) {
 
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
-        <ringGeometry args={[radius - (nearby ? 0.28 : 0.14), radius, 48]} />
+      <TerrainRing
+        x={object.position.x}
+        z={object.position.z}
+        baseY={getTerrainHeight(object.position.x, object.position.z)}
+        innerRadius={radius - (nearby ? 0.28 : 0.14)}
+        outerRadius={radius}
+      >
         <meshBasicMaterial
           ref={ringMaterial}
           color={color}
@@ -429,7 +435,7 @@ function Beacon({ object }: { object: MarsObject }) {
           depthWrite={false}
           side={THREE.DoubleSide}
         />
-      </mesh>
+      </TerrainRing>
 
       <mesh position={[0, columnHeight / 2, 0]}>
         <cylinderGeometry

@@ -1,4 +1,3 @@
-import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -10,55 +9,42 @@ import {
 } from '../data/environmentalSites'
 import { useProtocol } from '../ui/useProtocol'
 import { useGameStore } from '../store/gameStore'
+<<<<<<< Updated upstream
 import { getActiveWorld } from '../data/spiritSite'
 import { buildRockGeometry, buildTintedRockGeometry } from './landscape'
 import { MOON_ROCK } from './lunarRocks'
+=======
+import { useMarsRockGeometries, useMarsSurface } from './marsSurface'
+>>>>>>> Stashed changes
 import { getTerrainHeight } from './terrainHeight'
+import { TerrainRing } from './TerrainRing'
 import { PALETTE } from './worldConfig'
 import { getGuideLane, getGuideMode } from './practiceGuide'
 
-const OUTCROP_URL = 'models/mars-outcrop.glb'
-useGLTF.preload(OUTCROP_URL)
-
-function OutcropModel({ glow }: { glow: number }) {
-  const { scene } = useGLTF(OUTCROP_URL)
-  const model = useMemo(() => scene.clone(true), [scene])
-  useEffect(() => {
-    // The asset was authored with lilac layers; remap each layer's tone onto
-    // the Mars palette (dark brown to pale sand) and keep the banding.
-    const dark = new THREE.Color(PALETTE.rockDark)
-    const light = new THREE.Color(PALETTE.terrainHigh)
-    model.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        object.castShadow = true
-        object.receiveShadow = true
-        const source = object.material as THREE.MeshStandardMaterial
-        if (source?.isMeshStandardMaterial) {
-          const material = source.clone()
-          const tone = THREE.MathUtils.clamp(
-            source.color.r * 0.3 + source.color.g * 0.59 + source.color.b * 0.11,
-            0,
-            1,
-          )
-          material.color.copy(dark).lerp(light, Math.pow(tone, 0.6))
-          object.material = material
-        }
-      }
-    })
-  }, [model])
+function OutcropModel({ glow, x, z, ground }: { glow: number; x: number; z: number; ground: number }) {
+  const rocks = useMarsRockGeometries()
+  const surface = useMarsSurface('basalt')
   return (
     <group>
-      <primitive object={model} />
+      <mesh geometry={rocks[1]} position={[0, .36, 0]} scale={[1.5, .85, 1.15]} rotation={[.05, .3, -.08]} castShadow receiveShadow>
+        <meshStandardMaterial {...surface} color={PALETTE.rockLight} roughness={1} metalness={0} />
+      </mesh>
+      <mesh geometry={rocks[2]} position={[-1.05, .12, .65]} scale={[.8, .28, .65]} rotation={[.08, -.5, .13]} castShadow receiveShadow>
+        <meshStandardMaterial {...surface} color={PALETTE.terrainHigh} roughness={1} metalness={0} />
+      </mesh>
+      <mesh geometry={rocks[0]} position={[1.1, .13, -.6]} scale={[.7, .34, .6]} rotation={[0, 1.2, -.12]} castShadow receiveShadow>
+        <meshStandardMaterial {...surface} color={PALETTE.rockDark} roughness={1} metalness={0} />
+      </mesh>
       {glow > 0 && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
-          <ringGeometry args={[1.55, 1.72, 28]} />
+        <TerrainRing x={x} z={z} baseY={ground} innerRadius={1.55} outerRadius={1.72} segments={40}>
           <meshBasicMaterial
             color={PALETTE.accent}
             transparent
             opacity={glow}
             depthWrite={false}
+            side={THREE.DoubleSide}
           />
-        </mesh>
+        </TerrainRing>
       )}
     </group>
   )
@@ -80,12 +66,17 @@ function EnvironmentalVisual({
 }) {
   const ground = getTerrainHeight(site.position.x, site.position.z)
   const glow = selected ? 0.18 + (analysis === 'detailed' ? 0.22 : 0) : 0
+<<<<<<< Updated upstream
   // On the Moon the practice rock is a gray lunar rock.
   const moon = getActiveWorld() === 'moon'
   const rockGeometry = useMemo(() => (moon ? buildTintedRockGeometry(1, 3, MOON_ROCK.dust) : buildRockGeometry(1)), [moon])
   const chipGeometry = useMemo(() => (moon ? buildTintedRockGeometry(2, 2, MOON_ROCK.dust) : buildRockGeometry(2, 2)), [moon])
   useEffect(() => () => rockGeometry.dispose(), [rockGeometry])
   useEffect(() => () => chipGeometry.dispose(), [chipGeometry])
+=======
+  const rocks = useMarsRockGeometries()
+  const surface = useMarsSurface('basalt')
+>>>>>>> Stashed changes
 
   return (
     <group
@@ -101,28 +92,46 @@ function EnvironmentalVisual({
       {site.visual === 'rock' && (
         <>
           <mesh
-            geometry={rockGeometry}
-            position={[0, 0.42, 0]}
+            geometry={rocks[0]}
+            position={[0, 0.32, 0]}
             rotation={[0.12, site.position.z * 0.13, 0.08]}
             scale={[1.35, 0.78, 1.05]}
             castShadow
             receiveShadow
           >
             <meshStandardMaterial
+<<<<<<< Updated upstream
               color={moon ? MOON_ROCK.dark : PALETTE.rockDark}
               roughness={0.95}
               vertexColors
+=======
+              {...surface}
+              color={PALETTE.rockDark}
+              roughness={1}
+>>>>>>> Stashed changes
               emissive={PALETTE.accent}
               emissiveIntensity={glow}
             />
           </mesh>
+<<<<<<< Updated upstream
           <mesh geometry={chipGeometry} position={[1.55, 0.1, 0.85]} scale={[0.42, 0.32, 0.48]} castShadow>
             <meshStandardMaterial color={moon ? MOON_ROCK.light : PALETTE.rockLight} roughness={0.98} vertexColors />
+=======
+          <mesh geometry={rocks[2]} position={[1.55, 0.1, 0.85]} scale={[0.42, 0.32, 0.48]} castShadow receiveShadow>
+            <meshStandardMaterial {...surface} color={PALETTE.rockLight} roughness={1} />
+>>>>>>> Stashed changes
           </mesh>
         </>
       )}
 
-      {site.visual === 'outcrop' && <OutcropModel glow={glow} />}
+      {site.visual === 'outcrop' && (
+        <OutcropModel
+          glow={glow}
+          x={site.position.x}
+          z={site.position.z}
+          ground={ground}
+        />
+      )}
     </group>
   )
 }
@@ -180,6 +189,7 @@ function CalibrationStation() {
     geometry.translate(0, 3.5, 0)
     return geometry
   }, [])
+  useEffect(() => () => pillarGeometry.dispose(), [pillarGeometry])
 
   useFrame((state, delta) => {
     fade.current = THREE.MathUtils.damp(fade.current, pending ? 1 : 0, 3, delta)
@@ -187,7 +197,7 @@ function CalibrationStation() {
     const wave = reducedMotion ? 0.5 : 0.5 + Math.sin(t * 2.6) * 0.5
     if (ring.current) ring.current.opacity = (0.35 + wave * 0.45) * fade.current
     if (ringMesh.current) {
-      ringMesh.current.scale.setScalar(reducedMotion ? 1 : 1 + wave * 0.12)
+      ringMesh.current.scale.set(reducedMotion ? 1 : 1 + wave * 0.12, 1, reducedMotion ? 1 : 1 + wave * 0.12)
     }
     // The light column is for finding the rock; with the scanner out it
     // steps aside so the child sees the scan itself.
@@ -207,13 +217,18 @@ function CalibrationStation() {
         selected={selectedId === site.id}
         analysis="idle"
       />
-      <mesh
+      <TerrainRing
         ref={ringMesh}
-        position={[site.position.x, ground + 0.06, site.position.z]}
-        rotation={[-Math.PI / 2, 0, 0]}
+        x={site.position.x}
+        z={site.position.z}
+        baseY={ground}
+        innerRadius={1.45}
+        outerRadius={1.75}
+        segments={56}
+        lift={0.08}
+        position={[site.position.x, ground, site.position.z]}
         userData={{ scannerIgnore: true }}
       >
-        <ringGeometry args={[1.45, 1.75, 48]} />
         <meshBasicMaterial
           ref={ring}
           color={PALETTE.accent}
@@ -222,7 +237,7 @@ function CalibrationStation() {
           depthWrite={false}
           toneMapped={false}
         />
-      </mesh>
+      </TerrainRing>
       <mesh
         geometry={pillarGeometry}
         position={[site.position.x, ground, site.position.z]}
