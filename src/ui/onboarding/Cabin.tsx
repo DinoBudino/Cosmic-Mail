@@ -25,13 +25,24 @@ function useDialogueSteps(): HubDialogueStep[] {
 }
 
 const AWAIT_HINT: Record<HubAwait, string> = {
-  album: 'Tap the mission album',
-  'tab-stamps': 'Tap Stamps',
-  'tab-discoveries': 'Tap Discoveries',
-  'album-close': 'Tap the X to close the album',
-  nav: 'Tap the navigation screen',
   destination: 'Tap a place with a signal',
   confirm: 'Tap Confirm route',
+}
+
+/**
+ * PIP drives the tour: as the dialogue reaches a line he opens what it
+ * talks about (the album and its page, the navigation screen) himself.
+ * Done in the same update as the new line, so the tour never sees the
+ * line before what it shows. Closing the album is animated by the Hub.
+ */
+function showTourStep(step: HubDialogueStep) {
+  const store = useOnboardingStore.getState()
+  if (step.place === 'album') {
+    if (!store.passportDetailOpen) store.setPassportDetailOpen(true)
+    if (step.albumTab) store.setAlbumTab(step.albumTab)
+  } else if (step.place === 'nav' && !store.routeOpen) {
+    store.setRouteOpen(true)
+  }
 }
 
 
@@ -178,8 +189,9 @@ export function Cabin({ children }: { children: ReactNode }) {
     (state) => state.selectedDestination,
   )
 
-  // Guided steps: doing what PIP asks (opening the album, a tab, the
-  // navigation screen, picking a place) is what moves the tour on.
+  // Keeps the tour in step with the screen: picking a place moves on, a
+  // shortcut (the child opening the album or the navigation screen first)
+  // jumps ahead, and a closed album or navigation returns to its opener.
   useEffect(() => {
     if (phase !== 'hub' || steps.length === 0) return
     const next = tourIndexFor(steps, stepIndex, {
@@ -218,11 +230,13 @@ export function Cabin({ children }: { children: ReactNode }) {
     if (awaits) return
     if (!isLastLine) {
       setTypingDone(false)
+      const next = steps[dialogueIndex + 1]
+      if (phase === 'hub' && next) showTourStep(next)
       setDialogueIndex(dialogueIndex + 1)
       return
     }
     if (phase === 'hub') markHubVisited()
-  }, [typingDone, awaits, isLastLine, setDialogueIndex, dialogueIndex, phase, markHubVisited])
+  }, [typingDone, awaits, isLastLine, steps, setDialogueIndex, dialogueIndex, phase, markHubVisited])
 
   // PIP speaks where the child is: in the cabin, over the open album or
   // over the navigation close-up (docked at the top so it never covers

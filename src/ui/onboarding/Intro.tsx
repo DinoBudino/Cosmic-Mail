@@ -8,6 +8,7 @@ import {
   type IntroMoment,
 } from '../../data/onboardingNarrative'
 import { emitAudio } from '../../game/audio/audioEvents'
+import { startIntroQuake, stopIntroQuake } from '../../game/introQuake'
 import { speakPip, stopPipVoice } from '../../game/pipVoice'
 import { useGameStore } from '../../store/gameStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
@@ -128,14 +129,49 @@ export function Intro() {
     }
   }, [beat.line, beat.sound, beat.emotion, replayNonce, voiceEnabled, setPipTalking])
 
+  // The storm hits Mailwing as the data is lost: rumble always; tremor,
+  // light flicker and the edge glow only without reduced motion. A new
+  // line, Replay or Skip cancels pending and running hits.
+  const [activeQuake, setActiveQuake] = useState<{ key: string; strong: boolean } | null>(null)
+  const quaking = activeQuake?.key.startsWith(`${lineKey}#`) === true && !reducedMotion
+  useEffect(() => {
+    const quakes = beat.quakes
+    if (!quakes?.length) return
+    const timers: number[] = []
+    quakes.forEach((quake, index) => {
+      timers.push(
+        window.setTimeout(() => {
+          emitAudio('solarImpact')
+          if (reducedMotion) return
+          startIntroQuake(quake.duration, quake.strength)
+          const key = `${lineKey}#${index}`
+          setActiveQuake({ key, strong: quake.strength >= 0.7 })
+          timers.push(
+            window.setTimeout(
+              () => setActiveQuake((current) => (current?.key === key ? null : current)),
+              quake.duration,
+            ),
+          )
+        }, quake.at),
+      )
+    })
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer)
+      stopIntroQuake()
+    }
+  }, [beat.quakes, lineKey, reducedMotion])
+
   useEffect(() => () => stopPipVoice(), [])
 
   return (
     <section
-      className="cine"
+      className={`cine${quaking ? ' is-quaking' : ''}`}
       aria-labelledby="intro-title"
       data-scene={moment}
+      data-quake={quaking ? (activeQuake?.strong ? 'strong' : 'soft') : undefined}
     >
+      {/* Keyed per hit so each aftershock replays its CSS animation. */}
+      {quaking && <span key={activeQuake?.key} className="cine__quake-flash" aria-hidden="true" />}
       <h1 id="intro-title" className="sr-only">
         Cosmic Mail — introduction
       </h1>

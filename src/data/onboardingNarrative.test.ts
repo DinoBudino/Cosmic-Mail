@@ -321,21 +321,24 @@ describe('Proposal A onboarding beat sheet', () => {
     const first = { routeConfirmed: false, hubVisited: false, hubTourDone: false }
     const steps = hubDialogueSteps(first)
     expect(isHubTourActive(first)).toBe(true)
-    // The album comes before navigation, and each one must be opened.
-    const albumWait = steps.findIndex((step) => step.awaits === 'album')
-    const navWait = steps.findIndex((step) => step.awaits === 'nav')
-    expect(albumWait).toBeGreaterThan(0)
-    expect(navWait).toBeGreaterThan(albumWait)
-    expect(steps[albumWait]!.target).toBe('album')
-    expect(steps[navWait]!.target).toBe('nav')
-    // PIP explains every album section and the navigation screen from
-    // inside, and the child has to tap each part.
-    for (const awaited of ['tab-stamps', 'tab-discoveries', 'album-close', 'destination', 'confirm']) {
-      expect(steps.some((step) => step.awaits === awaited)).toBe(true)
-    }
+    // PIP points at the album, then at the navigation screen, and opens
+    // each one himself on the next line.
+    const albumIntro = steps.findIndex((step) => step.target === 'album')
+    const navIntro = steps.findIndex((step) => step.target === 'nav')
+    expect(albumIntro).toBeGreaterThan(0)
+    expect(navIntro).toBeGreaterThan(albumIntro)
     const places = steps.map((step) => step.place)
-    expect(places.indexOf('album')).toBe(albumWait + 1)
-    expect(places.indexOf('nav')).toBe(navWait + 1)
+    expect(places.indexOf('album')).toBe(albumIntro + 1)
+    expect(places.indexOf('nav')).toBe(navIntro + 1)
+    // He turns the album pages himself: missions, discoveries, stamps.
+    const tabs = steps.filter((step) => step.place === 'album').map((step) => step.albumTab)
+    expect([...new Set(tabs)]).toEqual(['missions', 'discoveries', 'stamps'])
+    // The child is never asked to tap to follow the tour: only real
+    // choices (where to fly, confirming the route) wait for the child.
+    expect(steps.map((step) => step.awaits).filter(Boolean)).toEqual(['destination', 'confirm'])
+    for (const step of steps.filter((entry) => !entry.awaits)) {
+      expect(step.line, step.line).not.toMatch(/\b(tap|click|press)\b/i)
+    }
     // The tour ends on confirming the route, which hands over to the red button.
     expect(steps[steps.length - 1]!.awaits).toBe('confirm')
     // Navigation is never described as a single destination.

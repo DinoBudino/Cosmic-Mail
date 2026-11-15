@@ -1,4 +1,5 @@
 import { useFrame } from '@react-three/fiber'
+import { sampleIntroQuake } from './introQuake'
 import { useGLTF } from '@react-three/drei'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
@@ -54,6 +55,7 @@ export function CabinCM01({ slots, launching = false, reducedMotion = false }: C
     const anchors: Partial<Record<CabinSlot, THREE.Matrix4>> = {}
     const lanterns: THREE.MeshStandardMaterial[] = []
     const ringLights: THREE.MeshStandardMaterial[] = []
+    const ceilingLights: THREE.MeshStandardMaterial[] = []
     const seen = new Set<THREE.Material>()
     root.traverse((node) => {
       if (node.name.startsWith('ANCHOR_')) {
@@ -79,13 +81,17 @@ export function CabinCM01({ slots, launching = false, reducedMotion = false }: C
           material.emissiveIntensity = RING_GLOW
         }
         if (material.name === 'CM_RING_LIGHT') ringLights.push(material)
+        if (material.name === 'CM_CEIL_LIGHT') {
+          material.userData.baseEmissive = material.emissiveIntensity
+          ceilingLights.push(material)
+        }
       }
     })
     // The old album book of the GLB is replaced by the tablet mounted on
     // the ALBUM anchor (CabinAlbumTablet).
     const album = root.getObjectByName('ALBUM')
     if (album) album.visible = false
-    return { root, anchors, lanterns, ringLights }
+    return { root, anchors, lanterns, ringLights, ceilingLights }
   }, [scene])
 
   const lanternL = useRef<THREE.PointLight>(null)
@@ -99,10 +105,15 @@ export function CabinCM01({ slots, launching = false, reducedMotion = false }: C
       return
     }
     const t = state.clock.elapsedTime
-    const flicker = 1 + Math.sin(t * 2.1) * 0.08 + Math.sin(t * 5.3) * 0.04
+    // Intro solar storm: every fixture browns out together (1 = normal).
+    const brownout = sampleIntroQuake().light
+    const flicker = (1 + Math.sin(t * 2.1) * 0.08 + Math.sin(t * 5.3) * 0.04) * brownout
     for (const material of model.lanterns) material.emissiveIntensity = 4.5 * flicker
     for (const material of model.ringLights) {
-      material.emissiveIntensity = RING_GLOW + Math.sin(t * 0.8) * 0.4 + pulse * 6
+      material.emissiveIntensity = (RING_GLOW + Math.sin(t * 0.8) * 0.4 + pulse * 6) * brownout
+    }
+    for (const material of model.ceilingLights) {
+      material.emissiveIntensity = (material.userData.baseEmissive ?? 1) * brownout
     }
     if (lanternL.current) lanternL.current.intensity = 1.6 * flicker
     if (lanternR.current) lanternR.current.intensity = 1.6 * (2 - flicker)

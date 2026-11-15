@@ -32,6 +32,7 @@ import {
 } from '../data/passport'
 import { introHologramSvg, pipPanelSvg } from '../ui/onboarding/introHologramTexture'
 import { emitAudio } from './audio/audioEvents'
+import { quakeOffset, sampleIntroQuake } from './introQuake'
 import { WindowHologram, type HologramFrame } from './WindowHologram'
 import { CabinCM01, CabinEffects, CabinMonitor } from './CabinCM01'
 import { CabinAlbumTablet } from './CabinAlbumTablet'
@@ -142,6 +143,9 @@ function CameraRig() {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const lookTarget = useMemo(() => new THREE.Vector3(), [])
   const wasCabinRef = useRef(false)
+  // Intro storm tremor applied last frame; removed before the rig moves
+  // the camera again, so it never accumulates into the damped framing.
+  const tremorRef = useRef(new THREE.Vector3())
   const hubView =
     phase === 'hub' || phase === 'launching' || phase === 'playing'
 
@@ -163,6 +167,8 @@ function CameraRig() {
 
   useFrame((state, delta) => {
     const camera = state.camera as THREE.PerspectiveCamera
+    camera.position.sub(tremorRef.current)
+    tremorRef.current.set(0, 0, 0)
     // The CM-01 cockpit is framed with a wider lens than the title shot.
     const inCabinView =
       (phase !== 'menu' && phase !== 'launching' && boardingStage === 'cabin') ||
@@ -295,6 +301,17 @@ function CameraRig() {
       )
     }
     camera.lookAt(lookTarget)
+
+    // Solar storm hit during the intro: the ship trembles for a moment.
+    if (phase === 'intro' && !reducedMotion) {
+      const quake = sampleIntroQuake()
+      if (quake.shake > 0) {
+        const offset = quakeOffset(quake.t, quake.shake)
+        tremorRef.current.set(offset.x, offset.y, 0)
+        camera.position.add(tremorRef.current)
+        camera.rotateZ(offset.roll)
+      }
+    }
   })
   return null
 }
@@ -1506,6 +1523,17 @@ function CabinPip() {
     } else {
       group.position.y = pose.y + emotionalSink
     }
+    // Solar storm hit: PIP is jostled in the air, a little behind the
+    // ship's own tremor (he floats, so he lags and wobbles).
+    if (isIntro && !reducedMotion) {
+      const quake = sampleIntroQuake()
+      if (quake.shake > 0) {
+        const lag = Math.max(0, quake.t - 0.08)
+        group.position.x += Math.sin(lag * 19) * 0.05 * quake.shake
+        group.position.y += Math.sin(lag * 23 + 1) * 0.035 * quake.shake
+        group.rotation.z += Math.sin(lag * 17) * 0.16 * quake.shake
+      }
+    }
     // Facial expression, blink, talking mouth, antenna and scarf movement
     // now live inside HubPipModel; the cabin keeps only placement and pose.
   })
@@ -2558,6 +2586,10 @@ const INTRO_ALERT_LEVEL: Record<IntroAmbience, number> = {
   soft: 0.25,
   hope: 0,
 }
+/** Base cabin light levels (the storm flicker scales these). */
+const CABIN_SKY_INTENSITY = 1.15
+const CABIN_KEY_INTENSITY = 0.7
+const CABIN_CEILING_INTENSITY = 4
 const RIM_CALM = new THREE.Color('#8FE3D8')
 const RIM_ALERT = new THREE.Color('#FFA24A')
 
@@ -2581,6 +2613,9 @@ function CabinInterior() {
   const windowDarkRef = useRef<THREE.MeshBasicMaterial>(null)
   const windowRimRef = useRef<THREE.MeshBasicMaterial>(null)
   const alertLightRef = useRef<THREE.PointLight>(null)
+  const skyLightRef = useRef<THREE.HemisphereLight>(null)
+  const keyLightRef = useRef<THREE.DirectionalLight>(null)
+  const ceilingLightRef = useRef<THREE.PointLight>(null)
   const [albumHovered, setAlbumHovered] = useState(false)
   // The launch countdown happens INSIDE the cabin (seated, PIP
   // talking); from liftoff on, the wide menu shot returns.
@@ -2627,11 +2662,20 @@ function CabinInterior() {
     const ambience: IntroAmbience =
       phase === 'intro' ? introBeatForLine(dialogueIndex).ambience : 'calm'
     const alert = INTRO_ALERT_LEVEL[ambience]
+    // Solar storm hit: the cabin lights brown out and flicker briefly
+    // while the orange emergency light flares.
+    const quake = phase === 'intro' && !reducedMotion ? sampleIntroQuake() : null
+    const flicker = quake?.light ?? 1
+    if (skyLightRef.current) skyLightRef.current.intensity = CABIN_SKY_INTENSITY * flicker
+    if (keyLightRef.current) keyLightRef.current.intensity = CABIN_KEY_INTENSITY * flicker
+    if (ceilingLightRef.current) ceilingLightRef.current.intensity = CABIN_CEILING_INTENSITY * flicker
     if (alertLightRef.current) {
       const light = alertLightRef.current
       light.intensity = reducedMotion
         ? alert * 3
-        : THREE.MathUtils.damp(light.intensity, alert * 3, 1.6, delta)
+        : quake && quake.shake > 0
+          ? alert * 3 + quake.shake * 5
+          : THREE.MathUtils.damp(light.intensity, alert * 3, 1.6, delta)
     }
     if (windowRimRef.current) {
       const rim = windowRimRef.current.color
@@ -2721,12 +2765,12 @@ function CabinInterior() {
           console from the pilot's side. */}
       {/* Violet "aura" of the reference sheet: lavender sky fill, deep
           violet bounce from below and violet rims in the side bays. */}
-      <hemisphereLight args={['#DCD0F7', '#3A2A63', 1.15]} />
-      <directionalLight position={[0.5, 2.0, 1.5]} intensity={0.7} color="#F4EEFF" />
+      <hemisphereLight ref={skyLightRef} args={['#DCD0F7', '#3A2A63', CABIN_SKY_INTENSITY]} />
+      <directionalLight ref={keyLightRef} position={[0.5, 2.0, 1.5]} intensity={CABIN_KEY_INTENSITY} color="#F4EEFF" />
       <pointLight position={[-3.0, 1.4, -1.0]} intensity={4} distance={5.5} color="#8C6BE0" />
       <pointLight position={[3.0, 1.4, -1.0]} intensity={4} distance={5.5} color="#8C6BE0" />
       <pointLight position={[0, 0.6, 2.6]} intensity={3} distance={5} color="#7B5CC9" />
-      <pointLight position={[0, 1.55, -1.6]} intensity={4} distance={7} color="#FFE9D2" />
+      <pointLight ref={ceilingLightRef} position={[0, 1.55, -1.6]} intensity={CABIN_CEILING_INTENSITY} distance={7} color="#FFE9D2" />
       <pointLight position={[0, 0.4, -3.9]} intensity={3.5} distance={4.5} color="#FF9A4A" />
       <pointLight position={[-0.9, -0.3, -2.4]} intensity={1.2} distance={2.2} color="#5FE0CF" />
       {/* Intro emergency glow, off (0) unless the storm beats call it. */}

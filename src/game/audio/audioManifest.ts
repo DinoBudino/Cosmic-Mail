@@ -642,6 +642,17 @@ const AUDIO_ASSET_SEEDS = {
   ),
 
   /* ---------------------------------------------------------------- Ship */
+  'ship.solarRumble': asset(
+    'audio/sfx/ship/ship-solar-rumble.mp3',
+    'sfx',
+    'sfx',
+    0.85,
+    false,
+    8,
+    ORIGINAL_LICENSE,
+    original('Solar storm hull rumble'),
+    ['ship', 'storm', 'intro'],
+  ),
   'ship.ignition': asset(
     'audio/sfx/ship/ship-ignition.mp3',
     'sfx',

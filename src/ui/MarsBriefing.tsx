@@ -79,7 +79,7 @@ export function MarsBriefing() {
   }
 
   // A click anywhere (or Space / Enter): first finishes PIP's typing, then
-  // works like the step's button. Card steps still wait for the card.
+  // works like the step's button (PIP opens the next card himself).
   const [typed, setTyped] = useState(false)
   const [skipNonce, setSkipNonce] = useState(0)
   const [seenStep, setSeenStep] = useState(step.id)
@@ -93,10 +93,10 @@ export function MarsBriefing() {
       setSkipNonce((nonce) => nonce + 1)
       return
     }
-    if (step.cta && !step.awaits) advance({ kind: 'button' })
+    if (step.cta) advance({ kind: 'button' })
   }
   useAdvanceAnywhere(
-    active && (!typed || (Boolean(step.cta) && !step.awaits)),
+    active && (!typed || Boolean(step.cta)),
     advanceAnywhere,
     step.id,
   )
@@ -109,7 +109,6 @@ export function MarsBriefing() {
       text={step.line}
       cta={step.cta}
       onCta={() => advance({ kind: 'button' })}
-      hint={step.awaits ? `Tap ${BRIEFING_CARDS[step.awaits].title}` : undefined}
       skipNonce={skipNonce}
       onTyped={() => setTyped(true)}
     />
@@ -148,10 +147,10 @@ export function MarsBriefing() {
                 key={tool}
                 tool={tool}
                 learned={learned.includes(tool)}
-                target={step.awaits === tool}
+                target={step.focus === tool}
                 locked={
-                  step.awaits !== undefined &&
-                  step.awaits !== tool &&
+                  step.focus !== undefined &&
+                  step.focus !== tool &&
                   !learned.includes(tool)
                 }
                 onPick={() => advance({ kind: 'card', tool })}
@@ -182,13 +181,8 @@ function ToolCard({
   onPick: () => void
 }) {
   const card = BRIEFING_CARDS[tool]
-  const ref = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (target) ref.current?.focus({ preventScroll: true })
-  }, [target])
   return (
     <button
-      ref={ref}
       type="button"
       className={`briefing-card${target ? ' is-target' : ''}${learned ? ' is-learned' : ''}`}
       disabled={!target}
@@ -202,7 +196,7 @@ function ToolCard({
       <span className="briefing-card__title">{card.title}</span>
       <span className="briefing-card__summary">{card.summary}</span>
       {learned && <span className="briefing-card__badge">✓ Learned</span>}
-      {target && <span className="briefing-card__badge briefing-card__badge--tap">Tap me!</span>}
+      {target && <span className="briefing-card__badge briefing-card__badge--tap">Up next</span>}
     </button>
   )
 }

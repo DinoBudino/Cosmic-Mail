@@ -37,6 +37,7 @@ export type AudioEvent =
   | 'archiveFaultGlitch'
   | 'solarAlert'
   | 'solarStormReplay'
+  | 'solarImpact'
   | 'archiveConnectionLost'
   | 'archiveQueryFailed'
   | 'archiveClueRecovered'
@@ -141,6 +142,8 @@ export const EVENT_PLANS: Record<AudioEvent, AudioEventPlan> = {
   archiveFaultGlitch: { sfx: ['archive.glitchSoft'] },
   solarAlert: { sfx: ['archive.queryFailed', 'pip.attention'], duckMs: 600 },
   solarStormReplay: { sfx: ['archive.activate', 'ui.hologram'] },
+  // The storm reaches Mailwing: a soft hull rumble with a short glitch.
+  solarImpact: { sfx: ['ship.solarRumble', 'archive.glitchSoft'], duckMs: 1200 },
   archiveConnectionLost: {
     sfx: ['archive.connectionLost', 'archive.glitchSoft'],
   },

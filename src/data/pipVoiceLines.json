@@ -155,7 +155,7 @@
   },
   {
     "key": "hub-tour-1",
-    "text": "Your mission album is on the console. Tap it to open it.",
+    "text": "Your mission album is on the console. Let me open it for you!",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
@@ -175,43 +175,29 @@
     "pitch": 1.05
   },
   {
-    "key": "hub-tour-4",
-    "text": "Now tap Discoveries.",
-    "speed": 1.06,
-    "category": "onboarding",
-    "pitch": 1.06
-  },
-  {
     "key": "hub-tour-5",
-    "text": "This is the photo lab. Every part you scan opens a new photo and a new fact!",
+    "text": "Now the Discoveries page, our photo lab! Every part you scan opens a new photo and a new fact.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
-    "key": "hub-tour-6",
-    "text": "Now tap Stamps.",
-    "speed": 1.06,
-    "category": "onboarding",
-    "pitch": 1.06
-  },
-  {
     "key": "hub-tour-7",
-    "text": "Every story we deliver to Earth earns a stamp here.",
+    "text": "And here are your Stamps! Every story we deliver to Earth earns one.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
     "key": "hub-tour-8",
-    "text": "You can open your album any time, even while exploring. Tap the X to close it.",
+    "text": "You can open your album any time, even while exploring. I'll close it for now.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.05
   },
   {
     "key": "hub-tour-9",
-    "text": "Now tap the navigation screen. It shows where the signals are coming from.",
+    "text": "Next, the navigation screen! It shows where the signals are coming from.",
     "speed": 1.04,
     "category": "onboarding",
     "pitch": 1.06
@@ -280,7 +266,7 @@
   },
   {
     "key": "mars-briefing-tools",
-    "text": "Before we go, you need to know two tools. Tap the Radar card first.",
+    "text": "Before we go, you need to know two tools. Let's start with the Radar!",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
@@ -294,7 +280,7 @@
   },
   {
     "key": "mars-briefing-tools-scanner",
-    "text": "Great job! Now tap the Scanner card.",
+    "text": "Great job! Now let's look at the Scanner.",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05

@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
+import { sampleIntroQuake } from './introQuake'
 
 /** One still of a projection and when it appears (ms after the start). */
 export interface HologramFrame {
@@ -60,6 +61,7 @@ export function WindowHologram({
   const texturesRef = useRef<THREE.CanvasTexture[] | null>(null)
   const frontRef = useRef<THREE.MeshBasicMaterial>(null)
   const backRef = useRef<THREE.MeshBasicMaterial>(null)
+  const groupRef = useRef<THREE.Group>(null)
   const startRef = useRef(-1)
   const shownRef = useRef(-1)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
@@ -146,6 +148,14 @@ export function WindowHologram({
       back.visible = false
       return
     }
+    // Solar storm hit: the projection loses power with the cabin lights
+    // and jitters sideways, like interference, then settles.
+    const quake = sampleIntroQuake()
+    const group = groupRef.current
+    if (group) {
+      group.position.x = quake.shake > 0 ? Math.sin(now * 0.061) * 0.035 * quake.shake : 0
+    }
+    front.color.setScalar(quake.shake > 0 ? 0.45 + 0.55 * quake.light : 1)
     // Quick swaps inside a sequence, a gentler fade for a new line.
     const lambda = shownRef.current === 0 ? 4 : 9
     front.opacity = THREE.MathUtils.damp(front.opacity, target, lambda, delta)
@@ -156,26 +166,28 @@ export function WindowHologram({
   if (!textures) return null
   return (
     <group position={[0, 0.3, -4.4]}>
-      <mesh renderOrder={4}>
-        <circleGeometry args={[radius, 64]} />
-        <meshBasicMaterial
-          ref={backRef}
-          transparent
-          opacity={0}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh position={[0, 0, 0.002]} renderOrder={5}>
-        <circleGeometry args={[radius, 64]} />
-        <meshBasicMaterial
-          ref={frontRef}
-          transparent
-          opacity={0}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
+      <group ref={groupRef}>
+        <mesh renderOrder={4}>
+          <circleGeometry args={[radius, 64]} />
+          <meshBasicMaterial
+            ref={backRef}
+            transparent
+            opacity={0}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh position={[0, 0, 0.002]} renderOrder={5}>
+          <circleGeometry args={[radius, 64]} />
+          <meshBasicMaterial
+            ref={frontRef}
+            transparent
+            opacity={0}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
     </group>
   )
 }

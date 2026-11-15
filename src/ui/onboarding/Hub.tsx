@@ -32,6 +32,17 @@ export function Hub() {
   const albumCloseEnabled = hubElementEnabled(focus, 'album-close')
   const navBackEnabled = hubElementEnabled(focus, 'nav-back')
   const [closing, setClosing] = useState(false)
+  // PIP closes the album himself when his tour leaves it (animated, like
+  // the X), adjusted during render when the tour reaches a cabin line.
+  // Keyed by the line (steps outside the tour are rebuilt every render).
+  const stepLine = focus.step?.line ?? null
+  const [seenLine, setSeenLine] = useState(stepLine)
+  if (seenLine !== stepLine) {
+    setSeenLine(stepLine)
+    if (focus.tourActive && focus.step?.place === 'cabin' && passportDetailOpen && !closing) {
+      setClosing(true)
+    }
+  }
   const openedAtRef = useRef(0)
   const save = useJourneyStore((state) => state.save)
   const showFinalQuote = useJourneyStore((state) => state.showFinalQuote)

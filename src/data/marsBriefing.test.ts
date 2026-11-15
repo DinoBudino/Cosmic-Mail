@@ -25,22 +25,30 @@ describe('Mars arrival briefing', () => {
     expect(briefingStep(indexOf('arrival')).expression).toBe('celebrating')
   })
 
-  it('teaches the radar first, then the scanner, each by tapping its card', () => {
+  it('teaches the radar first, then the scanner, opening each card himself', () => {
     const tools = indexOf('tools')
-    // Tapping the scanner while PIP asks for the radar does nothing.
+    expect(briefingStep(tools).focus).toBe('radar')
+    // Tapping the other card does nothing; the button opens PIP's card.
     expect(nextBriefingIndex(tools, { kind: 'card', tool: 'scanner' })).toBe(tools)
-    // No button skips a step that waits for a card.
-    expect(nextBriefingIndex(tools, { kind: 'button' })).toBe(tools)
-    const radarDetail = nextBriefingIndex(tools, { kind: 'card', tool: 'radar' })
+    const radarDetail = nextBriefingIndex(tools, { kind: 'button' })
     expect(briefingStep(radarDetail).id).toBe('radar-detail')
+    // Tapping the card PIP points at is a shortcut to the same place.
+    expect(nextBriefingIndex(tools, { kind: 'card', tool: 'radar' })).toBe(radarDetail)
     const toolsScanner = nextBriefingIndex(radarDetail, { kind: 'button' })
-    expect(briefingStep(toolsScanner).awaits).toBe('scanner')
+    expect(briefingStep(toolsScanner).focus).toBe('scanner')
     expect(learnedTools(toolsScanner)).toEqual(['radar'])
-    const scannerDetail = nextBriefingIndex(toolsScanner, { kind: 'card', tool: 'scanner' })
+    const scannerDetail = nextBriefingIndex(toolsScanner, { kind: 'button' })
     expect(briefingStep(scannerDetail).id).toBe('scanner-detail')
     const ready = nextBriefingIndex(scannerDetail, { kind: 'button' })
     expect(learnedTools(ready)).toEqual(['radar', 'scanner'])
     expect(isLastBriefingStep(ready)).toBe(true)
+  })
+
+  it('never asks the child to tap a card to follow the tutorial', () => {
+    for (const step of BRIEFING_STEPS) {
+      expect(step.cta, step.id).toBeTruthy()
+      expect(step.line, step.id).not.toMatch(/\b(tap|click|press)\b/i)
+    }
   })
 
   it('fills the progress bar as the tutorial advances', () => {

@@ -1,6 +1,5 @@
 import {
   hubDialogueSteps,
-  type HubAwait,
   isHubTourActive,
   type HubDialogueStep,
   type HubTarget,
@@ -71,9 +70,12 @@ export function hubElementEnabled(
 }
 
 /**
- * Index the guided tour should move to, given what the child has done:
- * forward when the awaited action happened, back to the opening step
- * when the album or the navigation screen was closed mid-explanation.
+ * Index the guided tour should move to, given what is on screen. PIP
+ * opens and closes things himself, but the child may get there first:
+ * tapping the album or the navigation screen PIP is pointing at, or the
+ * album's X, jumps ahead. A choice step (destination) moves on once the
+ * child has picked; if the album or navigation closes mid-explanation
+ * the tour returns to the line that opens it again.
  */
 export function tourIndexFor(
   steps: readonly HubDialogueStep[],
@@ -87,31 +89,16 @@ export function tourIndexFor(
 ): number {
   const step = steps[index]
   if (!step) return index
-  switch (step.awaits) {
-    case 'album':
-      if (state.albumOpen) return index + 1
-      break
-    case 'album-close':
-      if (!state.albumOpen) return index + 1
-      return index
-    case 'tab-stamps':
-      if (state.albumTab === 'stamps') return index + 1
-      break
-    case 'tab-discoveries':
-      if (state.albumTab === 'discoveries') return index + 1
-      break
-    case 'nav':
-      if (state.routeOpen) return index + 1
-      break
-    case 'destination':
-      if (state.selectedDestination) return index + 1
-      break
-    default:
-      break
+  if (step.awaits === 'destination' && state.selectedDestination) return index + 1
+  if (step.place === 'cabin') {
+    if (step.target === 'album' && state.albumOpen) return index + 1
+    if (step.target === 'nav' && state.routeOpen) return index + 1
+    return index
   }
-  const opener = (awaits: HubAwait) =>
-    steps.findIndex((entry) => entry.awaits === awaits)
+  const opener = (target: HubTarget) =>
+    steps.findIndex((entry) => entry.place === 'cabin' && entry.target === target)
   if (step.place === 'album' && !state.albumOpen) {
+    if (step.target === 'album-close') return index + 1
     const at = opener('album')
     if (at >= 0) return at
   }
@@ -120,7 +107,7 @@ export function tourIndexFor(
       const at = opener('nav')
       if (at >= 0) return at
     }
-    const pick = opener('destination')
+    const pick = steps.findIndex((entry) => entry.awaits === 'destination')
     if (!state.selectedDestination && pick >= 0 && index > pick) return pick
   }
   return index

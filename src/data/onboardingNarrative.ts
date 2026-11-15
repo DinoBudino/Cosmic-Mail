@@ -129,6 +129,22 @@ export interface IntroBeat {
   pipPanel?: IntroPipPanel
   /** Brief interference on one of PIP's eyes (never a lasting change). */
   pipGlitch?: boolean
+  /**
+   * The storm hits Mailwing at the very instant data is lost: a short
+   * tremor, a brown-out flicker of the cabin lights and a rumble, `at` ms
+   * after the line starts (each one lands on the frame where a link
+   * breaks). The cause is only explained later by the solar replay, which
+   * is a recording and never shakes the ship. Reduced motion keeps only
+   * the sound.
+   */
+  quakes?: readonly IntroQuake[]
+}
+
+export interface IntroQuake {
+  at: number
+  duration: number
+  /** 0..1: 1 is the main hit, smaller values are aftershocks. */
+  strength: number
 }
 
 function frames(
@@ -198,10 +214,12 @@ export const INTRO_BEATS: readonly IntroBeat[] = [
     line: 'Oh! That file just lost its connection.',
     emotion: 'surprised',
     hologram: 'losing1',
-    // Connected → flickering → dim link → cut, with a yellow flash.
-    timeline: frames('losing1', [3, 0], [2, 500], [1, 1000], [0, 1500]),
+    // The hit lands at once: the link flickers, flashes yellow and is cut
+    // while the ship is still shaking. PIP's "Oh!" is his reaction.
+    timeline: frames('losing1', [3, 0], [2, 150], [1, 450], [0, 900]),
     camera: 'archive',
-    ambience: 'calm',
+    ambience: 'warning',
+    quakes: [{ at: 150, duration: 1600, strength: 1 }],
   },
   // 3.2 The fault spreads.
   {
@@ -215,6 +233,11 @@ export const INTRO_BEATS: readonly IntroBeat[] = [
     camera: 'archive',
     ambience: 'warning',
     sound: 'archiveConnectionLost',
+    // An aftershock exactly as each new link goes dark.
+    quakes: [
+      { at: 1100, duration: 1000, strength: 0.55 },
+      { at: 2200, duration: 1100, strength: 0.7 },
+    ],
   },
   // 3.3 Solar activity alert (new): diagnostic first, then the warning.
   {
@@ -511,29 +534,36 @@ export type HubTarget =
   | 'nav-cards'
   | 'nav-confirm'
 
-/** What the child has to do before a guided step moves on. */
-export type HubAwait =
-  | 'album'
-  | 'tab-stamps'
-  | 'tab-discoveries'
-  | 'album-close'
-  | 'nav'
-  | 'destination'
-  | 'confirm'
+/**
+ * The few real choices in the tour: the child picks where to fly and
+ * confirms the route. Everything else PIP opens and shows himself.
+ */
+export type HubAwait = 'destination' | 'confirm'
 
 /** Where the line is shown: the cabin, the open album or the nav close-up. */
 export type HubPlace = 'cabin' | 'album' | 'nav'
+
+/** Album page PIP turns to while he explains it. */
+export type HubAlbumTab = 'missions' | 'discoveries' | 'stamps'
 
 export interface HubDialogueStep {
   line: string
   /** Element highlighted while PIP says the line. */
   target: HubTarget | null
   /**
-   * Guided step: the bubble does not advance on click. The child has to
-   * do this action; doing it moves the tour to the next line.
+   * Choice step: the bubble does not advance on click. The child has to
+   * make this choice; making it moves the tour to the next line.
    */
   awaits: HubAwait | null
+  /**
+   * What is on screen during the line. PIP drives it: when the tour
+   * reaches an album step he opens the album, a cabin step closes it and
+   * a nav step opens the navigation screen. The child only listens and
+   * moves the dialogue on.
+   */
   place: HubPlace
+  /** Album page PIP switches to for this line. */
+  albumTab?: HubAlbumTab
 }
 
 /**
@@ -544,63 +574,56 @@ export interface HubDialogueStep {
 export const HUB_TOUR_STEPS: readonly HubDialogueStep[] = [
   { line: HUB_ASSIGNMENT_LINE, target: null, awaits: null, place: 'cabin' },
   {
-    line: 'Your mission album is on the console. Tap it to open it.',
+    line: 'Your mission album is on the console. Let me open it for you!',
     target: 'album',
-    awaits: 'album',
+    awaits: null,
     place: 'cabin',
   },
-  // Inside the album
+  // Inside the album: PIP turns the pages himself as he explains them.
   {
     line: "This is your Cosmic Album! Here you see your carrier badge and how far we've come.",
     target: 'album-id',
     awaits: null,
     place: 'album',
+    albumTab: 'missions',
   },
   {
     line: "Each card is an explorer we're looking for. It fills up as we find it and send its story home.",
     target: 'tab-missions',
     awaits: null,
     place: 'album',
+    albumTab: 'missions',
   },
   {
-    line: 'Now tap Discoveries.',
-    target: 'tab-discoveries',
-    awaits: 'tab-discoveries',
-    place: 'album',
-  },
-  {
-    line: 'This is the photo lab. Every part you scan opens a new photo and a new fact!',
+    line: 'Now the Discoveries page, our photo lab! Every part you scan opens a new photo and a new fact.',
     target: 'tab-discoveries',
     awaits: null,
     place: 'album',
+    albumTab: 'discoveries',
   },
   {
-    line: 'Now tap Stamps.',
-    target: 'tab-stamps',
-    awaits: 'tab-stamps',
-    place: 'album',
-  },
-  {
-    line: 'Every story we deliver to Earth earns a stamp here.',
+    line: 'And here are your Stamps! Every story we deliver to Earth earns one.',
     target: 'tab-stamps',
     awaits: null,
     place: 'album',
+    albumTab: 'stamps',
   },
   {
-    line: 'You can open your album any time, even while exploring. Tap the X to close it.',
+    line: "You can open your album any time, even while exploring. I'll close it for now.",
     target: 'album-close',
-    awaits: 'album-close',
+    awaits: null,
     place: 'album',
+    albumTab: 'stamps',
   },
-  // Back in the cabin
+  // Back in the cabin (PIP closes the album)
   {
-    line: 'Now tap the navigation screen. It shows where the signals are coming from.',
+    line: 'Next, the navigation screen! It shows where the signals are coming from.',
     target: 'nav',
-    awaits: 'nav',
+    awaits: null,
     place: 'cabin',
   },
-  // Inside the navigation screen: every step waits for a tap, PIP never
-  // asks the child to click his bubble here.
+  // Inside the navigation screen (PIP opens it). Picking a place and
+  // confirming the route are the child's own choices.
   {
     line: 'These are the places we can fly to. Tap one with a signal.',
     target: 'nav-cards',
