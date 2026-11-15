@@ -100,6 +100,31 @@
   outline-offset: 3px;
 }
 
+.briefing-cta-wrap {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.briefing-anywhere {
+  font-size: 0.74rem;
+  font-weight: 650;
+  color: rgba(253, 244, 236, 0.62);
+  letter-spacing: 0.02em;
+  animation: briefing-anywhere-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes briefing-anywhere-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .briefing-anywhere { animation: none; }
+}
+
 .briefing-hint {
   flex: none;
   display: inline-flex;

@@ -16,6 +16,7 @@ import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import { PipAvatar } from './PipSpeech'
+import { useAdvanceAnywhere } from './useAdvanceAnywhere'
 import './marsBriefing.css'
 
 /** Let the landing scene settle before PIP starts talking. */
@@ -69,8 +70,6 @@ export function MarsBriefing() {
   }, [active, step, voiceName, voiceEnabled])
   useEffect(() => () => stopPipVoice(), [])
 
-  if (!active) return null
-
   const advance = (action: Parameters<typeof nextBriefingIndex>[1]) => {
     if (action.kind === 'button' && isLastBriefingStep(index)) {
       stopPipVoice()
@@ -80,6 +79,31 @@ export function MarsBriefing() {
     setIndex((current) => nextBriefingIndex(current, action))
   }
 
+  // A click anywhere (or Space / Enter): first finishes PIP's typing, then
+  // works like the step's button. Card steps still wait for the card.
+  const [typed, setTyped] = useState(false)
+  const [skipNonce, setSkipNonce] = useState(0)
+  const [seenStep, setSeenStep] = useState(step.id)
+  if (seenStep !== step.id) {
+    setSeenStep(step.id)
+    setTyped(false)
+    setSkipNonce(0)
+  }
+  const advanceAnywhere = () => {
+    if (!typed) {
+      setSkipNonce((nonce) => nonce + 1)
+      return
+    }
+    if (step.cta && !step.awaits) advance({ kind: 'button' })
+  }
+  useAdvanceAnywhere(
+    active && (!typed || (Boolean(step.cta) && !step.awaits)),
+    advanceAnywhere,
+    step.id,
+  )
+
+  if (!active) return null
+
   const pipLine = (
     <BriefingPipLine
       key={step.id}
@@ -87,6 +111,8 @@ export function MarsBriefing() {
       cta={step.cta}
       onCta={() => advance({ kind: 'button' })}
       hint={step.awaits ? `Tap ${BRIEFING_CARDS[step.awaits].title}` : undefined}
+      skipNonce={skipNonce}
+      onTyped={() => setTyped(true)}
     />
   )
 
@@ -216,11 +242,16 @@ function BriefingPipLine({
   cta,
   onCta,
   hint,
+  skipNonce,
+  onTyped,
 }: {
   text: string
   cta?: string
   onCta: () => void
   hint?: string
+  /** Bumped by a click anywhere: show the whole line at once. */
+  skipNonce: number
+  onTyped: () => void
 }) {
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const [shown, setShown] = useState(reducedMotion ? text.length : 0)
@@ -231,6 +262,20 @@ function BriefingPipLine({
     }, 26)
     return () => window.clearInterval(timer)
   }, [text, reducedMotion])
+  const [seenSkip, setSeenSkip] = useState(skipNonce)
+  if (seenSkip !== skipNonce) {
+    setSeenSkip(skipNonce)
+    if (skipNonce !== 0) setShown(text.length)
+  }
+  const done = shown >= text.length
+  const onTypedRef = useRef(onTyped)
+  useEffect(() => {
+    onTypedRef.current = onTyped
+  }, [onTyped])
+  useEffect(() => {
+    if (done) onTypedRef.current()
+  }, [done])
+  const touch = isCoarsePointer()
   const buttonRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     buttonRef.current?.focus({ preventScroll: true })
@@ -249,9 +294,14 @@ function BriefingPipLine({
         </p>
       </div>
       {cta ? (
-        <button ref={buttonRef} type="button" className="briefing-cta" onClick={onCta}>
-          {cta}
-        </button>
+        <div className="briefing-cta-wrap">
+          <button ref={buttonRef} type="button" className="briefing-cta" onClick={onCta}>
+            {cta}
+          </button>
+          <span className="briefing-anywhere" aria-hidden="true">
+            or {touch ? 'tap' : 'click'} anywhere
+          </span>
+        </div>
       ) : (
         hint && (
           <span className="briefing-hint">

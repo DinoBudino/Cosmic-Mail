@@ -9,6 +9,8 @@ import { useGameStore } from '../../store/gameStore'
 import { tourIndexFor, useHubFocus } from '../../store/hubFocus'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { PipAvatar } from '../PipSpeech'
+import { useAdvanceAnywhere } from '../useAdvanceAnywhere'
+import { isCoarsePointer } from '../../game/missionNarrative'
 
 /** PIP's dialogue steps for the current cabin step. */
 function useDialogueSteps(): HubDialogueStep[] {
@@ -206,7 +208,7 @@ export function Cabin({ children }: { children: ReactNode }) {
     setSkipNonce(0)
   }
 
-  const handleBubbleClick = () => {
+  const handleBubbleClick = useCallback(() => {
     if (!typingDone) {
       setSkipNonce((nonce) => nonce + 1)
       return
@@ -219,7 +221,7 @@ export function Cabin({ children }: { children: ReactNode }) {
       return
     }
     if (phase === 'hub') markHubVisited()
-  }
+  }, [typingDone, awaits, isLastLine, setDialogueIndex, dialogueIndex, phase, markHubVisited])
 
   // PIP speaks where the child is: in the cabin, over the open album or
   // over the navigation close-up (docked at the top so it never covers
@@ -229,6 +231,14 @@ export function Cabin({ children }: { children: ReactNode }) {
   const bubbleHidden =
     phase === 'intro' || (phase === 'hub' && stepPlace !== place)
   const docked = phase === 'hub' && place !== 'cabin'
+
+  // A click anywhere (or Space / Enter) moves PIP's tour on, so the child
+  // never has to aim at the bubble. Steps that wait for the child to open
+  // something keep waiting for that.
+  const canAdvanceAnywhere =
+    phase === 'hub' && !bubbleHidden && steps.length > 0 && (!typingDone || !awaits)
+  useAdvanceAnywhere(canAdvanceAnywhere, handleBubbleClick, `${dialogueIndex}-${line}`)
+  const touch = isCoarsePointer()
 
   return (
     <div className="cabin">
@@ -275,7 +285,7 @@ export function Cabin({ children }: { children: ReactNode }) {
                 typingDone &&
                 !isLastLine && (
                   <span className="pip-bubble__next" aria-hidden="true">
-                    ▸
+                    {touch ? 'Tap anywhere' : 'Click anywhere'} ▸
                   </span>
                 )
               )}

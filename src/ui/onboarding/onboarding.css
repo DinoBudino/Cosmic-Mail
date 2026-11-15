@@ -897,9 +897,21 @@
 
 .pip-bubble__next {
   align-self: flex-end;
+  margin-top: 2px;
   font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--rose-300);
-  animation: pip-blink 900ms steps(2) infinite;
+  animation: pip-next-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pip-next-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pip-bubble__next { animation: none; }
 }
 
 /* Guided tour task: the bubble waits for the child to tap the
