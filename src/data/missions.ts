@@ -285,8 +285,8 @@ export const APOLLO_11_PROBE_SOURCES: readonly MissionSource[] = [
 export const APOLLO_11_ENGINE_SOURCES: readonly MissionSource[] = [
   ...APOLLO_11_SOURCES,
   {
-    label: 'NASA History — Chariots for Apollo, chapter 6',
-    url: 'https://www.hq.nasa.gov/office/pao/History/SP-4205/ch6-5.html',
+    label: 'NASA History — Chariots for Apollo (SP-4205), chapter 6',
+    url: 'https://www.nasa.gov/wp-content/uploads/2023/03/sp-4205.pdf',
   },
   {
     label: 'NASA — Apollo Experience Report: Descent Propulsion System (1973)',
