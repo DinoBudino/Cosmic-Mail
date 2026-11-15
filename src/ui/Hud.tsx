@@ -22,12 +22,24 @@ function GearIcon() {
   )
 }
 
-function AlbumIcon() {
+/**
+ * A small Cosmic Album tablet (same look as the album: navy bezel,
+ * orange corner bumpers, cream screen) with a ringed planet photo on it.
+ */
+function AlbumTablet() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect x="4.5" y="3" width="15" height="18" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <rect x="7" y="6" width="10" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M8 16.5h8M10.5 19h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    <svg className="hud-album__tablet" viewBox="0 0 88 64" aria-hidden="true" focusable="false">
+      <rect x="3" y="3" width="82" height="58" rx="11" fill="#2b2063" stroke="#1a1340" strokeWidth="2" />
+      {/* Orange corner bumpers */}
+      <path d="M3 17V14A11 11 0 0 1 14 3h4M70 3h4a11 11 0 0 1 11 11v3M85 47v3a11 11 0 0 1-11 11h-4M18 61h-4A11 11 0 0 1 3 50v-3" fill="none" stroke="#ff8a3d" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="44" cy="8" r="1.8" fill="#8f86c9" />
+      <rect x="11" y="12" width="66" height="42" rx="6" fill="#fff1e2" />
+      {/* The photo on screen: a ringed planet and two sparkles */}
+      <circle cx="40" cy="33" r="10" fill="#ff9a52" />
+      <path d="M33 37c4-1 11-4 15-8" stroke="#e2622b" strokeWidth="2.4" strokeLinecap="round" />
+      <ellipse cx="40" cy="33" rx="17" ry="5" fill="none" stroke="#2b2063" strokeWidth="2.2" transform="rotate(-18 40 33)" />
+      <path d="M61 19l1.4 3 3 1.4-3 1.4L61 28l-1.4-3-3-1.4 3-1.4z" fill="#ff8a3d" />
+      <circle cx="64" cy="43" r="1.6" fill="#8f86c9" />
     </svg>
   )
 }
@@ -85,8 +97,8 @@ export function Hud() {
         aria-label="Open the Cosmic Album"
         aria-haspopup="dialog"
       >
-        <AlbumIcon />
-        <span>Album</span>
+        <AlbumTablet />
+        <span className="hud-album__label">Album</span>
       </button>
 
       <button

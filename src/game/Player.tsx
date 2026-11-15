@@ -12,7 +12,7 @@ import {
 import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
 import { emitFootstep } from './audio/audioEvents'
-import { AstronautModel } from './AstronautModel'
+import { AstronautModel, RUN_CLIP_MOTION, RUN_STRIDE, WALK_STRIDE } from './AstronautModel'
 import { resolveEnvironmentalCollision } from './environmentCollision'
 import { resolveBoulderCollision } from './landscape'
 import {
@@ -462,7 +462,9 @@ export function Player() {
     // Footsteps follow travelled distance, never frame count.
     if (horizontalSpeed > 0.35) {
       stepDistance.current += horizontalSpeed * dt
-      const stride = runHeld ? 1.08 : 0.82
+      // One sound per animated foot contact (about 2.5 steps a second
+      // walking, 3 running), not a rattle tied to raw distance.
+      const stride = motionRef.current > RUN_CLIP_MOTION ? RUN_STRIDE : WALK_STRIDE
       if (stepDistance.current >= stride) {
         stepDistance.current = 0
         stepVariant.current += 1

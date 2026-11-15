@@ -1,6 +1,7 @@
 import { useProgress } from '@react-three/drei'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { getActiveWorld } from '../data/spiritSite'
+import { useGameStore } from '../store/gameStore'
 
 /** How long nothing may be loading before the world counts as ready. */
 const SETTLE_MS = 450
@@ -17,9 +18,20 @@ const FADE_MS = 700
  * ground, or the "Preparing…" card, before the landscape pops in. The
  * veil starts in the dive's final colour and fades away once the scene
  * has stopped loading, so the landing reads as one continuous move.
+ * Lifting it starts the landing-site title (SiteTitle).
  */
 export function ArrivalVeil() {
   const [stage, setStage] = useState<'hold' | 'fade' | 'gone'>('hold')
+
+  // Each landing starts with the world loading; the next one starts over.
+  useLayoutEffect(() => {
+    useGameStore.getState().setArrivalStage('loading')
+    return () => useGameStore.getState().setArrivalStage('loading')
+  }, [])
+  // As the veil lifts, the landing-site title takes the screen.
+  useEffect(() => {
+    if (stage === 'fade') useGameStore.getState().setArrivalStage('title')
+  }, [stage])
 
   useEffect(() => {
     if (stage !== 'hold') return

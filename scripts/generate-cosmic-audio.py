@@ -177,6 +177,47 @@ def solar_rumble(name: str, duration=1.9, peak=0.62) -> None:
     write_wav(os.path.join(TEMP, name + ".wav"), normalize(values, peak))
 
 
+def site_reveal(name: str, airy: bool, duration=4.2, peak=0.6) -> None:
+    """The landing-site title card. Mars: a warm wind swell under an open,
+    hopeful chord and three soft bells as the place name appears. Moon: the
+    same chord and bells, cooler and with no wind, because there is no air
+    to carry it. Gentle attack, no percussion, no pitch drop."""
+    rnd = random.Random(7070 if airy else 7171)
+    count = int(duration * SR)
+    pad = [146.83, 220.00, 293.66, 329.63] if airy else [130.81, 196.00, 293.66, 493.88]
+    bells = [(0.55, 880.0), (0.85, 1174.66), (1.15, 1318.51)] if airy else \
+            [(0.55, 987.77), (0.85, 1318.51), (1.15, 1567.98)]
+    lp1 = lp2 = 0.0
+    values = []
+    for index in range(count):
+        t = index / SR
+        # Slow swell in and a long release.
+        swell = min(1.0, t / 0.9) ** 1.5 * max(0.0, 1.0 - max(0.0, t - 2.0) / (duration - 2.0)) ** 1.6
+        value = 0.0
+        for offset, frequency in enumerate(pad):
+            detune = 1.0 + 0.0015 * math.sin(2 * math.pi * (0.3 + offset * 0.11) * t)
+            value += math.sin(2 * math.pi * frequency * detune * t + offset) * (0.5 if offset == 0 else 0.32)
+        value *= swell * 0.55
+        if airy:
+            # Wind: band-limited noise whose brightness rises with the swell.
+            white = rnd.uniform(-1, 1)
+            k = 0.004 + 0.018 * swell
+            lp1 = lp1 * (1 - k) + white * k
+            lp2 = lp2 * 0.96 + lp1 * 0.04
+            value += lp2 * 4.5 * swell
+        else:
+            # A deep, soft sub swell instead of wind.
+            value += math.sin(2 * math.pi * 55 * t) * swell * 0.35
+        for start, frequency in bells:
+            if t >= start:
+                u = t - start
+                ring = math.exp(-u * (2.2 if airy else 1.4))
+                value += (math.sin(2 * math.pi * frequency * u)
+                          + 0.25 * math.sin(2 * math.pi * frequency * 2.01 * u)) * ring * min(1.0, u / 0.006) * 0.28
+        values.append(value)
+    write_wav(os.path.join(TEMP, name + ".wav"), normalize(values, peak))
+
+
 def encode_one_shot(name: str, folder: str) -> None:
     source = os.path.join(TEMP, name + ".wav")
     target = os.path.join(OUT, folder, name + ".mp3")
@@ -240,6 +281,10 @@ with tempfile.TemporaryDirectory(prefix="cosmic-mail-audio-") as temp:
         drone_loop("deep-space-drone")
     if want("ship-solar-rumble"):
         solar_rumble("ship-solar-rumble")
+    if want("site-reveal-mars"):
+        site_reveal("site-reveal-mars", True)
+    if want("site-reveal-moon"):
+        site_reveal("site-reveal-moon", False)
 
     for name in ("pip-attention", "pip-curious", "pip-surprise", "pip-worried",
                  "pip-discovery", "pip-celebrate", "pip-hologram"):
@@ -257,5 +302,8 @@ with tempfile.TemporaryDirectory(prefix="cosmic-mail-audio-") as temp:
         encode_loop("deep-space-drone", "ambience")
     if want("ship-solar-rumble"):
         encode_one_shot("ship-solar-rumble", os.path.join("sfx", "ship"))
+    for name in ("site-reveal-mars", "site-reveal-moon"):
+        if want(name):
+            encode_one_shot(name, os.path.join("sfx", "ui"))
 
 print("Generated original Cosmic Mail audio in", OUT)

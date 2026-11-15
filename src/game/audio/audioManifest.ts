@@ -642,6 +642,28 @@ const AUDIO_ASSET_SEEDS = {
   ),
 
   /* ---------------------------------------------------------------- Ship */
+  'ui.siteRevealMars': asset(
+    'audio/sfx/ui/site-reveal-mars.mp3',
+    'sfx',
+    'sfx',
+    0.7,
+    false,
+    8,
+    ORIGINAL_LICENSE,
+    original('Landing site title: Mars wind swell and bells'),
+    ['ui', 'landing', 'title', 'mars'],
+  ),
+  'ui.siteRevealMoon': asset(
+    'audio/sfx/ui/site-reveal-moon.mp3',
+    'sfx',
+    'sfx',
+    0.7,
+    false,
+    8,
+    ORIGINAL_LICENSE,
+    original('Landing site title: Moon chord and bells'),
+    ['ui', 'landing', 'title', 'moon'],
+  ),
   'ship.solarRumble': asset(
     'audio/sfx/ship/ship-solar-rumble.mp3',
     'sfx',

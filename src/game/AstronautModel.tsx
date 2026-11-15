@@ -63,6 +63,18 @@ interface AstronautModelProps {
 /** Ground speed (m/s) at which each authored cycle's feet keep up best. */
 const WALK_REF_SPEED = 4.6
 const RUN_REF_SPEED = 6.6
+/** Clip lengths in astronaut-v2.glb (one cycle = two steps). */
+const WALK_CYCLE_S = 0.633
+const RUN_CYCLE_S = 0.533
+/** Above this share of top speed the Run clip plays (else Walk). */
+export const RUN_CLIP_MOTION = 0.86
+/**
+ * Ground covered per footstep by each clip at its reference speed. The
+ * clip's playback follows ground speed, so a footstep sound every stride
+ * lands on the animated foot contact.
+ */
+export const WALK_STRIDE = (WALK_REF_SPEED * WALK_CYCLE_S) / 2
+export const RUN_STRIDE = (RUN_REF_SPEED * RUN_CYCLE_S) / 2
 
 /**
  * Loads the Blender-authored astronaut (V2, one skinned mesh) and drives
@@ -227,7 +239,7 @@ export function AstronautModel({
     }
 
     if (!gesture.current) {
-      const desired = motion > 0.86 ? 'Run' : motion > 0.06 ? 'Walk' : 'Idle'
+      const desired = motion > RUN_CLIP_MOTION ? 'Run' : motion > 0.06 ? 'Walk' : 'Idle'
       playClip(desired, 'loop', desired === 'Idle' ? 0.25 : 0.2)
       if (desired === 'Walk' || desired === 'Run') {
         const action = actionSet[desired]

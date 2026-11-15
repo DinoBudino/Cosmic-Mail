@@ -29,7 +29,8 @@ export function ScanKeyLabel() {
       state.archiveView !== 'none' ||
       state.activeSiteId !== null ||
       state.cinematicFocus !== null ||
-      state.marsBriefingStep !== null,
+      state.marsBriefingStep !== null ||
+      state.arrivalStage !== 'done',
   )
   const target = getScanKeyTarget(step, objective.highlight)
   const position = useMemo(() => {

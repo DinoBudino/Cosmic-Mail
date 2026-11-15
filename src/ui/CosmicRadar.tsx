@@ -31,6 +31,7 @@ export function CosmicRadar() {
   const cinematicFocus = useGameStore((state) => state.cinematicFocus)
   const briefingStep = useGameStore((state) => state.marsBriefingStep)
   const activeSiteId = useGameStore((state) => state.activeSiteId)
+  const arriving = useGameStore((state) => state.arrivalStage !== 'done')
   const settingsOpen = useGameStore((state) => state.settingsOpen)
   const pipMessage = useGameStore((state) => state.pipMessage)
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
@@ -56,6 +57,7 @@ export function CosmicRadar() {
   const targetZ = radarTarget.z
 
   const hidden =
+    arriving ||
     settingsOpen ||
     activeSiteId !== null ||
     nearbySiteId !== null ||

@@ -19,8 +19,11 @@ import { PipAvatar } from './PipSpeech'
 import { useAdvanceAnywhere } from './useAdvanceAnywhere'
 import './marsBriefing.css'
 
-/** Let the landing scene settle before PIP starts talking. */
-const OPENING_DELAY_MS = 900
+/**
+ * After the landing-site title, a short breath to take in the landscape
+ * before PIP starts talking.
+ */
+const OPENING_DELAY_MS = 1600
 
 /**
  * Guided Mars arrival: PIP's welcome, the signal, the radar, then the
@@ -41,12 +44,14 @@ export function MarsBriefing() {
 
   const [index, setIndex] = useState(0)
   const [opened, setOpened] = useState(false)
+  // The landing-site title comes first.
+  const arrived = useGameStore((state) => state.arrivalStage === 'done')
 
   useEffect(() => {
-    if (!needed) return
+    if (!needed || !arrived) return
     const timer = window.setTimeout(() => setOpened(true), OPENING_DELAY_MS)
     return () => window.clearTimeout(timer)
-  }, [needed])
+  }, [needed, arrived])
 
   const active = needed && opened
   const step = briefingStep(index)

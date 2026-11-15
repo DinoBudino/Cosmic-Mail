@@ -32,6 +32,7 @@ describe('site interaction state', () => {
       archiveView: 'none',
       archiveMissionId: null,
       travelTargetId: null,
+      arrivalStage: 'done',
     })
   })
 
@@ -44,6 +45,16 @@ describe('site interaction state', () => {
     expect(useGameStore.getState().activeSiteId).toBe('opportunity')
     expect(isWorldPaused()).toBe(true)
     state.closeSite()
+    expect(isWorldPaused()).toBe(false)
+  })
+
+  it('pauses the world until the landing-site title has been shown', () => {
+    const state = useGameStore.getState()
+    state.setArrivalStage('loading')
+    expect(isWorldPaused()).toBe(true)
+    state.setArrivalStage('title')
+    expect(isWorldPaused()).toBe(true)
+    state.setArrivalStage('done')
     expect(isWorldPaused()).toBe(false)
   })
 

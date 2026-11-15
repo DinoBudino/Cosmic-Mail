@@ -31,6 +31,9 @@ export type ScannerPhysicalState =
   | 'out-of-range'
   | 'occluded'
 
+/** See GameState.arrivalStage. */
+export type ArrivalStage = 'loading' | 'title' | 'done'
+
 /** Reward shown when a scan finishes (practice rock, part or landscape). */
 export interface ScanCelebration {
   seq: number
@@ -187,6 +190,14 @@ interface GameState {
    */
   marsBriefingStep: BriefingStepId | null
   setMarsBriefingStep: (step: BriefingStepId | null) => void
+  /**
+   * Landing presentation, before anything else: 'loading' while the world
+   * loads under the arrival veil, 'title' while the landing-site name is on
+   * screen, 'done' once PIP and the HUD may start. The world is paused
+   * until 'done'.
+   */
+  arrivalStage: ArrivalStage
+  setArrivalStage: (stage: ArrivalStage) => void
   /** Arrival protocol: the scanner stays locked until the calibration station. */
   scannerLocked: boolean
   setScannerLocked: (locked: boolean) => void
@@ -329,6 +340,12 @@ export const useGameStore = create<GameState>((set, get) => {
   scannerLatched: false,
   historicalExplanationId: null,
   radarUnlocked: false,
+  arrivalStage: 'loading',
+  setArrivalStage: (arrivalStage) => {
+    if (get().arrivalStage === arrivalStage) return
+    clearInput()
+    set({ arrivalStage })
+  },
   marsBriefingStep: null,
   setMarsBriefingStep: (marsBriefingStep) => {
     if (get().marsBriefingStep === marsBriefingStep) return
@@ -819,6 +836,7 @@ export function isWorldPaused(): boolean {
   return (
     isOnboardingActive() ||
     state.marsBriefingStep !== null ||
+    state.arrivalStage !== 'done' ||
     state.settingsOpen ||
     state.albumOpen ||
     state.activeSiteId !== null ||

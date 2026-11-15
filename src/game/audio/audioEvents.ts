@@ -38,6 +38,8 @@ export type AudioEvent =
   | 'solarAlert'
   | 'solarStormReplay'
   | 'solarImpact'
+  | 'siteRevealMars'
+  | 'siteRevealMoon'
   | 'archiveConnectionLost'
   | 'archiveQueryFailed'
   | 'archiveClueRecovered'
@@ -144,6 +146,9 @@ export const EVENT_PLANS: Record<AudioEvent, AudioEventPlan> = {
   solarStormReplay: { sfx: ['archive.activate', 'ui.hologram'] },
   // The storm reaches Mailwing: a soft hull rumble with a short glitch.
   solarImpact: { sfx: ['ship.solarRumble', 'archive.glitchSoft'], duckMs: 1200 },
+  // The landing-site title card: wind swell + bells on Mars, no wind on the Moon.
+  siteRevealMars: { sfx: ['ui.siteRevealMars'], duckMs: 2600 },
+  siteRevealMoon: { sfx: ['ui.siteRevealMoon'], duckMs: 2600 },
   archiveConnectionLost: {
     sfx: ['archive.connectionLost', 'archive.glitchSoft'],
   },

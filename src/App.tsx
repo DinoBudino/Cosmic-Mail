@@ -22,6 +22,8 @@ import { CinematicOverlay } from './ui/CinematicOverlay'
 import { Hud } from './ui/Hud'
 import { AlbumOverlay } from './ui/AlbumOverlay'
 import { ArrivalVeil } from './ui/ArrivalVeil'
+import { SiteTitle } from './ui/SiteTitle'
+import { OverlayBoundary } from './ui/OverlayBoundary'
 import { MissionPanel } from './ui/MissionPanel'
 import { ObjectiveBar } from './ui/ObjectiveBar'
 import { PipTipCard } from './ui/PipTipCard'
@@ -33,11 +35,19 @@ import { SceneBoundary, SceneStatus } from './ui/SceneStatus'
 
 const GameCanvas = lazy(() => import('./game/GameCanvas'))
 
+function finishArrival() {
+  useGameStore.getState().setArrivalStage('done')
+}
+
 export default function App() {
   const settingsOpen = useGameStore((state) => state.settingsOpen)
   const reducedMotion = useGameStore((state) => state.reducedMotion)
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
-  const briefingOpen = useGameStore((state) => state.marsBriefingStep !== null)
+  // The arrival briefing, or the landing presentation before it, owns the
+  // screen: the HUD waits.
+  const briefingOpen = useGameStore(
+    (state) => state.marsBriefingStep !== null || state.arrivalStage !== 'done',
+  )
   const scannerCamera = useGameStore((state) => state.scannerCamera)
   const scanStation = useGameStore((state) => state.scanStation)
   const onboardingActive = useOnboardingStore((state) => state.phase !== 'playing')
@@ -112,6 +122,10 @@ export default function App() {
             {/* Covers the first moments while the ground loads, in the
                 orbit dive's final colour, then fades away. */}
             <ArrivalVeil />
+            {/* If the title card ever fails, the landing goes on without it. */}
+            <OverlayBoundary onError={finishArrival}>
+              <SiteTitle />
+            </OverlayBoundary>
 
             {/* The guided arrival briefing owns the screen: only the radar
                 PIP presents stays, everything else waits until it ends. */}

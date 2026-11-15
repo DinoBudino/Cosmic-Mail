@@ -96,8 +96,10 @@ export const EXPLORATION_ZONES = [
 ] as const
 
 export const PLAYER = {
-  moveSpeed: 5.4,
-  runSpeedMultiplier: 1.45,
+  // A brisk, believable walk in a bulky suit (it was a jog at 5.4 m/s,
+  // with footsteps racing to match). Run stays clearly faster.
+  moveSpeed: 3.6,
+  runSpeedMultiplier: 1.55,
   moveAccel: 11,
   turnSpeed: 13,
   radius: 0.45,

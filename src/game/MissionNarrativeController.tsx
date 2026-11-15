@@ -136,6 +136,8 @@ function openTabletAfter(cueId: string | null, missionId: MissionId): void {
 
 export function MissionNarrativeController() {
   const save = useJourneyStore((state) => state.save)
+  // The landing-site title opens every landing; PIP speaks after it.
+  const arrived = useGameStore((state) => state.arrivalStage === 'done')
   const archiveView = useGameStore((state) => state.archiveView)
   const archiveMissionId = useGameStore((state) => state.archiveMissionId)
   const settingsOpen = useGameStore((state) => state.settingsOpen)
@@ -181,7 +183,7 @@ export function MissionNarrativeController() {
 
   // One entry/revisit line per mounted visit.
   useEffect(() => {
-    if (enteredRef.current || !save) return
+    if (enteredRef.current || !save || !arrived) return
     enteredRef.current = true
     // A fresh landing gets the guided arrival briefing instead of the
     // short entry line (MarsBriefing owns PIP's voice until it ends).
@@ -222,7 +224,7 @@ export function MissionNarrativeController() {
     previousEnvironmentalDetailedRef.current = [
       ...(save.environmentalDetailedDiscoveries ?? []),
     ]
-  }, [save, mission, progress])
+  }, [save, mission, progress, arrived])
 
   // Detection, identification, scanner hints and voluntary guidance are
   // driven by the real player position and the real scanner state.
@@ -267,6 +269,7 @@ export function MissionNarrativeController() {
       // (the idle clock restarts, so no hint fires the moment they close).
       if (
         game.marsBriefingStep !== null ||
+        game.arrivalStage !== 'done' ||
         game.settingsOpen ||
         game.scannerOpen ||
         game.scannerRecordsOpen ||
