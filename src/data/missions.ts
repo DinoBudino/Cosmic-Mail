@@ -381,8 +381,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
         shortName: 'TV camera',
         historicalRecord:
           "Surveyor 3's television camera sent 6,326 pictures of the lunar surface to Earth. It used 25 mm and 100 mm lenses and a movable mirror. Apollo 12 astronauts later brought the camera back for study.",
-        pipLine:
-          "This camera was Surveyor 3's eye. It sent home thousands of pictures so people could see the Moon up close.",
+        pipLine: pipLine('surveyor-camera'),
         pipHint: pipLine('surveyor-hint-camera'),
         pipDirectHint: pipLine('surveyor-direct-camera'),
         howItWorks: { verb: 'Looks', detail: 'A camera that looked at the Moon through a turning mirror.' },
@@ -398,8 +397,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
         shortName: 'Soil scoop',
         historicalRecord:
           'Surveyor 3 carried a surface sampler that could reach about 1.5 meters from the lander and dig about 18 centimeters deep. It dug trenches and tested how the lunar soil held weight.',
-        pipLine:
-          'This scoop touched the Moon for us. It dug little trenches and showed how the dusty ground holds weight.',
+        pipLine: pipLine('surveyor-scoop'),
         pipHint: pipLine('surveyor-hint-scoop'),
         pipDirectHint: pipLine('surveyor-direct-scoop'),
         howItWorks: { verb: 'Touches', detail: 'A little scoop that dug trenches and pressed on the ground.' },
@@ -415,8 +413,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
         shortName: 'Descent radar',
         historicalRecord:
           "Surveyor 3 used descent radar to measure its height and speed during landing. Reflective rocks confused the radar, and the main engine did not cut off at the expected moment, so the lander bounced twice before settling.",
-        pipLine:
-          'This radar helped Surveyor 3 feel its way down. The landing was a little bumpy, but it still reached the surface safely.',
+        pipLine: pipLine('surveyor-radar'),
         pipHint: pipLine('surveyor-hint-radar'),
         pipDirectHint: pipLine('surveyor-direct-radar'),
         howItWorks: { verb: 'Measures', detail: 'Radio waves bounced off the ground to measure height and speed.' },
@@ -435,7 +432,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
         historicalRecord:
           'Surveyor 3 made electricity with a solar panel of about 0.86 square metres covered with 792 solar cells, mounted at the top of its mast.',
         pipNote:
-          "A solar panel! It turned sunlight into power. Nice find, but it won't unlock a memory fragment.",
+          "A solar panel that turned sunlight into power! Nice find, but it won't unlock a memory fragment.",
         sources: SURVEYOR_3_HARDWARE_SOURCES,
         validation: 'source-checked',
       },
@@ -480,7 +477,8 @@ export const MISSIONS: readonly MissionDefinition[] = [
     },
     reconstruction: {
       title: 'Surveyor 3 · First-person reconstruction',
-      status: 'script-draft',
+      status: 'video',
+      video: 'video/surveyor3-720p.webm',
       lines: [
         'I am falling toward a grey plain that no one has ever touched.',
         'My radar measures the ground. The engine fires, the surface rises to meet me, and I settle.',
@@ -596,7 +594,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
         historicalRecord:
           "Eagle's ladder ran down its front leg. Neil Armstrong climbed down it to take the first human step on the Moon.",
         pipNote:
-          'The famous ladder! The first steps on the Moon started here. Nice find, but not a fragment.',
+          'The famous ladder, where the first steps on the Moon began! Nice find, but not a fragment.',
         sources: APOLLO_11_SOURCES,
         validation: 'source-checked',
       },
@@ -619,7 +617,8 @@ export const MISSIONS: readonly MissionDefinition[] = [
     },
     reconstruction: {
       title: 'Eagle · First-person reconstruction',
-      status: 'script-draft',
+      status: 'video',
+      video: 'video/apollo11-720p.webm',
       lines: [
         'Two people ride inside me as I fall toward a gray plain.',
         'My engine pushes softly. Rocks pass below. We fly on, looking for a smooth place.',
@@ -724,7 +723,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
         historicalRecord:
           'Opportunity was powered by solar panels. In early 2014 the wind blew much of the dust off them, and its daily energy rose from under 375 to over 620 watt-hours.',
         pipNote:
-          "Solar panels! The wind even cleaned them once. Nice find, but they won't unlock a memory fragment.",
+          "Solar panels, and the wind even cleaned them once! Nice find, but they won't unlock a memory fragment.",
         sources: OPPORTUNITY_SOURCES,
         validation: 'source-checked',
       },
@@ -877,7 +876,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
         historicalRecord:
           'Spirit was powered by solar panels. After landing, the rover deployed its petal solar panels.',
         pipNote:
-          "Solar panels! They gave Spirit its power. Nice find, but they won't unlock a memory fragment.",
+          "Solar panels that gave Spirit its power! Nice find, but they won't unlock a memory fragment.",
         sources: SPIRIT_SOURCES,
         validation: 'source-checked',
       },

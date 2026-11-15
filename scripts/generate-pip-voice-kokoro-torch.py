@@ -6,7 +6,10 @@ public/audio/pip/heart/<key>1.mp3 and <key>2.mp3 (PIP's only voice, af_heart),
 with the same two-take treatment (take 2 at 96 % speed, same pitch lift).
 Use it when the onnx engine files are not installed.
 
-    python generate-pip-voice-kokoro-torch.py [key ...] [--prefix moon-,apollo-] [--force]
+    python generate-pip-voice-kokoro-torch.py [key ...] [--prefix moon-,apollo-] [--all] [--force]
+
+--all regenerates every line (the JSON catalog plus the four Mars landmark
+lines), so the whole game keeps one identical PIP voice.
 
 Requirements: kokoro (>=0.9), soundfile, numpy; ffmpeg on PATH.
 """
@@ -33,7 +36,17 @@ prefixes = ()
 if "--prefix" in argv:
     prefixes = tuple(argv[argv.index("--prefix") + 1].split(","))
 keys = {a for a in argv if not a.startswith("--") and a not in (",".join(prefixes),)}
-selected = [l for l in LINES if (l["key"] in keys) or (prefixes and l["key"].startswith(prefixes))]
+# Mars landmark lines live outside the JSON (see generate-pip-voice.py).
+LANDMARKS = [
+    {"key": "opportunity", "text": "Wow! Valley of Echoes! Look, old rover tracks!", "speed": 1.0},
+    {"key": "insight", "text": "Hush now! Silent Plains. Listen with me!", "speed": 1.0},
+    {"key": "ingenuity", "text": "First Flight Dunes! Whoa. The sky is so wide here.", "speed": 1.0},
+    {"key": "viking1", "text": "Ancient Lands. Whoa! This place feels old.", "speed": 1.0},
+]
+if "--all" in argv:
+    selected = LINES + LANDMARKS
+else:
+    selected = [l for l in LINES if (l["key"] in keys) or (prefixes and l["key"].startswith(prefixes))]
 
 pipelines = {}
 

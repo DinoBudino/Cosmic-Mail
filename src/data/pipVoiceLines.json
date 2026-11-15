@@ -991,5 +991,201 @@
     "speed": 1.06,
     "category": "apollo",
     "pitch": 1.05
+  },
+  {
+    "key": "distractor-surveyor-3-solar-panel",
+    "text": "A solar panel that turned sunlight into power! Nice find, but it won't unlock a memory fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-surveyor-3-footpads",
+    "text": "Three legs with squishy footpads for a soft landing. Important, but not a fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-surveyor-3-antenna",
+    "text": "This flat antenna sent the pictures home. Good to know, but not a fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-apollo-11-landing-legs",
+    "text": "Four strong legs with big round feet! Important, but they won't unlock a memory fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-apollo-11-ladder",
+    "text": "The famous ladder, where the first steps on the Moon began! Nice find, but not a fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-opportunity-solar-panels",
+    "text": "Solar panels, and the wind even cleaned them once! Nice find, but they won't unlock a memory fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-opportunity-wheels",
+    "text": "Six wheels carried Opportunity farther than a marathon. They're important, but this is not a memory fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-opportunity-antenna",
+    "text": "Antennas helped Opportunity send its pictures home. Good to know, but not a fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-spirit-solar-panels",
+    "text": "Solar panels that gave Spirit its power! Nice find, but they won't unlock a memory fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-spirit-wheels",
+    "text": "Six wheels carried Spirit across Mars. They're important, but this is not a memory fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "distractor-spirit-antenna",
+    "text": "Antennas helped Spirit send its data home through orbiters. Good to know, but not a fragment.",
+    "speed": 1.06,
+    "category": "distractor",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-off-trail",
+    "text": "Let us stay on the signal trail.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-later",
+    "text": "Later, pilot. The signal first.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-inspect-first",
+    "text": "Inspect it first (E).",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-hint-1",
+    "text": "Drag the joystick to walk and drag the screen to look around.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-hint-2",
+    "text": "Walk with WASD and move the mouse to look around.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-hint-3",
+    "text": "Tap the scanner button, aim at the glowing rock and hold Scan.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-hint-4",
+    "text": "Press Q, aim at the glowing rock and hold the left mouse button.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-hint-13",
+    "text": "Turn until the orange star is at the top of the radar, then walk.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "protocol-hint-14",
+    "text": "The signal is near. Walk up to the shape and press E.",
+    "speed": 1.06,
+    "category": "protocol",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-new-signal",
+    "text": "I'm picking up another faint signal. It's still too weak to follow, but the Archive has marked it for later.",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-env-quick-1",
+    "text": "This dark rock looks volcanic. I am comparing its shape and tone with Martian basalt references.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-env-quick-2",
+    "text": "This looks like fine Martian dust over broken rock. The surface is loose and easy for the wind to move.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-env-quick-3",
+    "text": "These streaks look shaped by the wind. The scanner is reading the ripple pattern, not the weather.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "mars-env-quick-4",
+    "text": "This layered outcrop may record ancient changes. The scanner sees stacked layers worth a closer look.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-restored-1-of-4",
+    "text": "1 of 4 stories restored. Great work, carrier!",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-restored-2-of-4",
+    "text": "2 of 4 stories restored. Great work, carrier!",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.05
+  },
+  {
+    "key": "hub-restored-3-of-4",
+    "text": "3 of 4 stories restored. Great work, carrier!",
+    "speed": 1.06,
+    "category": "onboarding",
+    "pitch": 1.05
   }
 ]
