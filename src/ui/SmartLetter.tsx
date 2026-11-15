@@ -1,16 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   TRANSMISSION_DESTINATION,
 } from '../data/onboardingNarrative'
 import { findMission } from '../data/missions'
 import { getArchiveCue } from '../data/missionNarrative'
-import {
-  advanceDelivery,
-  createDelivery,
-  isDeliveryInProgress,
-  type DeliveryEvent,
-  type DeliveryState,
-} from '../data/postalDelivery'
 import { emitAudio } from '../game/audio/audioEvents'
 import { speakPip, stopPipVoice } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
@@ -18,7 +11,6 @@ import { useJourneyStore } from '../store/journeyStore'
 import { useNarrativeStore } from '../store/narrativeStore'
 import { useOnboardingStore } from '../store/onboardingStore'
 import { PipAvatar } from './PipSpeech'
-import { PostalDelivery } from './PostalDelivery'
 import { HuntIconGlyph } from './HuntTracker'
 
 type TimelineKey = 'launch' | 'landing' | 'discovery' | 'end'
@@ -41,39 +33,6 @@ export function SmartLetterOverlay() {
   return <SmartLetter mission={mission} onClose={closeArchive} />
 }
 
-function Stamp({
-  label,
-  transmitted,
-  animate,
-}: {
-  label: string
-  transmitted: boolean
-  animate: boolean
-}) {
-  if (!transmitted) {
-    return (
-      <span className="smart-letter__stamp-pending">
-        Awaiting
-        <br />
-        delivery
-      </span>
-    )
-  }
-  return (
-    <div
-      className={`smart-letter__stamp${animate ? ' is-just-sealed' : ''}`}
-      role="img"
-      aria-label={`Archive stamp: ${label}`}
-    >
-      <span className="smart-letter__stamp-star" aria-hidden="true">
-        ✦
-      </span>
-      <span className="smart-letter__stamp-label">{label}</span>
-      <span className="smart-letter__stamp-word">TRANSMITTED</span>
-    </div>
-  )
-}
-
 function SmartLetter({
   mission,
   onClose,
@@ -85,7 +44,6 @@ function SmartLetter({
   const prepareSmartLetter = useJourneyStore(
     (state) => state.prepareSmartLetter,
   )
-  const transmit = useJourneyStore((state) => state.transmit)
   const markReconstructionWatched = useJourneyStore(
     (state) => state.markReconstructionWatched,
   )
@@ -94,11 +52,9 @@ function SmartLetter({
   const voiceName = useGameStore((state) => state.voiceName)
   const openArchive = useGameStore((state) => state.openArchive)
   const phase = useOnboardingStore((state) => state.phase)
-  const reducedMotion = useGameStore((state) => state.reducedMotion)
 
   const [message, setMessage] = useState<string | null>(null)
   const [openStep, setOpenStep] = useState<TimelineKey | null>(null)
-  const [delivery, setDelivery] = useState<DeliveryState | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
   const previousFocus = useRef<Element | null>(null)
@@ -107,14 +63,13 @@ function SmartLetter({
   const memoryRecovered = progress?.memoryRecoveredAt != null
   const hasLetter = progress?.smartLetterCreatedAt != null
   const transmitted = progress?.transmittedAt != null
-  // While the ceremony runs, the stamp and "Delivered" appear only when the
-  // carrier actually stamps the passport, not the moment the data commits.
-  const ceremonyRunning = isDeliveryInProgress(delivery)
-  const showDelivered = transmitted && !ceremonyRunning
+  const showDelivered = transmitted
   const isAboardMailwing = phase === 'hub' || phase === 'orbit'
-  // Last step on Mars: the letter is sealed, so the only thing left on the
-  // tablet is its story (the video). Closing happens from the story.
-  const storyOnly = hasLetter && !transmitted && !isAboardMailwing
+  // A sealed letter is sent right after its story video (StoryTransmission),
+  // so the only thing left on the tablet is "Watch its story". On Mars the
+  // tablet cannot be closed: the story is the way forward.
+  const storyPending = hasLetter && !transmitted
+  const storyOnly = storyPending && !isAboardMailwing
   const cue = getArchiveCue(mission, progress)
   const activeCue = archiveLine?.missionId === mission.id ? archiveLine : cue
   const pipLine = activeCue.text
@@ -165,42 +120,6 @@ function SmartLetter({
         ? 'The memory must be recovered before a smart letter can be prepared.'
         : 'This mission is not available.',
     )
-  }
-
-  const handleAdvance = useCallback((event: DeliveryEvent) => {
-    setDelivery((current) =>
-      current ? advanceDelivery(current, event) : current,
-    )
-  }, [])
-
-  const handleBeginDelivery = () => {
-    setMessage(null)
-    setDelivery(createDelivery(transmitted))
-  }
-
-  /** The one real transmission. Idempotent: repeats never duplicate it. */
-  const handleSend = (): boolean => {
-    emitAudio('transmissionStarted')
-    const result = transmit(mission.id)
-    if (!result) {
-      emitAudio('uiError')
-      setMessage('No active journey save. Return to exploring and try again.')
-      return false
-    }
-    if (
-      result.status === 'transmitted' ||
-      result.status === 'already-transmitted'
-    ) {
-      setMessage(null)
-      return true
-    }
-    emitAudio('uiError')
-    setMessage(
-      result.status === 'letter-missing'
-        ? 'Prepare the smart letter before transmitting it.'
-        : 'This mission is not available.',
-    )
-    return false
   }
 
   const handleReconstruction = () => {
@@ -259,11 +178,16 @@ function SmartLetter({
           <div className="archive-tablet__hero">
             <div className="archive-tablet__badge" aria-hidden={!showDelivered}>
               {showDelivered ? (
-                <Stamp
-                  label={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
-                  transmitted
-                  animate={false}
-                />
+                <span
+                  className="archive-tablet__holo-stamp"
+                  role="img"
+                  aria-label={`Archive stamp: ${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
+                  style={{
+                    backgroundImage: `url(${import.meta.env.BASE_URL}textures/${mission.destination === 'moon' ? 'moon/moon' : 'mars/mars'}-color.jpg)`,
+                  }}
+                >
+                  <b aria-hidden="true">✦</b>
+                </span>
               ) : (
                 <span className="archive-tablet__badge-glyph">
                   {progress?.discovered ? '✉' : '?'}
@@ -353,24 +277,14 @@ function SmartLetter({
                 <span aria-hidden="true">✉</span> Seal the letter
               </button>
             )}
-            {hasLetter && !transmitted && isAboardMailwing && !delivery && (
-              <button
-                ref={primaryRef}
-                type="button"
-                className="archive-tablet__action archive-tablet__action--primary"
-                onClick={handleBeginDelivery}
-              >
-                Send to Earth
-              </button>
-            )}
             {hasLetter && (
               <button
-                ref={storyOnly || transmitted || ceremonyRunning ? primaryRef : undefined}
+                ref={hasLetter ? primaryRef : undefined}
                 type="button"
-                className={`archive-tablet__action${storyOnly ? ' archive-tablet__action--primary' : ''}`}
+                className={`archive-tablet__action${storyPending ? ' archive-tablet__action--primary archive-tablet__action--story' : ''}`}
                 onClick={handleReconstruction}
               >
-                {progress?.reconstructionWatchedAt != null ? 'Replay its story' : 'Watch its story'}
+                {storyPending ? '▶ Watch its story' : 'Replay its story'}
               </button>
             )}
             {(!hasLetter || transmitted) && !(memoryRecovered && !hasLetter) && (
@@ -385,15 +299,6 @@ function SmartLetter({
             )}
           </div>
 
-          {delivery && (
-            <PostalDelivery
-              delivery={delivery}
-              stampLabel={`${mission.stampLabel} · ${TRANSMISSION_DESTINATION}`}
-              reducedMotion={reducedMotion}
-              onAdvance={handleAdvance}
-              onSend={handleSend}
-            />
-          )}
 
           {message && (
             <p className="archive-tablet__message" role="status">

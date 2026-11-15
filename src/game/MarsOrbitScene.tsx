@@ -10,6 +10,7 @@ import {
 import type { MarsExplorerId } from '../data/spiritSite'
 import { makeMarsCanvas } from './marsTexture'
 import { RockySurface } from './PlanetGlobe'
+import { PauseWhenCovered } from './PauseWhenCovered'
 import { mulberry32 } from './random'
 
 export interface OrbitMarker {
@@ -249,6 +250,7 @@ export default function MarsOrbitScene(props: MarsOrbitSceneProps) {
       gl={{ antialias: true, powerPreference: 'low-power' }}
     >
       <color attach="background" args={['#0b0614']} />
+      <PauseWhenCovered />
       <ambientLight intensity={0.35} />
       <directionalLight position={[4, 2.5, 5]} intensity={2.2} />
       <Stars />

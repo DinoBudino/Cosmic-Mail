@@ -346,11 +346,11 @@ export function getObjective(ctx: ObjectiveContext): Objective {
       return {
         text: ctx.memoryRecovered
           ? 'Seal the letter on your tablet'
-          : 'Walk back to the ship and climb aboard',
+          : 'Watch its story and send it to Earth',
         highlight: null,
       }
     case 'M7':
-      return { text: 'Free exploration', highlight: null }
+      return { text: 'Story sent! Explore, or walk back to the ship', highlight: null }
   }
 }
 

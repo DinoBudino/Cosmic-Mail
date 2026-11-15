@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { mulberry32 } from './random'
 import { makeMarsCanvas } from './marsTexture'
 import { EarthSurface, RockySurface } from './PlanetGlobe'
+import { PauseWhenCovered } from './PauseWhenCovered'
 import {
   DESTINATIONS,
   destinationPlanetKind,
@@ -20,7 +21,12 @@ import {
   type IntroEmotion,
   type IntroMoment,
 } from '../data/onboardingNarrative'
-import { getPassportView, STORY_STATUS_LABEL, type PassportView } from '../data/passport'
+import {
+  getDestinationSummary,
+  getPassportView,
+  STORY_STATUS_LABEL,
+  type PassportView,
+} from '../data/passport'
 import { introHologramSvg } from '../ui/onboarding/introHologramTexture'
 import { emitAudio } from './audio/audioEvents'
 import { WindowHologram } from './WindowHologram'
@@ -1771,18 +1777,24 @@ interface NavRow {
  * screen can never show a wrong number): terrain, signal and explorer.
  */
 function navRows(destination: NavDestination, view: PassportView): NavRow[] {
-  const story = storyFor(view, destination)
+  const summary = getDestinationSummary(view, destination.id)
+  const total = summary.stories.length
   return [
     { label: 'Terrain', value: destination.terrain },
     {
       label: 'Signal',
       value: !destination.available
         ? 'Too weak for now'
-        : story?.stampEarned
-          ? 'Story restored'
-          : 'Detected',
+        : summary.restored
+          ? total > 1 ? 'All stories restored' : 'Story restored'
+          : summary.restoredCount > 0
+            ? `${summary.restoredCount}/${total} stories restored`
+            : 'Detected',
     },
-    { label: 'Explorer', value: story?.machineName ?? 'Not identified yet' },
+    {
+      label: total > 1 ? 'Explorers' : 'Explorer',
+      value: summary.explorers ?? 'Not identified yet',
+    },
   ]
 }
 
@@ -1812,15 +1824,15 @@ function drawInfoRows(
   ctx.textAlign = 'left'
 }
 
+/** The explorer story the child is working on at this place. */
 function storyFor(view: PassportView, destination: NavDestination) {
-  return view.stories.find((entry) => entry.destination.id === destination.id) ?? null
+  return getDestinationSummary(view, destination.id).current
 }
 
 /** Status of the place's signal for the list cards. */
 function signalLabel(destination: NavDestination, view: PassportView): string {
   if (!destination.available) return 'SIGNAL TOO WEAK · SOON'
-  const story = storyFor(view, destination)
-  if (story?.stampEarned) return 'STORY RESTORED'
+  if (getDestinationSummary(view, destination.id).restored) return 'STORY RESTORED'
   return 'SIGNAL DETECTED'
 }
 
@@ -2774,6 +2786,7 @@ export default function MenuScene() {
         onFallback={() => onDprFactor(0)}
       />
       <color attach="background" args={['#050309']} />
+      <PauseWhenCovered />
       <CameraRig />
       <MenuLights />
       <MenuStars />

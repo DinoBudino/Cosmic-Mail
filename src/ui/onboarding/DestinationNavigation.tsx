@@ -1,6 +1,7 @@
 import { DESTINATIONS } from '../../data/destinations'
 import {
   STORY_STATUS_LABEL,
+  getDestinationSummary,
   getPassportView,
 } from '../../data/passport'
 import { getSliceClosure } from '../../data/sliceClosure'
@@ -34,11 +35,10 @@ export function DestinationNavigation({
   const view = getPassportView(save)
   const closure = getSliceClosure(save)
   const selected = DESTINATIONS.find((entry) => entry.id === selectedId) ?? null
-  const selectedStory = selected
-    ? (view.stories.find(
-        (story) => story.destination.id === selected.id,
-      ) ?? null)
+  const selectedSummary = selected
+    ? getDestinationSummary(view, selected.id)
     : null
+  const selectedStory = selectedSummary?.current ?? null
 
   return (
     <section className="quest" aria-labelledby="destination-title">
@@ -65,9 +65,7 @@ export function DestinationNavigation({
 
         <div className="choice-list">
           {DESTINATIONS.map((destination) => {
-            const story = view.stories.find(
-              (entry) => entry.destination.id === destination.id,
-            )
+            const explorers = getDestinationSummary(view, destination.id).explorers
             return (
               <button
                 key={destination.id}
@@ -79,7 +77,7 @@ export function DestinationNavigation({
                 aria-pressed={selectedId === destination.id}
                 aria-label={`${destination.name}: ${
                   destination.available
-                    ? story?.machineName ?? 'signal awaiting identification'
+                    ? explorers ?? 'signal awaiting identification'
                     : 'mission in development'
                 }`}
                 onClick={() => selectDestination(destination.id)}
@@ -95,7 +93,7 @@ export function DestinationNavigation({
                 </span>
                 <span className="choice-option__hint">
                   {destination.available
-                    ? story?.machineName ?? 'Signal awaiting identification'
+                    ? explorers ?? 'Signal awaiting identification'
                     : 'Mission in development'}
                 </span>
               </button>
@@ -111,13 +109,12 @@ export function DestinationNavigation({
               Terrain: {selected.terrain}
             </p>
             <p className="destination-summary__machine">
-              {selectedStory.machineName ?? 'Signal unidentified'}
+              {selectedSummary?.explorers ?? 'Signal unidentified'}
             </p>
             <p className="destination-summary__meta">
-              {STORY_STATUS_LABEL[selectedStory.status]}
-              {selectedStory.stampEarned
-                ? ` · ✦ ${selectedStory.stampLabel}`
-                : ''}
+              {selectedSummary?.restored
+                ? `✦ ${selectedSummary.restoredCount} stamp${selectedSummary.restoredCount === 1 ? '' : 's'}`
+                : STORY_STATUS_LABEL[selectedStory.status]}
             </p>
             <div className="tablet__cta">
               <button

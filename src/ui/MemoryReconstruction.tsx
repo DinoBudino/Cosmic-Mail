@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { findMission } from '../data/missions'
 import { emitAudio } from '../game/audio/audioEvents'
-import { audioManager } from '../game/audio/audioManager'
 import { speakPip, stopPipVoice } from '../game/pipVoice'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { useOnboardingStore } from '../store/onboardingStore'
+import { StoryTransmission } from './StoryTransmission'
 
 /**
  * First-person historical reconstruction. It is clearly labelled as a
@@ -22,6 +22,11 @@ export function MemoryReconstructionOverlay() {
   if (view !== 'reconstruction' || !missionId) return null
   const mission = findMission(missionId)
   if (!mission) return null
+  // Explorers with a story video get the full-screen transmission, which
+  // also sends the story to Earth right after the video.
+  if (mission.reconstruction.video) {
+    return <StoryTransmission mission={mission} onClose={closeArchive} />
+  }
   return <MemoryReconstruction mission={mission} onClose={closeArchive} />
 }
 
@@ -46,13 +51,8 @@ function MemoryReconstruction({
   const [index, setIndex] = useState(0)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
-  const returnRef = useRef<HTMLButtonElement>(null)
   const previousFocus = useRef<Element | null>(null)
   const lines = mission.reconstruction.lines
-  const video = unlocked ? mission.reconstruction.video : undefined
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const masterVolume = useGameStore((state) => state.masterVolume)
-  const muted = useGameStore((state) => state.muted)
   const current = lines[Math.min(index, lines.length - 1)]!
 
   useEffect(() => {
@@ -60,9 +60,7 @@ function MemoryReconstruction({
     if (!dialog) return
     previousFocus.current = document.activeElement
     if (!dialog.open) dialog.showModal()
-    const frame = window.requestAnimationFrame(() =>
-      (videoRef.current ?? primaryRef.current)?.focus(),
-    )
+    const frame = window.requestAnimationFrame(() => primaryRef.current?.focus())
     return () => {
       window.cancelAnimationFrame(frame)
       if (dialog.open) dialog.close()
@@ -73,26 +71,11 @@ function MemoryReconstruction({
     }
   }, [])
 
-  // The video follows the game's master volume and mute.
   useEffect(() => {
-    const element = videoRef.current
-    if (!element) return
-    element.volume = Math.min(1, Math.max(0, masterVolume))
-    element.muted = muted
-  }, [masterVolume, muted, video])
-
-  // While the story video plays, game music and wind go quiet.
-  useEffect(() => {
-    if (!video) return
-    stopPipVoice()
-    return () => audioManager.setVideoActive(false)
-  }, [video])
-
-  useEffect(() => {
-    if (!unlocked || video) return
+    if (!unlocked) return
     speakPip(current, voiceName, voiceEnabled)
     return () => stopPipVoice()
-  }, [current, unlocked, video, voiceName, voiceEnabled])
+  }, [current, unlocked, voiceName, voiceEnabled])
 
   useEffect(() => {
     if (unlocked && index > 0) emitAudio('reconstructionLine')
@@ -109,14 +92,14 @@ function MemoryReconstruction({
         onClose()
       }}
     >
-      <article className={`smart-letter${video ? ' smart-letter--video' : ''}`}>
+      <article className="smart-letter">
         <header className="smart-letter__header">
           <div className="smart-letter__heading">
             <p className="smart-letter__eyebrow">
-              {video ? 'Cosmic Archive · Story video' : 'Cosmic Archive · Memory reconstruction'}
+              Cosmic Archive · Memory reconstruction
             </p>
             <h2 id="reconstruction-title">
-              {video ? `${mission.machineName}'s story` : mission.reconstruction.title}
+              {mission.reconstruction.title}
             </h2>
             <p className="smart-letter__meta">
               {mission.missionName} · {mission.yearLabel}
@@ -133,9 +116,7 @@ function MemoryReconstruction({
         </header>
 
         <p id="reconstruction-disclaimer" className="reconstruction__label">
-          {video
-            ? 'Archive story · NASA images and simplified drawings'
-            : 'Historical reconstruction · not an original recording'}
+          Historical reconstruction · not an original recording
         </p>
 
         {!unlocked ? (
@@ -145,25 +126,6 @@ function MemoryReconstruction({
               Recover the memory and prepare the smart letter before viewing
               the reconstruction.
             </p>
-          </div>
-        ) : video ? (
-          <div className="reconstruction__video">
-            <video
-              ref={videoRef}
-              src={`${import.meta.env.BASE_URL}${video}`}
-              controls
-              autoPlay
-              playsInline
-              preload="auto"
-              controlsList="nodownload noplaybackrate"
-              disablePictureInPicture
-              onPlay={() => audioManager.setVideoActive(true)}
-              onPause={() => audioManager.setVideoActive(false)}
-              onEnded={() => {
-                audioManager.setVideoActive(false)
-                returnRef.current?.focus()
-              }}
-            />
           </div>
         ) : (
           <>
@@ -221,7 +183,6 @@ function MemoryReconstruction({
         <footer className="smart-letter__footer">
           <span className="smart-letter__barcode" aria-hidden="true" />
           <button
-            ref={returnRef}
             type="button"
             className="smart-letter__return"
             onClick={() => {

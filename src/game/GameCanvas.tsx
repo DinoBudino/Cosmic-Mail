@@ -6,6 +6,7 @@ import { SceneStatus } from '../ui/SceneStatus'
 import { CameraControls } from './CameraControls'
 import { clearInput } from './input'
 import { MarsWorld } from './MarsWorld'
+import { PauseWhenCovered } from './PauseWhenCovered'
 import { CAMERA, QUALITY_PRESETS } from './worldConfig'
 
 function ContextMonitor({ onLost }: { onLost: () => void }) {
@@ -49,6 +50,7 @@ export default function GameCanvas() {
       }}
     >
       <ContextMonitor onLost={() => setContextLost(true)} />
+      <PauseWhenCovered />
       <CameraControls />
       <MarsWorld />
     </Canvas>

@@ -167,7 +167,7 @@ export function Passport({
                                   : 'Delivered to Earth.'
                       return (
                       <article
-                        key={story.destination.id}
+                        key={story.missionId}
                         className={`passport__story passport__story--${story.status}`}
                         aria-label={`${story.destination.name}: ${STORY_STATUS_LABEL[story.status]}`}
                       >
@@ -176,7 +176,7 @@ export function Passport({
                             {story.destination.glyph}
                           </span>
                           <div>
-                            <h3>{story.destination.name}</h3>
+                            <h3>{story.machineName ?? `${story.destination.name} explorer`}</h3>
                             <p className="passport__story-clue">
                               {story.destination.clue}
                             </p>
@@ -187,7 +187,7 @@ export function Passport({
                         </div>
 
                         <p className="passport__story-machine">
-                          {story.machineName ?? 'Explorer not yet identified'}
+                          {story.machineName ? `On ${story.destination.name}` : 'Explorer not yet identified'}
                         </p>
 
                         <p className="passport__story-hint">{statusLine}</p>
@@ -271,13 +271,15 @@ export function Passport({
                   <ul className="album__stamps">
                     {view.stories.map((story) => (
                       <li
-                        key={story.destination.id}
+                        key={story.missionId}
                         className={`album__stamp${story.stampEarned ? ' is-filled' : ''}`}
                       >
                         <span className="album__stamp-glyph" aria-hidden="true">
                           {story.stampEarned ? story.destination.glyph : '?'}
                         </span>
-                        <span className="album__stamp-name">{story.destination.name}</span>
+                        <span className="album__stamp-name">
+                          {story.machineName ?? `${story.destination.name} explorer`}
+                        </span>
                         <span className="album__stamp-label">
                           {story.stampEarned ? story.stampLabel : 'Not yet stamped'}
                         </span>
@@ -285,7 +287,7 @@ export function Passport({
                     ))}
                   </ul>
                   <p className="passport__notes-intro">
-                    A stamp is added each time a history is delivered to Earth.
+                    One stamp for each explorer whose story reaches Earth.
                   </p>
                 </>
               )}

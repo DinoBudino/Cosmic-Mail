@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getMission } from './missions'
 import {
   STORY_STATUS_LABEL,
+  getDestinationSummary,
   getPassportView,
   getStoryForMission,
 } from './passport'
@@ -37,7 +38,12 @@ describe('Cosmic Passport projection', () => {
     const view = getPassportView(save)
     expect(view.carrierName).toBe('Ada')
     expect(view.carrierId).toMatch(/^CM-\d{5}$/)
-    expect(view.stories).toHaveLength(2)
+    // One story per explorer: Surveyor 3 (Moon), Opportunity and Spirit (Mars).
+    expect(view.stories.map((story) => story.missionId)).toEqual([
+      'surveyor-3',
+      'opportunity',
+      'spirit',
+    ])
     expect(view.transmittedCount).toBe(0)
   })
 
@@ -121,5 +127,29 @@ describe('Cosmic Passport projection', () => {
     const story = getStoryForMission(save, 'opportunity')!
     expect(story.machineName).toBe('Opportunity')
     expect(story.status).toBe('investigating')
+  })
+
+  it('gives Spirit its own stamp: one stamp per explorer, not per place', () => {
+    const deliver = (save: ReturnType<typeof createJourney>, missionId: 'opportunity' | 'spirit') => {
+      let next = markMissionDiscovered(save, missionId, 1100)
+      for (const component of getMission(missionId).components.slice(0, 3)) {
+        next = scanComponent(next, missionId, component.id, 1200).save
+      }
+      next = prepareSmartLetter(next, missionId, 1300).save
+      return transmitLetter(next, missionId, 1400).save
+    }
+    const one = deliver(createJourney('Ada', 1000), 'opportunity')
+    let summary = getDestinationSummary(getPassportView(one), 'mars')
+    expect(summary.restoredCount).toBe(1)
+    expect(summary.restored).toBe(false)
+    expect(summary.current?.missionId).toBe('spirit')
+
+    const both = deliver(one, 'spirit')
+    const view = getPassportView(both)
+    expect(view.stamps).toBe(2)
+    expect(getStoryForMission(both, 'spirit')?.stampLabel).toBe('Spirit · Mars')
+    summary = getDestinationSummary(view, 'mars')
+    expect(summary.restored).toBe(true)
+    expect(summary.explorers).toBe('Opportunity · Spirit')
   })
 })

@@ -441,14 +441,14 @@
   },
   {
     "key": "mars-letter-prepared",
-    "text": "Sealed! Opportunity's story is ready to fly home.",
+    "text": "Sealed! Tap Watch its story to see Opportunity's adventure.",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
   },
   {
     "key": "mars-return-to-ship",
-    "text": "Follow the star back to our ship, explorer! The letter rides with us.",
+    "text": "Story delivered! Follow the star back to our ship, explorer.",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
@@ -560,7 +560,21 @@
   },
   {
     "key": "spirit-letter-prepared",
-    "text": "Sealed! Spirit's story is ready to fly home.",
+    "text": "Sealed! Tap Watch its story to see Spirit's adventure.",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "story-send-ready",
+    "text": "Record saved! Now tap the big button and send it home to Earth!",
+    "speed": 1.06,
+    "category": "mars",
+    "pitch": 1.05
+  },
+  {
+    "key": "story-delivered",
+    "text": "Whoosh, it made it! The story is safe on Earth, and you earned a new stamp!",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
@@ -623,7 +637,7 @@
   },
   {
     "key": "orbit-deliver",
-    "text": "We have a letter aboard! Let's send it to Earth first.",
+    "text": "We have a story aboard! Let's watch it and send it to Earth.",
     "speed": 1.06,
     "category": "mars",
     "pitch": 1.05
