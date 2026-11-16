@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useGameStore } from '../../store/gameStore'
 import { useJourneyStore } from '../../store/journeyStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { hubElementEnabled, useHubFocus } from '../../store/hubFocus'
@@ -85,10 +86,11 @@ export function Hub() {
   useEffect(() => {
     if (!passportDetailOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        closeDetail()
-      }
+      if (event.key !== 'Escape') return
+      // A story (video) open over the album owns Escape: it can't be skipped.
+      if (useGameStore.getState().archiveView !== 'none') return
+      event.preventDefault()
+      closeDetail()
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)

@@ -6,6 +6,8 @@ Cosmic Mail is a cozy 3D exploration game about restoring the stories of NASA's 
 
 Made by **Neuroagames**.
 
+**▶ Play it:** https://cosmicmail.neuroa.health
+
 ## Controls
 
 | Key | Action |
@@ -85,4 +87,4 @@ The story videos for each explorer were edited by the team for the game's narrat
 
 ### Libraries
 
-[React](https://react.dev), [Three.js](https://threejs.org), [React Three Fiber](https://r3f.docs.pmnd.rs), [drei](https://github.com/pmndrs/drei), [postprocessing](https://github.com/pmndrs/postprocessing), [Zustand](https://github.com/pmndrs/zustand) and [Vite](https://vite.dev), all under the MIT license.
+[React](https://react.dev), [Three.js](https://threejs.org), [React Three Fiber](https://r3f.docs.pmnd.rs), [drei](https://github.com/pmndrs/drei), [Zustand](https://github.com/pmndrs/zustand) and [Vite](https://vite.dev) (MIT), and [postprocessing](https://github.com/pmndrs/postprocessing) (Zlib). Other bundled dependencies use MIT, Apache 2.0, ISC or BSD licenses.

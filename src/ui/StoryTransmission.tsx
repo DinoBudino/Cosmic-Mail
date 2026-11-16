@@ -114,6 +114,26 @@ export function StoryTransmission({
     }
   }, [])
 
+  // Escape never skips the story: not during the "incoming transmission"
+  // countdown, the video or the flight. It only leaves from the delivered
+  // screen, or from the end of a replay (Back / Watch again). Caught in the
+  // capture phase so no other screen (album, settings) acts underneath.
+  const canLeave = phase === 'delivered' || (phase === 'record' && alreadySent)
+  const leaveRef = useRef({ canLeave, onClose })
+  useEffect(() => {
+    leaveRef.current = { canLeave, onClose }
+  }, [canLeave, onClose])
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (!event.repeat && leaveRef.current.canLeave) leaveRef.current.onClose()
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [])
+
   // 1. Incoming transmission, then the video.
   useEffect(() => {
     if (phase !== 'connecting') return
@@ -285,7 +305,15 @@ export function StoryTransmission({
       onCancel={(event) => {
         event.preventDefault()
         // The story itself can't be skipped; it ends on its own.
-        if (phase === 'delivered' || alreadySent) onClose()
+        if (canLeave) onClose()
+      }}
+      onClose={() => {
+        // A browser may still force the dialog shut (a second Escape in a
+        // row): while the story is on screen it opens again at once.
+        window.requestAnimationFrame(() => {
+          const dialog = dialogRef.current
+          if (dialog?.isConnected && !dialog.open) dialog.showModal()
+        })
       }}
     >
       {phase === 'connecting' && (
