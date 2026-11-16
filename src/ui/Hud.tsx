@@ -104,25 +104,29 @@ export function Hud() {
         </details>
       )}
 
-      <button
-        type="button"
-        className={`hud-album${albumCalling ? ' is-calling' : ''}`}
-        onClick={() => openAlbum(albumCalling ? SPIRIT_SITE.missionId : undefined)}
-        aria-label={
-          albumCalling
-            ? 'Open the Cosmic Album: your explorer is waiting there'
-            : 'Open the Cosmic Album'
-        }
-        aria-haspopup="dialog"
-      >
-        <AlbumTablet />
-        {albumCalling && (
-          <span className="hud-album__badge" aria-hidden="true">
-            !
-          </span>
-        )}
-        <span className="hud-album__label">Album</span>
-      </button>
+      {/* Never during a film (sighting, identification, part close-up,
+          send): a stray tap would open the album over the scene. */}
+      {cinematicFocus === null && (
+        <button
+          type="button"
+          className={`hud-album${albumCalling ? ' is-calling' : ''}`}
+          onClick={() => openAlbum(albumCalling ? SPIRIT_SITE.missionId : undefined)}
+          aria-label={
+            albumCalling
+              ? 'Open the Cosmic Album: your explorer is waiting there'
+              : 'Open the Cosmic Album'
+          }
+          aria-haspopup="dialog"
+        >
+          <AlbumTablet />
+          {albumCalling && (
+            <span className="hud-album__badge" aria-hidden="true">
+              !
+            </span>
+          )}
+          <span className="hud-album__label">Album</span>
+        </button>
+      )}
 
       <button
         type="button"

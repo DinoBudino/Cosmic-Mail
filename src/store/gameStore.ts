@@ -821,7 +821,9 @@ export const useGameStore = create<GameState>((set, get) => {
       state.albumOpen ||
       state.activeSiteId ||
       state.marsBriefingStep !== null ||
-      state.archiveView !== 'none'
+      state.archiveView !== 'none' ||
+      // A film owns the screen: the album waits until it ends.
+      state.cinematicFocus !== null
     ) {
       return
     }

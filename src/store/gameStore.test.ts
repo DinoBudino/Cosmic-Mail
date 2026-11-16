@@ -500,3 +500,24 @@ describe('scan station', () => {
     expect(storageLength()).toBe(before)
   })
 })
+
+describe('album during a film', () => {
+  it('stays shut while a cinematic plays, and opens once it ends', () => {
+    useOnboardingStore.setState({ phase: 'playing' })
+    useGameStore.setState({
+      settingsOpen: false,
+      albumOpen: false,
+      activeSiteId: null,
+      marsBriefingStep: null,
+      archiveView: 'none',
+      cinematicFocus: null,
+    })
+    useGameStore.getState().startCinematic('send', { x: 0, z: 0 }, 9800, undefined, 'opportunity')
+    useGameStore.getState().openAlbum('opportunity')
+    expect(useGameStore.getState().albumOpen).toBe(false)
+    useGameStore.getState().endCinematic()
+    useGameStore.getState().openAlbum('opportunity')
+    expect(useGameStore.getState().albumOpen).toBe(true)
+    useGameStore.getState().closeAlbum()
+  })
+})
