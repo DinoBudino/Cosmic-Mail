@@ -41,6 +41,14 @@ coverage/
 /README.md
 *.md
 !/README.md
+# Project documentation that is published
+!/AUDIO_CREDITS.md
+!/public/audio/ATTRIBUTION.md
+!/public/models/README.md
+!/blender/Astronaut/Astronaut_README.md
+!/blender/PIP/PIP_README.md
+!/blender/AstronautV2/reports/Astronaut_Build_Report.md
+!/blender/PIPV2/reports/PIP_Build_Report.md
 /backups/
 *.bak
 
@@ -50,6 +58,15 @@ coverage/
 # Blender source files, autosaves and review builds
 *.blend
 *.blend1
+# Final Blender masters made by the team (autosaves, checkpoints and old versions stay out)
+!/blender/AstronautV2/CosmicMail_Astronaut_Final.blend
+!/blender/PIPV2/PIP_CosmicMail_Final.blend
+!/blender/Spaceship/Spaceship.blend
+!/blender/Scanner/Cosmic_Mail_Scanner_Master.blend
+!/blender/CabinCM01/CabinCM01.blend
+!/blender/Spirit/Spirit_CosmicMail_SolarCorrected.blend
+!/blender/Apollo11/Apollo_11_Eagle_Descent_Final.blend
+!/blender/Viking1/Viking1.blend
 blender/*.glb
 /public/models/cosmic_carrier_v2.glb
 
