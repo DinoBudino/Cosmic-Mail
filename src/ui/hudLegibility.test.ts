@@ -7,7 +7,6 @@ const FLOOR_PX = 12.8
 
 /** Gameplay HUD selectors that must stay readable at 720p and 1080p. */
 const HUD_SELECTORS = [
-  '.pip-speech__skip',
   '.pip-name',
   '.hud-controls',
   '.hud-key',

@@ -42,8 +42,8 @@ export function PipAvatar() {
 
 /**
  * One typewritten line, remounted per message so its state starts clean.
- * `forceFull` shows the complete subtitle immediately (first press of the
- * skip button); the voice keeps playing until the next press dismisses it.
+ * `forceFull` shows the complete subtitle immediately (when the voice ends
+ * before the typewriter does).
  */
 export function PipLine({
   message,
@@ -103,7 +103,6 @@ export function PipLine({
  */
 export function PipSpeech() {
   const current = useNarrativeStore((state) => state.current)
-  const queueLength = useNarrativeStore((state) => state.queue.length)
   const completeNarrative = useNarrativeStore((state) => state.complete)
 
   const pipMessage = useGameStore((state) => state.pipMessage)
@@ -230,27 +229,13 @@ export function PipSpeech() {
   // timing above still run from here.
   if (!showing || current?.tip) return null
 
-  const skip = () => {
-    // First press completes the subtitle; the next press moves on.
-    if (!lineFullyShown) {
-      setForcedKey(activeKey)
-      return
-    }
-    if (activeNarrative) completeNarrative()
-    else clearPipMessage()
-  }
-
+  // PIP can't be cut off: no Skip button and no tap on the box. Each line
+  // ends by itself (with his voice, or after a reading time).
   return (
     <aside
       className="pip-speech"
       data-emotion={activeEmotion ?? 'neutral'}
       aria-label="PIP is speaking"
-      onClick={(event) => {
-        // The Skip button handles itself; a click anywhere else on the box
-        // does the same. Enter works on the focused button.
-        if ((event.target as HTMLElement).closest('button')) return
-        skip()
-      }}
     >
       <PipAvatar />
       <div className="pip-speech__copy">
@@ -263,24 +248,6 @@ export function PipSpeech() {
               <i />
             </span>
           </p>
-          <button
-            type="button"
-            className="pip-speech__skip"
-            onClick={skip}
-            aria-label={
-              lineFullyShown
-                ? "Dismiss PIP's message"
-                : "Show PIP's full message"
-            }
-          >
-            {!lineFullyShown
-              ? 'Show all'
-              : activeNarrative && queueLength > 0
-                ? 'Next'
-                : reducedMotion
-                  ? 'Close'
-                  : 'Skip'}
-          </button>
         </div>
         <PipLine
           key={activeKey ?? 'pip'}

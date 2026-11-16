@@ -398,6 +398,8 @@
 
 .pip-speech {
   position: relative;
+  /* Not a button: taps go through to the game, PIP is never cut off. */
+  pointer-events: none;
   display: flex;
   align-items: flex-start;
   gap: 14px;
@@ -498,25 +500,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-.pip-speech__skip {
-  flex: none;
-  padding: 2px 7px;
-  border: 1px solid rgba(244, 180, 223, 0.28);
-  border-radius: 999px;
-  background: rgba(244, 180, 223, 0.08);
-  color: var(--rose-300);
-  font: inherit;
-  font-family: var(--font-mono);
-  font-size: 0.52rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.pip-speech__skip:hover {
-  background: rgba(244, 180, 223, 0.18);
-  color: var(--cream);
 }
 
 .pip-name {
@@ -4054,7 +4037,6 @@
 /* ------------------------------------------------ HUD legibility floor */
 /* Gameplay HUD text never drops below 0.8rem (12.8px); primary lines are
    larger. This block is last on purpose and guarded by hudLegibility.test. */
-.pip-speech__skip,
 .pip-name,
 .hud-controls,
 .hud-controls > summary,
