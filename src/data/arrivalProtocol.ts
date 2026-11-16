@@ -76,9 +76,9 @@ export interface ProtocolContext {
 }
 
 /**
- * The child already knows the scanner: landscape readings, or another Mars
- * explorer already found (second landing from orbit skips the briefing and
- * the practice rock).
+ * The child already knows the scanner: landscape readings, or another
+ * explorer already found on any world (a second landing, on the Moon or on
+ * Mars, skips the briefing and the practice rock: the tutorial is done once).
  */
 export function hasPriorFieldWork(
   save: Pick<JourneySave, 'environmentalDiscoveries' | 'missions'> | null | undefined,
@@ -86,8 +86,8 @@ export function hasPriorFieldWork(
 ): boolean {
   if (!save) return false
   if ((save.environmentalDiscoveries?.length ?? 0) > 0) return true
-  return (['opportunity', 'spirit'] as const).some(
-    (id) => id !== missionId && Boolean(save.missions[id]?.discovered),
+  return Object.entries(save.missions).some(
+    ([id, progress]) => id !== missionId && Boolean(progress?.discovered),
   )
 }
 

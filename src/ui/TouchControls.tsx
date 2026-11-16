@@ -4,7 +4,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { SPIRIT_SITE } from '../data/spiritSite'
-import { setTouchMove, setTouchRun } from '../game/input'
+import { queueTouchJump, setTouchMove, setTouchRun } from '../game/input'
 import { useGameStore } from '../store/gameStore'
 
 export function TouchControls() {
@@ -118,6 +118,17 @@ export function TouchControls() {
         <div ref={knobRef} className="touch-knob" />
       </div>
       <p className="touch-hint">Drag to move · push far to run</p>
+      <button
+        type="button"
+        className="touch-jump"
+        aria-label="Hop"
+        onPointerDown={(event) => {
+          event.preventDefault()
+          queueTouchJump()
+        }}
+      >
+        Hop
+      </button>
       {!scannerEquipped && !scannerLocked && (
         <button
           type="button"

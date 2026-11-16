@@ -280,6 +280,25 @@ export function pickPipSpot(
  */
 export const SEND_FILM_SPLIT = 0.46
 
+/** Below this elevation (sine) Earth counts as "low in the sky". */
+const LOW_SKY = 0.35
+
+/**
+ * Where the message is, `launch` (0..1) into its flight from `from`
+ * towards `sky`: it climbs in an arc first, so it is always seen rising
+ * (even when Earth is near the horizon), then sinks onto Earth's line.
+ */
+export function getMessageFlight(
+  from: { x: number; y: number; z: number },
+  sky: { x: number; y: number; z: number },
+  launch: number,
+): { x: number; y: number; z: number } {
+  const t = Math.min(1, Math.max(0, launch))
+  const k = Math.pow(t, 1.7) * 45
+  const arc = Math.sin(Math.PI * Math.min(1, t * 1.15)) * 6 * (1 - sky.y)
+  return { x: from.x + sky.x * k, y: from.y + sky.y * k + arc, z: from.z + sky.z * k }
+}
+
 export interface SendFilmFrame extends ShotFrame {
   /** Where PIP floats with the message. */
   pip: { x: number; y: number; z: number }
@@ -341,21 +360,32 @@ export function getSendFilmFrame(
   }
   // Well to one side as well, so PIP is never right against the lens
   // (from Mars the sky target lies behind him, seen from the child's side).
-  const back = (size * 2 + 2.6) * wide
-  const across = 2.4 * wide
-  const x = center.x - hx * back - hz * across
-  const z = center.z - hz * back + hx * across
+  // When Earth hangs low (Apollo 11: just over the horizon), standing
+  // behind the explorer would hide Earth and the message behind it: the
+  // camera steps much further aside, on PIP's side, and turns to follow
+  // the message all the way to Earth.
+  const low = sky.y < LOW_SKY
+  const px = -hz
+  const pz = hx
+  const side = low && bx * px + bz * pz < 0 ? -1 : 1
+  const back = (size * 2 + 2.6) * wide * (low ? 0.75 : 1)
+  const across = (low ? size + 3.2 : 2.4) * wide * side
+  const x = center.x - hx * back + px * across
+  const z = center.z - hz * back + pz * across
   const y = groundAt(x, z) + 1.0
   const lookNear = { x: mix([center.x, pip.x], 0.5), y: base + height * 0.7, z: mix([center.z, pip.z], 0.5) }
-  const lookSky = { x: center.x + sky.x * 30, y: base + sky.y * 30, z: center.z + sky.z * 30 }
+  const lookSky = low
+    ? { x: x + hx * 30, y: y + Math.max(sky.y, 0.12) * 30 + 2, z: z + hz * 30 }
+    : { x: center.x + sky.x * 30, y: base + sky.y * 30, z: center.z + sky.z * 30 }
   const k = smooth(Math.min(1, t * 1.15))
+  const turn = k * (low ? 0.8 : 0.3)
   return {
     shot: 1,
     position: { x, y, z },
     look: {
-      x: mix([lookNear.x, lookSky.x], k * 0.3),
-      y: mix([lookNear.y, lookSky.y], k * 0.3),
-      z: mix([lookNear.z, lookSky.z], k * 0.3),
+      x: mix([lookNear.x, lookSky.x], turn),
+      y: mix([lookNear.y, lookSky.y], turn),
+      z: mix([lookNear.z, lookSky.z], turn),
     },
     pip,
     launch: t,

@@ -95,6 +95,9 @@ export function StoryTransmission({
   // then a big Play button waits for the child's tap.
   const [paused, setPaused] = useState(false)
   const [failed, setFailed] = useState(false)
+  // The video is fetching (slow network): a "loading" note, never a silent
+  // black screen.
+  const [buffering, setBuffering] = useState(true)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const actionRef = useRef<HTMLButtonElement>(null)
@@ -158,6 +161,20 @@ export function StoryTransmission({
       // Autoplay refused: show the big Play button.
       setPaused(true)
     })
+    // A video that never starts (lost request, slow network): ask for it
+    // again once, then offer the Play button so a tap can start it.
+    const retry = window.setTimeout(() => {
+      if (!element || element.currentTime > 0 || element.readyState >= 3) return
+      element.load()
+      void element.play().catch(() => setPaused(true))
+    }, 9000)
+    const offer = window.setTimeout(() => {
+      if (element && element.currentTime === 0) setPaused(true)
+    }, 20000)
+    return () => {
+      window.clearTimeout(retry)
+      window.clearTimeout(offer)
+    }
   }, [phase])
 
   useEffect(() => {
@@ -347,6 +364,9 @@ export function StoryTransmission({
             disablePictureInPicture
             onClick={togglePlay}
             onPlay={() => setPaused(false)}
+            onWaiting={() => setBuffering(true)}
+            onPlaying={() => setBuffering(false)}
+            onCanPlay={() => setBuffering(false)}
             onPause={() => setPaused(true)}
             onEnded={endVideo}
           >
@@ -358,6 +378,12 @@ export function StoryTransmission({
               onError={endVideo}
             />
           </video>
+          {phase === 'video' && buffering && !paused && (
+            <p className="story-tx__loading" role="status">
+              <span aria-hidden="true" />
+              Loading the story…
+            </p>
+          )}
           {phase === 'video' && paused && (
             <button
               type="button"

@@ -20,8 +20,8 @@ const MOVEMENT_KEYS = new Set([
 ])
 
 const INTERACT_KEY = 'e'
-/** Space does nothing in the world (no jet boots); it is only swallowed so it
- * never presses a focused button by accident while playing. */
+/** Space makes the carrier hop (a small jump, lower gravity on the Moon).
+ * It is swallowed so it never presses a focused button while playing. */
 const SPACE_KEY = ' '
 const RUN_KEY = 'shift'
 const SCANNER_KEY = 'q'
@@ -31,6 +31,7 @@ const touchAxes: MoveAxes = { x: 0, y: 0 }
 let touchRun = false
 let interactQueued = false
 let scannerToggleQueued = false
+let jumpQueued = false
 
 /** Normalizes a 2D movement vector so diagonals are not faster. */
 export function normalizeMoveVector(x: number, z: number): MoveVector {
@@ -79,6 +80,18 @@ export function consumeScannerToggle(): boolean {
   if (!scannerToggleQueued) return false
   scannerToggleQueued = false
   return true
+}
+
+/** True once per Space press (or touch Jump). Makes the carrier hop. */
+export function consumeJump(): boolean {
+  if (!jumpQueued) return false
+  jumpQueued = false
+  return true
+}
+
+/** The touch Jump button. */
+export function queueTouchJump(): void {
+  jumpQueued = true
 }
 
 /**
@@ -132,6 +145,7 @@ export function clearInput(): void {
   touchRun = false
   interactQueued = false
   scannerToggleQueued = false
+  jumpQueued = false
 }
 
 /** Attaches keyboard listeners once. Returns a cleanup function. */
@@ -153,6 +167,7 @@ export function attachInput(isPaused: () => boolean = () => false): () => void {
     }
 
     if (key === SPACE_KEY) {
+      if (!event.repeat) jumpQueued = true
       event.preventDefault()
       return
     }

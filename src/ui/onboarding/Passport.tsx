@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { clockText } from './tabletClock'
 import { getAlbumPhotos, unlockedPhotoCount } from '../../data/albumPhotos'
 import { getFieldNotesView } from '../../data/fieldNotes'
 import { getMission, type MissionId } from '../../data/missions'
@@ -485,16 +486,21 @@ function TabletShell() {
   )
 }
 
-function clockText(): string {
-  const now = new Date()
-  return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`
-}
-
 function TabletClock() {
-  const [time, setTime] = useState(clockText)
+  const [time, setTime] = useState(() => clockText())
   useEffect(() => {
-    const timer = window.setInterval(() => setTime(clockText()), 20000)
-    return () => window.clearInterval(timer)
+    // Tick right when the minute changes, then every minute.
+    let interval = 0
+    const tick = () => setTime(clockText())
+    const wait = 60000 - (Date.now() % 60000) + 50
+    const first = window.setTimeout(() => {
+      tick()
+      interval = window.setInterval(tick, 60000)
+    }, wait)
+    return () => {
+      window.clearTimeout(first)
+      window.clearInterval(interval)
+    }
   }, [])
   return (
     <span className="ctab__clock" aria-hidden="true">

@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { MARS_WORLD_SITES, REGION_INFO } from '../data/marsObjects'
-import { findScanAnchor, getActiveExplorer, getScanStationView, SPIRIT_SITE } from '../data/spiritSite'
+import { findScanAnchor, getActiveExplorer, getActiveWorld, getScanStationView, SPIRIT_SITE } from '../data/spiritSite'
 import { getExplorerShot, getPartShot, getSendFilmFrame } from './explorerShots'
 import { getEarthDirection } from './earthDirection'
 import { clampToLane, getGuideLane, getGuideMode, getPracticeRock } from './practiceGuide'
@@ -41,6 +41,7 @@ import {
 } from './cameraRig'
 import {
   consumeInteract,
+  consumeJump,
   consumeScannerToggle,
   isRunHeld,
   readMoveAxes,
@@ -143,6 +144,9 @@ export function Player() {
   const turnRef = useRef(0)
   const stepDistance = useRef(0)
   const stepVariant = useRef(0)
+  // The hop (Space): height above the ground and vertical speed.
+  const hopHeight = useRef(0)
+  const hopSpeed = useRef(0)
   const cameraTarget = useRef(new THREE.Vector3())
   const cameraDesired = useRef(new THREE.Vector3())
   const cameraOffset = useRef(new THREE.Vector3())
@@ -391,9 +395,35 @@ export function Player() {
     )
     resolveEnvironmentalCollision(player.position, playerAir)
 
-    // Always on foot: the feet follow the terrain.
-    player.position.y = getTerrainHeight(player.position.x, player.position.z)
-    const heightAboveGround = 0
+    // On foot: the feet follow the terrain, plus a small hop on Space.
+    // No hop where the walk is guided or held (scan station, auto-travel,
+    // a film): there the child's feet stay put.
+    const hopWanted = consumeJump()
+    const world = getActiveWorld() === 'moon' ? 'moon' : 'mars'
+    if (
+      hopWanted &&
+      hopHeight.current === 0 &&
+      !store.scanStation &&
+      !store.travelTargetId &&
+      !guide &&
+      store.cinematicFocus === null
+    ) {
+      hopSpeed.current = PLAYER.jumpSpeed[world]
+    }
+    if (hopHeight.current > 0 || hopSpeed.current > 0) {
+      hopSpeed.current -= PLAYER.gravity[world] * dt
+      hopHeight.current += hopSpeed.current * dt
+      if (hopHeight.current <= 0) {
+        // Touchdown: one soft footstep.
+        hopHeight.current = 0
+        hopSpeed.current = 0
+        stepVariant.current += 1
+        emitFootstep(world === 'moon' ? 'lunar' : 'rock', stepVariant.current)
+      }
+    }
+    player.position.y =
+      getTerrainHeight(player.position.x, player.position.z) + hopHeight.current
+    const heightAboveGround = hopHeight.current
     playerPosition.x = player.position.x
     playerPosition.z = player.position.z
     playerPosition.airborne = heightAboveGround
@@ -470,8 +500,9 @@ export function Player() {
       1,
     )
 
-    // Footsteps follow travelled distance, never frame count.
-    if (horizontalSpeed > 0.35) {
+    // Footsteps follow travelled distance, never frame count (none in
+    // the air during a hop).
+    if (horizontalSpeed > 0.35 && hopHeight.current === 0) {
       stepDistance.current += horizontalSpeed * dt
       // One sound per animated foot contact (about 2.5 steps a second
       // walking, 3 running), not a rattle tied to raw distance.

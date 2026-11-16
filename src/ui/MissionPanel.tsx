@@ -7,7 +7,6 @@ import { requestMissionHint } from '../game/missionNarrative'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import {
-  getArchiveCtaLabel,
   getMissionStage,
   scannedComponentCount,
 } from './missionStage'
@@ -50,7 +49,6 @@ export function MissionPanel() {
   const signalLabel = discovered
     ? spiritMission.machineName
     : 'the silent signal'
-  const archiveCta = getArchiveCtaLabel(stage)
   const spiritStatus =
     stage === 'transmitted'
       ? 'History restored'
@@ -111,19 +109,6 @@ export function MissionPanel() {
           onClick={() => requestMissionHint(SPIRIT_SITE.missionId)}
         >
           Ask PIP for a hint
-        </button>
-      )}
-      {archiveCta && (
-        <button
-          type="button"
-          className="site-action mission-pilot__archive"
-          onClick={() =>
-            useGameStore
-              .getState()
-              .openArchive('smart-letter', SPIRIT_SITE.missionId)
-          }
-        >
-          {archiveCta}
         </button>
       )}
 

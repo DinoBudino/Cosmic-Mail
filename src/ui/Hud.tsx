@@ -1,5 +1,8 @@
 import { useGameStore } from '../store/gameStore'
+import { useJourneyStore } from '../store/journeyStore'
+import { getMissionStage } from '../store/journeyLogic'
 import { isStepAtLeast } from '../data/arrivalProtocol'
+import { SPIRIT_SITE } from '../data/spiritSite'
 import { useProtocol } from './useProtocol'
 
 function GearIcon() {
@@ -51,6 +54,13 @@ export function Hud() {
   const scannerEquipped = useGameStore((state) => state.scannerEquipped)
   const cinematicFocus = useGameStore((state) => state.cinematicFocus)
   const { step } = useProtocol()
+  const stage = useJourneyStore((state) =>
+    getMissionStage(state.save?.missions[SPIRIT_SITE.missionId] ?? null),
+  )
+  // The one way into the album. When the explorer's letter waits to be
+  // sealed or its story to be watched, it calls the child (glow + "!")
+  // and opens right on that explorer's card.
+  const albumCalling = stage === 'memory_recovered' || stage === 'smart_letter_ready'
   // Show only the keys the current step needs: movement first, then the
   // scanner, then inspect.
   const showScanner = isStepAtLeast(step, 'M2')
@@ -74,6 +84,10 @@ export function Hud() {
               <span className="hud-key">Shift</span>
               <span className="hud-label">run</span>
             </span>
+            <span className="hud-control">
+              <span className="hud-key">Space</span>
+              <span className="hud-label">hop</span>
+            </span>
             {showScanner && (
               <span className="hud-control">
                 <span className="hud-key">Q</span>
@@ -92,12 +106,21 @@ export function Hud() {
 
       <button
         type="button"
-        className="hud-album"
-        onClick={() => openAlbum()}
-        aria-label="Open the Cosmic Album"
+        className={`hud-album${albumCalling ? ' is-calling' : ''}`}
+        onClick={() => openAlbum(albumCalling ? SPIRIT_SITE.missionId : undefined)}
+        aria-label={
+          albumCalling
+            ? 'Open the Cosmic Album: your explorer is waiting there'
+            : 'Open the Cosmic Album'
+        }
         aria-haspopup="dialog"
       >
         <AlbumTablet />
+        {albumCalling && (
+          <span className="hud-album__badge" aria-hidden="true">
+            !
+          </span>
+        )}
         <span className="hud-album__label">Album</span>
       </button>
 

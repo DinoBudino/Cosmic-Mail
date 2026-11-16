@@ -265,6 +265,46 @@
   transform: translateY(-50%) scale(0.97);
 }
 
+/* Something waits in the album (seal the letter, watch the story): the
+   tablet glows and wears a "!" badge. */
+.hud-album.is-calling .hud-album__tablet {
+  animation: hud-album-call 1.6s ease-in-out infinite;
+}
+.hud-album.is-calling .hud-album__label {
+  border-color: #ffb36b;
+  background: linear-gradient(180deg, #ff9a52, #e2622b);
+  color: #fff;
+}
+.hud-album__badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e2622b;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  box-shadow: 0 3px 8px rgba(10, 5, 20, 0.5);
+  animation: hud-album-badge 0.9s ease-in-out infinite;
+}
+@keyframes hud-album-call {
+  0%, 100% { filter: drop-shadow(0 8px 14px rgba(10, 5, 20, 0.55)) drop-shadow(0 0 0 rgba(255, 154, 82, 0)); }
+  50% { filter: drop-shadow(0 8px 14px rgba(10, 5, 20, 0.55)) drop-shadow(0 0 12px rgba(255, 154, 82, 0.95)); }
+}
+@keyframes hud-album-badge {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-album.is-calling .hud-album__tablet,
+  .hud-album__badge { animation: none; }
+}
+
 @keyframes hud-album-in {
   from { opacity: 0; translate: -24px 0; }
   to { opacity: 1; translate: 0 0; }
@@ -4140,6 +4180,22 @@
   font-weight: 600;
 }
 
+/* Touch: a small Hop button beside the movement pad. */
+.touch-jump {
+  pointer-events: auto;
+  min-width: 76px;
+  min-height: 52px;
+  border: 1px solid rgba(255, 179, 107, 0.6);
+  border-radius: 999px;
+  background: rgba(255, 138, 61, 0.18);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  touch-action: manipulation;
+}
+.touch-jump:active { background: rgba(255, 138, 61, 0.36); }
+
 /* Touch: scanner equip button sits with the boost button */
 .touch-scanner {
   pointer-events: auto;
@@ -5019,6 +5075,33 @@
   animation: tx-fade-in 0.4s ease-out both;
 }
 .story-tx__play span { font-size: 1.3rem; }
+/* Shown only while the video is still fetching. */
+.story-tx__loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: rgba(13, 8, 24, 0.75);
+  color: #ffd9a8;
+  font-weight: 800;
+  pointer-events: none;
+  animation: tx-fade-in 0.4s ease-out 0.6s both;
+}
+.story-tx__loading span {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(255, 217, 168, 0.3);
+  border-top-color: #ffd9a8;
+  border-radius: 50%;
+  animation: tx-loading-spin 0.9s linear infinite;
+}
+@keyframes tx-loading-spin { to { transform: rotate(360deg); } }
 
 /* Record saved: the panel rises over the video's last frame. */
 .story-tx[data-phase='record'] .story-tx__video video { filter: brightness(0.55); transition: filter 0.6s; }

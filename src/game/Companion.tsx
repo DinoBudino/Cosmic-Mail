@@ -10,7 +10,7 @@ import {
   getScanAnchors,
   getScanStationView,
 } from '../data/spiritSite'
-import { getPartShot, getSendFilmFrame, pickPipSpot, type SpotCheck } from './explorerShots'
+import { getMessageFlight, getPartShot, getSendFilmFrame, pickPipSpot, type SpotCheck } from './explorerShots'
 import { getEarthDirection } from './earthDirection'
 import { useJourneyStore } from '../store/journeyStore'
 import { isWorldPaused, useGameStore } from '../store/gameStore'
@@ -663,13 +663,8 @@ export function Companion({
             orbLaunched.current = true
             orbFrom.current.copy(orbNode.position)
           }
-          const sky = getEarthDirection()
-          const k = Math.pow(sendLaunch, 1.7) * 45
-          orbNode.position.set(
-            orbFrom.current.x + sky.x * k,
-            orbFrom.current.y + sky.y * k,
-            orbFrom.current.z + sky.z * k,
-          )
+          const at = getMessageFlight(orbFrom.current, getEarthDirection(), sendLaunch)
+          orbNode.position.set(at.x, at.y, at.z)
         }
         orbNode.scale.setScalar(reducedMotion ? 1 : 1 + Math.sin(t * 6) * 0.08)
       }

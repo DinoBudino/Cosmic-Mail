@@ -8,7 +8,6 @@ import { getMinimapPoint, SPIRIT_RADAR_RANGE } from '../game/radar'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
 import { canBoardShip } from '../game/landedShip'
-import { getArchiveCtaLabel, getMissionStage } from './missionStage'
 
 /** Disc radius (SVG units) where the star sits when it is out of range. */
 const MAP_RADIUS = 40
@@ -40,7 +39,6 @@ export function CosmicRadar() {
   const archiveView = useGameStore((state) => state.archiveView)
   const equipScanner = useGameStore((state) => state.equipScanner)
   const openScannerRecords = useGameStore((state) => state.openScannerRecords)
-  const openAlbum = useGameStore((state) => state.openAlbum)
   const save = useJourneyStore((state) => state.save)
   const loadStatus = useJourneyStore((state) => state.loadStatus)
   const startJourney = useJourneyStore((state) => state.startJourney)
@@ -97,8 +95,6 @@ export function CosmicRadar() {
   if (hidden) return null
 
   const progress = save?.missions[SPIRIT_SITE.missionId] ?? null
-  const stage = getMissionStage(progress)
-  const archiveCta = getArchiveCtaLabel(stage)
   const discovered = Boolean(progress?.discovered)
 
   // The landing step (M0) shows no radar: PIP presents it first.
@@ -152,17 +148,6 @@ export function CosmicRadar() {
           >
             <span className="desktop-interact">Take out scanner (Q)</span>
             <span className="touch-interact">Take out scanner</span>
-          </button>
-        )}
-        {archiveCta && (
-          <button
-            type="button"
-            className="site-action cosmic-radar__archive"
-            onClick={() =>
-              openAlbum(SPIRIT_SITE.missionId)
-            }
-          >
-            {archiveCta}
           </button>
         )}
         {save && showRecords && (

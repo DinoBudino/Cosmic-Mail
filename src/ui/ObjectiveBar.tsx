@@ -1,39 +1,17 @@
-import { isStepAtLeast, type ProtocolStep } from '../data/arrivalProtocol'
+import { isStepAtLeast } from '../data/arrivalProtocol'
 import { getMission } from '../data/missions'
 import { HuntTracker } from './HuntTracker'
 import { SPIRIT_SITE } from '../data/spiritSite'
 import { requestMissionHint } from '../game/missionNarrative'
 import { useGameStore } from '../store/gameStore'
 import { useJourneyStore } from '../store/journeyStore'
-import { getMissionStage } from './missionStage'
 import { useProtocol } from './useProtocol'
-
-interface BarAction {
-  label: string
-  run: () => void
-}
-
-/** The one primary action that moves the current step forward, if any. */
-function getPrimaryAction(
-  step: ProtocolStep,
-  stage: ReturnType<typeof getMissionStage>,
-): BarAction | null {
-  const missionId = SPIRIT_SITE.missionId
-  if (step === 'M6' && stage === 'memory_recovered') {
-    return {
-      label: 'Open album',
-      run: () => useGameStore.getState().openAlbum(missionId),
-    }
-  }
-  // Letter sealed: the child walks back to Mailwing (radar star) and boards.
-  return null
-}
 
 /**
  * The single place that says what to do now. It is derived from journey
- * progress (via useProtocol), shows one line, and carries the one action
- * that moves the current step forward. "Ask PIP" is offered while the
- * player is still learning (M0–M4).
+ * progress (via useProtocol) and shows one line. "Ask PIP" is offered
+ * while the player is still learning (M0–M4). The album has a single
+ * button, the HUD tablet, which glows when the explorer's letter waits.
  */
 export function ObjectiveBar() {
   const { step, objective, hasSave } = useProtocol()
@@ -61,7 +39,6 @@ export function ObjectiveBar() {
     return null
   }
 
-  const action = getPrimaryAction(step, getMissionStage(progress))
   const learning = !isStepAtLeast(step, 'M6')
 
   return (
@@ -80,15 +57,6 @@ export function ObjectiveBar() {
       <p className="objective-bar__text" role="status" aria-live="polite">
         {objective.text}
       </p>
-      {action && (
-        <button
-          type="button"
-          className="objective-bar__action"
-          onClick={action.run}
-        >
-          {action.label}
-        </button>
-      )}
       {learning && (
         <button
           type="button"

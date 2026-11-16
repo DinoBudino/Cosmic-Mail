@@ -81,3 +81,13 @@ describe('Passport progressive disclosure', () => {
     expect(delivered).toContain('Opportunity · Mars')
   })
 })
+
+describe('tablet clock', () => {
+  it('shows the local time as 24 h with two-digit hours', async () => {
+    const { clockText } = await import('./tabletClock')
+    expect(clockText(new Date(2026, 10, 15, 9, 5))).toBe('09:05')
+    expect(clockText(new Date(2026, 10, 15, 0, 0))).toBe('00:00')
+    expect(clockText(new Date(2026, 10, 15, 17, 45))).toBe('17:45')
+    expect(clockText(new Date(2026, 10, 15, 23, 59))).toBe('23:59')
+  })
+})

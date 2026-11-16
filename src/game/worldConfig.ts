@@ -105,6 +105,10 @@ export const PLAYER = {
   radius: 0.45,
   // Inspection rings only count near the ground.
   inspectMaxHeight: 1.2,
+  // A small hop (Space): about half a metre on Mars, higher and slower on
+  // the Moon, whose gravity is weaker. Real surface gravities, in m/s².
+  jumpSpeed: { mars: 1.9, moon: 1.5 },
+  gravity: { mars: 3.71, moon: 1.62 },
 } as const
 
 export const CAMERA = {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { clampMoveVector, normalizeMoveVector } from './input'
 
 describe('normalizeMoveVector', () => {
@@ -51,5 +51,28 @@ describe('clampMoveVector', () => {
     const result = clampMoveVector(1.5, 1.5)
     expect(Math.hypot(result.x, result.z)).toBeCloseTo(1, 12)
     expect(result.x).toBeCloseTo(result.z, 12)
+  })
+})
+
+describe('hop (Space)', () => {
+  it('queues one hop per press and none on key repeat', async () => {
+    // Node has no DOM: a bare EventTarget stands in for window/document.
+    vi.stubGlobal('window', new EventTarget())
+    vi.stubGlobal('document', Object.assign(new EventTarget(), { hidden: false }))
+    vi.stubGlobal('HTMLElement', class {})
+    const key = (repeat = false) =>
+      window.dispatchEvent(Object.assign(new Event('keydown', { cancelable: true }), { key: ' ', repeat }))
+    const { attachInput, consumeJump, queueTouchJump, clearInput } = await import('./input')
+    const detach = attachInput()
+    key()
+    expect(consumeJump()).toBe(true)
+    expect(consumeJump()).toBe(false)
+    key(true)
+    expect(consumeJump()).toBe(false)
+    queueTouchJump()
+    clearInput()
+    expect(consumeJump()).toBe(false)
+    detach()
+    vi.unstubAllGlobals()
   })
 })

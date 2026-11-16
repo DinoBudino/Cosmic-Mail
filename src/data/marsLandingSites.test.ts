@@ -91,4 +91,11 @@ describe('Mars orbit', () => {
     expect(hasPriorFieldWork(save, 'spirit')).toBe(true)
     expect(hasPriorFieldWork(save, 'opportunity')).toBe(false)
   })
+
+  it('skips the tutorial on Mars once it was done on the Moon', () => {
+    let save = createJourney('Ada', 1000)
+    save = markMissionDiscovered(save, 'surveyor-3', 1100)
+    expect(hasPriorFieldWork(save, 'opportunity')).toBe(true)
+    expect(hasPriorFieldWork(save, 'apollo-11')).toBe(true)
+  })
 })
